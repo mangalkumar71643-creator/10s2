@@ -1,6 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
+import RankingTabIcon from '../components/RankingTabIcon';
 import HomeScreen from '../screens/HomeScreen';
 import RankingScreen from '../screens/RankingScreen';
 import RewardsScreen from '../screens/RewardsScreen';
@@ -31,14 +32,17 @@ export default function BottomTabs() {
           backgroundColor: colors.backgroundAlt,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 64,
+          height: 70,
           paddingBottom: 8,
           paddingTop: 6,
         },
         tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
-        tabBarIcon: ({ color, size }) => (
-          <MaterialCommunityIcons name={TAB_ICONS[route.name as keyof BottomTabParamList]} size={size - 2} color={color} />
-        ),
+        tabBarIcon: ({ color, size, focused }) =>
+          route.name === 'Ranking' ? (
+            <RankingTabIcon focused={focused} />
+          ) : (
+            <MaterialCommunityIcons name={TAB_ICONS[route.name as keyof BottomTabParamList]} size={size - 2} color={color} />
+          ),
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
