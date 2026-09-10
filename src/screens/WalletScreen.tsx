@@ -5,10 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import PrimaryButton from '../components/PrimaryButton';
 import ScreenContainer from '../components/ScreenContainer';
 import { BottomTabParamList, RootStackParamList } from '../navigation/types';
 import { useGameState } from '../state/GameStateContext';
-import { colors, gradients, radius, spacing, typography } from '../theme';
+import { colors, gradients, radius, shadow, spacing, typography } from '../theme';
 
 const CARD_TEXT_COLOR = '#5C3A0E';
 
@@ -28,7 +29,7 @@ export default function WalletScreen() {
           <Pressable onPress={() => rootNavigation.navigate('Help')} style={styles.headerButton}>
             <MaterialCommunityIcons name="headset" size={24} color={colors.gold} />
           </Pressable>
-          <Pressable onPress={() => rootNavigation.navigate('History')} style={styles.headerButton}>
+          <Pressable onPress={() => rootNavigation.navigate('BalanceRecords')} style={styles.headerButton}>
             <MaterialCommunityIcons name="clock-time-four-outline" size={24} color={colors.gold} />
           </Pressable>
         </View>
@@ -37,19 +38,46 @@ export default function WalletScreen() {
       <LinearGradient colors={gradients.goldButton} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balanceCard}>
         <MaterialCommunityIcons
           name="wallet-outline"
-          size={110}
+          size={130}
           color={CARD_TEXT_COLOR}
           style={styles.balanceCardIcon}
         />
-        <Text style={styles.balanceLabel}>My Balance</Text>
-        <Text style={styles.balanceValue}>{coins.toLocaleString('en-IN')} Coins</Text>
+        <View style={styles.balanceLabelRow}>
+          <MaterialCommunityIcons name="circle-multiple" size={16} color={CARD_TEXT_COLOR} />
+          <Text style={styles.balanceLabel}>My Balance</Text>
+        </View>
+        <Text style={styles.balanceValue}>{coins.toLocaleString('en-IN')}</Text>
+        <Text style={styles.balanceUnit}>Virtual Coins</Text>
       </LinearGradient>
+
+      <View style={styles.buttonRow}>
+        <PrimaryButton
+          label="History"
+          variant="crimson"
+          onPress={() => rootNavigation.navigate('BalanceRecords')}
+          style={styles.buttonFlex}
+        />
+        <PrimaryButton
+          label="Earn Coins"
+          variant="gold"
+          onPress={() => navigation.navigate('Home')}
+          style={styles.buttonFlex}
+        />
+      </View>
 
       <View style={styles.tipsBlock}>
         <Text style={styles.tipsTitle}>How to earn coins:</Text>
         <Text style={styles.tipsText}>
-          Play games and complete daily challenges to earn coins. Coins are for in-app fun only and have no cash
-          value.
+          Play games, finish daily missions and keep your streak alive to earn coins — new coins land in your
+          balance the moment you collect them.
+        </Text>
+      </View>
+
+      <View style={styles.tipsBlock}>
+        <Text style={styles.tipsTitle}>About your coins:</Text>
+        <Text style={styles.tipsText}>
+          Coins are for in-app fun only — they have no cash value and can&apos;t be bought, withdrawn or cashed
+          out.
         </Text>
       </View>
     </ScreenContainer>
@@ -68,35 +96,22 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row' },
   headerTitle: { color: colors.gold, fontSize: typography.xl, fontWeight: '800' },
   balanceCard: {
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
     overflow: 'hidden',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
+    ...shadow.glow,
   },
-  balanceCardIcon: { position: 'absolute', right: -10, bottom: -10, opacity: 0.25, transform: [{ rotate: '-8deg' }] },
-  balanceLabel: { color: CARD_TEXT_COLOR, fontSize: typography.lg, fontWeight: '700', marginBottom: spacing.md },
-  balanceValue: { color: CARD_TEXT_COLOR, fontSize: typography.display, fontWeight: '800' },
-  tipsBlock: { marginBottom: spacing.xxl },
+  balanceCardIcon: { position: 'absolute', right: -14, bottom: -14, opacity: 0.22, transform: [{ rotate: '-8deg' }] },
+  balanceLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  balanceLabel: { color: CARD_TEXT_COLOR, fontSize: typography.lg, fontWeight: '700', marginLeft: spacing.xs },
+  balanceValue: { color: CARD_TEXT_COLOR, fontSize: typography.display + 6, fontWeight: '800' },
+  balanceUnit: { color: CARD_TEXT_COLOR, fontSize: typography.sm, fontWeight: '700', opacity: 0.75, marginTop: spacing.xs },
+  buttonRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xxl },
+  buttonFlex: { flex: 1 },
+  tipsBlock: { marginBottom: spacing.xl },
   tipsTitle: { color: colors.textPrimary, fontSize: typography.lg, fontWeight: '700', marginBottom: spacing.sm },
   tipsText: { color: colors.textSecondary, fontSize: typography.sm, lineHeight: 20 },
-  buttonRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg },
-  withdrawButton: {
-    flex: 1,
-    backgroundColor: colors.crimson,
-    borderRadius: radius.md,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  withdrawLabel: { color: colors.textPrimary, fontSize: typography.lg, fontWeight: '700' },
-  depositButtonWrap: { flex: 1 },
-  depositButton: {
-    borderRadius: radius.md,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  depositLabel: { color: CARD_TEXT_COLOR, fontSize: typography.lg, fontWeight: '700' },
 });
