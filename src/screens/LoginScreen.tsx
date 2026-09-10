@@ -122,7 +122,7 @@ export default function LoginScreen() {
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.imageWrap} onLayout={handleImageWrapLayout}>
-            <Image source={require('../../assets/login-screen.png')} style={styles.image} resizeMode="contain" />
+            <Image source={require('../../assets/login-screen.webp')} style={styles.image} resizeMode="contain" />
 
             <GameShineOverlay width={layoutWidth} height={layoutWidth * (IMAGE_HEIGHT / IMAGE_WIDTH)} />
 

@@ -50,7 +50,7 @@ export default function HomeScreen() {
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
   return (
-    <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.png')}>
+    <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.webp')}>
       <View
         style={{
           position: 'absolute',
@@ -134,7 +134,7 @@ export default function HomeScreen() {
         </Pressable>
       </View>
       <Image
-        source={require('../../assets/control-panel.png')}
+        source={require('../../assets/control-panel.webp')}
         style={{
           position: 'absolute',
           top: panelTop,
