@@ -3,11 +3,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Mission } from '../data/models';
-import { colors, radius, spacing, typography } from '../theme';
+import { radius, spacing, typography } from '../theme';
 
 type Props = { mission: Mission; onClaim: () => void };
 
-const GREEN_BUTTON = ['#4FE3A0', '#1E9E63', '#0E6B41'] as const;
+const GREEN_BUTTON = ['#3FBE7A', '#1E9E63', '#146B45'] as const;
+const CARD_BG = '#FFFFFF';
+const TITLE_COLOR = '#2B2320';
+const AMOUNT_COLOR = '#F07B1E';
+const TRACK_COLOR = '#E4E1DD';
+const BADGE_RED = '#E4453A';
+const BADGE_GREEN = '#3FBE7A';
 
 export default function MissionCard({ mission, onClaim }: Props) {
   const ready = mission.progress >= mission.target && !mission.claimed;
@@ -16,8 +22,8 @@ export default function MissionCard({ mission, onClaim }: Props) {
 
   return (
     <View style={styles.card}>
-      <View style={styles.iconWrap}>
-        <MaterialCommunityIcons name={mission.icon} size={22} color={colors.textPrimary} />
+      <View style={[styles.badge, { backgroundColor: mission.claimed ? BADGE_GREEN : BADGE_RED }]}>
+        <MaterialCommunityIcons name={mission.claimed ? 'check' : 'close'} size={24} color="#FFFFFF" />
       </View>
 
       <View style={styles.middle}>
@@ -53,17 +59,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: CARD_BG,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.md,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.crimson,
+  badge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -76,16 +84,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     gap: spacing.sm,
   },
-  title: { flex: 1, color: colors.textPrimary, fontWeight: '700', fontSize: typography.sm },
-  fraction: { color: colors.gold, fontWeight: '800' },
-  reward: { color: colors.gold, fontWeight: '800', fontSize: typography.md, flexShrink: 0 },
+  title: { flex: 1, color: TITLE_COLOR, fontWeight: '700', fontSize: typography.sm },
+  fraction: { color: AMOUNT_COLOR, fontWeight: '800' },
+  reward: { color: AMOUNT_COLOR, fontWeight: '800', fontSize: typography.lg, flexShrink: 0 },
   progressTrack: {
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.surfaceAlt,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: TRACK_COLOR,
     overflow: 'hidden',
   },
-  progressFill: { height: 10, borderRadius: 5, backgroundColor: colors.gold },
+  progressFill: { height: 12, borderRadius: 6, backgroundColor: AMOUNT_COLOR },
   buttonWrap: { marginLeft: spacing.xs },
   button: {
     borderRadius: radius.pill,
@@ -94,7 +102,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonMuted: { backgroundColor: colors.surfaceAlt },
-  buttonText: { color: colors.textPrimary, fontWeight: '800', fontSize: typography.xs },
-  buttonTextMuted: { color: colors.textMuted, fontWeight: '800', fontSize: typography.xs },
+  buttonMuted: { backgroundColor: '#E4E1DD' },
+  buttonText: { color: '#FFFFFF', fontWeight: '800', fontSize: typography.xs },
+  buttonTextMuted: { color: '#9A938D', fontWeight: '800', fontSize: typography.xs },
 });
