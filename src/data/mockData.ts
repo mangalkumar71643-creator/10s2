@@ -186,11 +186,14 @@ export const games: Game[] = [
 ];
 
 export const initialMissions: Mission[] = [
-  { id: 'm-1', title: 'Play 3 Games', icon: 'gamepad-variant', progress: 2, target: 3, reward: 200, claimed: false },
-  { id: 'm-2', title: 'Win 5 Rounds', icon: 'trophy-outline', progress: 3, target: 5, reward: 300, claimed: false },
-  { id: 'm-3', title: 'Play for 15 Minutes', icon: 'clock-outline', progress: 11, target: 15, reward: 150, claimed: false },
-  { id: 'm-4', title: 'Spin the Lucky Wheel', icon: 'ferris-wheel', progress: 1, target: 1, reward: 180, claimed: true },
-  { id: 'm-5', title: 'Share the App', icon: 'share-variant', progress: 1, target: 1, reward: 100, claimed: true },
+  { id: 'm-1', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 300, reward: 6, claimed: false },
+  { id: 'm-2', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 500, reward: 11, claimed: false },
+  { id: 'm-3', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 1000, reward: 20, claimed: false },
+  { id: 'm-4', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 3000, reward: 35, claimed: false },
+  { id: 'm-5', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 5000, reward: 56, claimed: false },
+  { id: 'm-6', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 10000, reward: 78, claimed: false },
+  { id: 'm-7', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 30000, reward: 106, claimed: false },
+  { id: 'm-8', title: 'Play', icon: 'gamepad-variant', progress: 0, target: 50000, reward: 166, claimed: false },
 ];
 
 export const dailyRewardTrack: DailyRewardDay[] = [
