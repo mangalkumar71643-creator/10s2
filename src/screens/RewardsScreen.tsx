@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import { Alert, Platform, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 import DailyRewardTrack from '../components/DailyRewardTrack';
+import MissionCard from '../components/MissionCard';
 import RewardPopup from '../components/RewardPopup';
 import ScreenContainer from '../components/ScreenContainer';
 import { dailyRewardTrack } from '../data/mockData';
@@ -32,7 +33,7 @@ const INVITATION_MILESTONES: { count: number; reward: number }[] = [
 
 export default function RewardsScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
-  const { streak, claimedToday, claimDailyReward } = useGameState();
+  const { streak, claimedToday, claimDailyReward, missions, claimMission } = useGameState();
   const [tab, setTab] = useState<Tab>('daily');
   const [shareInHindi, setShareInHindi] = useState(false);
   const [popup, setPopup] = useState<{ amount: number; title: string } | null>(null);
@@ -43,6 +44,13 @@ export default function RewardsScreen() {
     const amount = dailyRewardTrack[dayIndex].amount;
     claimDailyReward();
     setPopup({ amount, title: `Day ${dailyRewardTrack[dayIndex].day} Reward` });
+  }
+
+  function handleClaimMission(missionId: string) {
+    const mission = missions.find((m) => m.id === missionId);
+    if (!mission || mission.claimed || mission.progress < mission.target) return;
+    claimMission(missionId);
+    setPopup({ amount: mission.reward, title: mission.title });
   }
 
   // No referral backend exists yet, so these totals are genuinely zero
@@ -98,6 +106,11 @@ export default function RewardsScreen() {
               </Text>
             </Pressable>
           </View>
+
+          <Text style={styles.missionSectionTitle}>Daily Mission</Text>
+          {missions.map((mission) => (
+            <MissionCard key={mission.id} mission={mission} onClaim={() => handleClaimMission(mission.id)} />
+          ))}
         </>
       ) : null}
 
@@ -220,6 +233,14 @@ const styles = StyleSheet.create({
   claimDailyButtonDisabled: { backgroundColor: colors.surfaceAlt },
   claimDailyText: { color: colors.background, fontWeight: '800', fontSize: typography.sm, marginLeft: spacing.sm },
   claimDailyTextDisabled: { color: colors.textMuted },
+  missionSectionTitle: {
+    color: colors.textPrimary,
+    fontSize: typography.md,
+    fontWeight: '800',
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.md,
+  },
 
   leaderboardCard: {
     marginHorizontal: spacing.lg,
