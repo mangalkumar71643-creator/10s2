@@ -27,9 +27,12 @@ export default function MissionCard({ mission, onClaim }: Props) {
       </View>
 
       <View style={styles.middle}>
+        <Text style={styles.missionName} numberOfLines={1}>
+          {mission.title}
+        </Text>
         <View style={styles.topRow}>
           <Text style={styles.title}>
-            {mission.title}: <Text style={styles.fraction}>{shown}/{mission.target}</Text>
+            Progress: <Text style={styles.fraction}>{shown}/{mission.target}</Text>
           </Text>
           <Text style={styles.reward}>+{mission.reward}</Text>
         </View>
@@ -84,6 +87,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     gap: spacing.sm,
   },
+  missionName: { color: TITLE_COLOR, fontWeight: '800', fontSize: typography.sm, marginBottom: 2 },
   title: { flex: 1, color: TITLE_COLOR, fontWeight: '700', fontSize: typography.sm },
   fraction: { color: AMOUNT_COLOR, fontWeight: '800' },
   reward: { color: AMOUNT_COLOR, fontWeight: '800', fontSize: typography.lg, flexShrink: 0 },
