@@ -4,7 +4,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { BottomTabParamList, RootStackParamList } from '../navigation/types';
 import { useGameState } from '../state/GameStateContext';
@@ -12,10 +12,26 @@ import { colors, gradients, radius, spacing, typography } from '../theme';
 
 const CARD_TEXT_COLOR = '#5C3A0E';
 
+function notice(title: string, message: string) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+  Alert.alert(title, message);
+}
+
 export default function WalletScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { coins } = useGameState();
+
+  function handleWithdraw() {
+    notice('No cash withdrawals', 'Coins are for in-app fun only — they have no cash value and cannot be withdrawn or exchanged for money.');
+  }
+
+  function handleDeposit() {
+    navigation.navigate('Home');
+  }
 
   return (
     <ScreenContainer contentStyle={styles.content}>
@@ -46,11 +62,30 @@ export default function WalletScreen() {
       </LinearGradient>
 
       <View style={styles.tipsBlock}>
-        <Text style={styles.tipsTitle}>How to earn coins:</Text>
+        <Text style={styles.tipsTitle}>Deposit tips:</Text>
         <Text style={styles.tipsText}>
-          Play games and complete daily challenges to earn coins. Coins are for in-app fun only and have no cash
-          value.
+          Coins are credited instantly when you claim rewards, missions or the daily streak. Contact support if a
+          reward doesn't show up.
         </Text>
+      </View>
+
+      <View style={styles.tipsBlock}>
+        <Text style={styles.tipsTitle}>Withdraw tips:</Text>
+        <Text style={styles.tipsText}>
+          Coins are for in-app entertainment only. They have no cash value and there is no mechanism to withdraw or
+          cash them out.
+        </Text>
+      </View>
+
+      <View style={styles.buttonRow}>
+        <Pressable onPress={handleWithdraw} style={styles.withdrawButton}>
+          <Text style={styles.withdrawLabel}>Withdraw</Text>
+        </Pressable>
+        <Pressable onPress={handleDeposit} style={styles.depositButtonWrap}>
+          <LinearGradient colors={gradients.goldButton} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.depositButton}>
+            <Text style={styles.depositLabel}>Deposit</Text>
+          </LinearGradient>
+        </Pressable>
       </View>
     </ScreenContainer>
   );
