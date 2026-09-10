@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "729186219260",
+    "project_id": "nova-play-d6906",
+    "storage_bucket": "nova-play-d6906.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:729186219260:android:8cb8ef91060cbb59acd379",
+        "android_client_info": {
+          "package_name": "com.anonymous.novaplayhub"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDy854TecFzBoXzRLHFeo21lXNeRL8bXF8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
