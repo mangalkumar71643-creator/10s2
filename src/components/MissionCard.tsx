@@ -39,14 +39,14 @@ export default function MissionCard({ mission, onClaim }: Props) {
       </View>
 
       <Pressable onPress={onClaim} disabled={!ready} style={styles.buttonWrap}>
-        {ready ? (
-          <LinearGradient colors={GREEN_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.button}>
-            <Text style={styles.buttonText}>Claim</Text>
-          </LinearGradient>
-        ) : (
+        {mission.claimed ? (
           <View style={[styles.button, styles.buttonMuted]}>
-            <Text style={styles.buttonTextMuted}>{mission.claimed ? 'Claimed' : 'In progress'}</Text>
+            <Text style={styles.buttonTextMuted}>Claimed</Text>
           </View>
+        ) : (
+          <LinearGradient colors={GREEN_BUTTON} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.button}>
+            <Text style={styles.buttonText}>{ready ? 'Claim' : 'Deposit'}</Text>
+          </LinearGradient>
         )}
       </Pressable>
     </View>
