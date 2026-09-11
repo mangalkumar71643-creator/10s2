@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const db = require("../db");
+const store = require("../store");
 const { generateCode, deliverOtp, OTP_TTL_MS, MAX_ATTEMPTS } = require("../utils/otp");
 const { requireAuth } = require("../middleware/auth");
 const { JWT_SECRET } = require("../config");
@@ -36,17 +36,12 @@ router.post("/register", (req, res) => {
     return res.status(400).json({ error: "Password must be at least 6 characters" });
   }
 
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-  if (existing) {
+  if (store.findUserByEmail(email)) {
     return res.status(409).json({ error: "An account with this email already exists" });
   }
 
   const passwordHash = bcrypt.hashSync(password, 10);
-  const info = db
-    .prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)")
-    .run(name || null, email, passwordHash);
-
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid);
+  const user = store.createUserWithPassword({ name, email, passwordHash });
   return res.status(201).json({ token: signToken(user), user: publicUser(user) });
 });
 
@@ -56,7 +51,7 @@ router.post("/login", (req, res) => {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+  const user = store.findUserByEmail(email);
   if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: "Invalid email or password" });
   }
@@ -74,9 +69,7 @@ router.post("/otp/request", (req, res) => {
 
   const code = generateCode();
   const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
-  db.prepare(
-    "INSERT INTO otp_codes (phone, code, expires_at) VALUES (?, ?, ?)"
-  ).run(phone, code, expiresAt);
+  store.insertOtp({ phone, code, expiresAt });
 
   const delivery = deliverOtp(phone, code);
   return res.json({
@@ -93,11 +86,7 @@ router.post("/otp/verify", (req, res) => {
     return res.status(400).json({ error: "Phone and code are required" });
   }
 
-  const otp = db
-    .prepare(
-      "SELECT * FROM otp_codes WHERE phone = ? AND consumed = 0 ORDER BY id DESC LIMIT 1"
-    )
-    .get(phone);
+  const otp = store.findLatestUnconsumedOtp(phone);
 
   if (!otp) {
     return res.status(400).json({ error: "No OTP was requested for this number" });
@@ -110,21 +99,17 @@ router.post("/otp/verify", (req, res) => {
   }
 
   if (otp.code !== code) {
-    db.prepare("UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?").run(otp.id);
+    store.incrementOtpAttempts(otp.id);
     return res.status(400).json({ error: "Incorrect OTP" });
   }
 
-  db.prepare("UPDATE otp_codes SET consumed = 1 WHERE id = ?").run(otp.id);
+  store.consumeOtp(otp.id);
 
-  let user = db.prepare("SELECT * FROM users WHERE phone = ?").get(phone);
+  let user = store.findUserByPhone(phone);
   if (!user) {
-    const info = db
-      .prepare("INSERT INTO users (name, phone, phone_verified) VALUES (?, ?, 1)")
-      .run(name || null, phone);
-    user = db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid);
+    user = store.createUserWithPhone({ name, phone });
   } else if (!user.phone_verified) {
-    db.prepare("UPDATE users SET phone_verified = 1 WHERE id = ?").run(user.id);
-    user = db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
+    user = store.markPhoneVerified(user.id);
   }
 
   return res.json({ token: signToken(user), user: publicUser(user) });
@@ -133,7 +118,7 @@ router.post("/otp/verify", (req, res) => {
 // ---- Current user ----
 
 router.get("/me", requireAuth, (req, res) => {
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.sub);
+  const user = store.findUserById(req.user.sub);
   if (!user) {
     return res.status(404).json({ error: "User not found" });
   }
