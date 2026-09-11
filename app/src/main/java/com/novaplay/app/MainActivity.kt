@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -47,6 +48,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.novaplay.app.auth.AuthViewModel
+import com.novaplay.app.auth.OtpStage
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.Alignment
@@ -210,11 +215,26 @@ private data class StarSpec(
 )
 
 @Composable
-private fun LoginCard() {
+private fun LoginCard(viewModel: AuthViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
     var isPhoneLogin by remember { mutableStateOf(true) }
-    var identifier by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var otpCode by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+
+    fun selectPhoneTab() {
+        isPhoneLogin = true
+        otpCode = ""
+        viewModel.resetOtpFlow()
+    }
+
+    fun selectEmailTab() {
+        isPhoneLogin = false
+        viewModel.resetOtpFlow()
+    }
 
     Column(
         modifier = Modifier
@@ -228,6 +248,41 @@ private fun LoginCard() {
             )
             .padding(18.dp)
     ) {
+        val loggedInUser = uiState.loggedInUser
+        if (loggedInUser != null) {
+            Text(
+                "You're logged in",
+                color = NovaGold,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                loggedInUser.name ?: loggedInUser.email ?: loggedInUser.phone ?: "Player",
+                color = Color.White,
+                fontSize = 14.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .border(1.dp, NovaGoldDark, RoundedCornerShape(14.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        phone = ""; email = ""; password = ""; otpCode = ""
+                        viewModel.logout()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Log Out", color = NovaGold, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            }
+            return@Column
+        }
+
         // Tabs
         Row(
             modifier = Modifier
@@ -241,84 +296,131 @@ private fun LoginCard() {
                 icon = Icons.Filled.Phone,
                 selected = isPhoneLogin,
                 modifier = Modifier.weight(1f)
-            ) { isPhoneLogin = true }
+            ) { selectPhoneTab() }
             TabButton(
                 text = "Email Login",
                 icon = Icons.Filled.Email,
                 selected = !isPhoneLogin,
                 modifier = Modifier.weight(1f)
-            ) { isPhoneLogin = false }
+            ) { selectEmailTab() }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        OutlinedTextField(
-            value = identifier,
-            onValueChange = { identifier = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    if (isPhoneLogin) "Enter Mobile Number" else "Enter Email",
-                    color = Color(0xFF8A7A6A)
-                )
-            },
-            leadingIcon = {
-                if (isPhoneLogin) {
+        if (isPhoneLogin) {
+            val codeStage = uiState.otpStage == OtpStage.ENTER_CODE
+
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { if (it.length <= 10 && it.all(Char::isDigit)) phone = it },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !codeStage,
+                placeholder = { Text("Enter Mobile Number", color = Color(0xFF8A7A6A)) },
+                leadingIcon = {
                     Text("+91", color = NovaGold, fontSize = 14.sp, modifier = Modifier.padding(start = 8.dp))
-                } else {
-                    Icon(Icons.Filled.Email, contentDescription = null, tint = NovaGold)
-                }
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = if (isPhoneLogin) KeyboardType.Phone else KeyboardType.Email
-            ),
-            shape = RoundedCornerShape(14.dp),
-            colors = novaFieldColors()
-        )
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                shape = RoundedCornerShape(14.dp),
+                colors = novaFieldColors()
+            )
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Enter Password", color = Color(0xFF8A7A6A)) },
-            leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = NovaGold) },
-            trailingIcon = {
-                Icon(
-                    imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = null,
-                    tint = Color(0xFF8A7A6A),
+            if (codeStage) {
+                Spacer(modifier = Modifier.height(14.dp))
+                OutlinedTextField(
+                    value = otpCode,
+                    onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) otpCode = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Enter 6-digit OTP", color = Color(0xFF8A7A6A)) },
+                    leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = NovaGold) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = novaFieldColors()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Change number / Resend OTP",
+                    color = NovaGold,
+                    fontSize = 12.sp,
                     modifier = Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
-                    ) { passwordVisible = !passwordVisible }
+                    ) { otpCode = ""; viewModel.resetOtpFlow() }
                 )
-            },
-            singleLine = true,
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            shape = RoundedCornerShape(14.dp),
-            colors = novaFieldColors()
-        )
+            }
+        } else {
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Enter Email", color = Color(0xFF8A7A6A)) },
+                leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null, tint = NovaGold) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                shape = RoundedCornerShape(14.dp),
+                colors = novaFieldColors()
+            )
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-        Text(
-            "Forgot Password?",
-            color = NovaGold,
-            fontSize = 13.sp,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { }
-                .padding(vertical = 6.dp),
-            textAlign = TextAlign.End
-        )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Enter Password", color = Color(0xFF8A7A6A)) },
+                leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = NovaGold) },
+                trailingIcon = {
+                    Icon(
+                        imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                        contentDescription = null,
+                        tint = Color(0xFF8A7A6A),
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { passwordVisible = !passwordVisible }
+                    )
+                },
+                singleLine = true,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                shape = RoundedCornerShape(14.dp),
+                colors = novaFieldColors()
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                "Forgot Password?",
+                color = NovaGold,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { }
+                    .padding(vertical = 6.dp),
+                textAlign = TextAlign.End
+            )
+        }
+
+        val message = uiState.errorMessage ?: uiState.infoMessage
+        if (message != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                message,
+                color = if (uiState.errorMessage != null) NovaRedBright else NovaGold,
+                fontSize = 12.sp
+            )
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
+
+        val buttonLabel = when {
+            !isPhoneLogin -> "LOGIN"
+            uiState.otpStage == OtpStage.ENTER_CODE -> "VERIFY OTP"
+            else -> "SEND OTP"
+        }
 
         Box(
             modifier = Modifier
@@ -329,16 +431,31 @@ private fun LoginCard() {
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
-                ) { },
+                ) {
+                    if (uiState.isLoading) return@clickable
+                    if (isPhoneLogin) {
+                        if (uiState.otpStage == OtpStage.ENTER_CODE) {
+                            viewModel.verifyPhoneOtp(phone, otpCode)
+                        } else {
+                            viewModel.requestPhoneOtp(phone)
+                        }
+                    } else {
+                        viewModel.loginWithEmail(email, password)
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                "LOGIN",
-                color = Color.White,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp
-            )
+            if (uiState.isLoading) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            } else {
+                Text(
+                    buttonLabel,
+                    color = Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.5.sp
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -366,7 +483,7 @@ private fun LoginCard() {
             SocialOption(label = "Facebook") {
                 Text("f", color = Color(0xFF1877F2), fontWeight = FontWeight.Bold, fontSize = 22.sp)
             }
-            SocialOption(label = "OTP") {
+            SocialOption(label = "OTP", onClick = { selectPhoneTab() }) {
                 Icon(Icons.Filled.Phone, contentDescription = null, tint = NovaRedBright, modifier = Modifier.size(20.dp))
             }
         }
@@ -440,7 +557,7 @@ private fun TabButton(
 }
 
 @Composable
-private fun SocialOption(label: String, content: @Composable () -> Unit) {
+private fun SocialOption(label: String, onClick: () -> Unit = {}, content: @Composable () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier
@@ -451,7 +568,7 @@ private fun SocialOption(label: String, content: @Composable () -> Unit) {
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
-                ) { },
+                ) { onClick() },
             contentAlignment = Alignment.Center
         ) {
             content()
