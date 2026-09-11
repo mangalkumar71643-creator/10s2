@@ -76,8 +76,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            NovaPlayLoginScreen()
+            NovaPlayApp()
         }
+    }
+}
+
+@Composable
+fun NovaPlayApp(authViewModel: AuthViewModel = viewModel()) {
+    val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
+
+    if (uiState.loggedInUser != null) {
+        HomeScreen()
+    } else {
+        NovaPlayLoginScreen(authViewModel)
     }
 }
 
@@ -89,7 +100,7 @@ private val CardBg = Color(0xFF120A0A)
 private val FieldBg = Color(0xFF1A0F0F)
 
 @Composable
-fun NovaPlayLoginScreen() {
+fun NovaPlayLoginScreen(authViewModel: AuthViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -109,7 +120,7 @@ fun NovaPlayLoginScreen() {
             Spacer(modifier = Modifier.height(28.dp))
             HeroBanner()
             Spacer(modifier = Modifier.height(18.dp))
-            LoginCard()
+            LoginCard(authViewModel)
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
@@ -215,7 +226,7 @@ private data class StarSpec(
 )
 
 @Composable
-private fun LoginCard(viewModel: AuthViewModel = viewModel()) {
+private fun LoginCard(viewModel: AuthViewModel) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     var isPhoneLogin by remember { mutableStateOf(true) }
@@ -248,41 +259,6 @@ private fun LoginCard(viewModel: AuthViewModel = viewModel()) {
             )
             .padding(18.dp)
     ) {
-        val loggedInUser = uiState.loggedInUser
-        if (loggedInUser != null) {
-            Text(
-                "You're logged in",
-                color = NovaGold,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                loggedInUser.name ?: loggedInUser.email ?: loggedInUser.phone ?: "Player",
-                color = Color.White,
-                fontSize = 14.sp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, NovaGoldDark, RoundedCornerShape(14.dp))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        phone = ""; email = ""; password = ""; otpCode = ""
-                        viewModel.logout()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Log Out", color = NovaGold, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            }
-            return@Column
-        }
-
         // Tabs
         Row(
             modifier = Modifier
