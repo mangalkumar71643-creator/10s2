@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -36,7 +35,6 @@ private val PillBg = Color(0xFF0D0808)
 private val CoinGoldLight = Color(0xFFFFE082)
 private val CoinGoldDark = Color(0xFFB8860B)
 private val WalletRedBright = Color(0xFFD4232C)
-private val WalletRedDark = Color(0xFF8B0000)
 
 @Composable
 fun HomeScreen() {
@@ -97,19 +95,10 @@ private fun WalletBar(modifier: Modifier = Modifier, balance: Int = 0) {
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(Brush.verticalGradient(listOf(WalletRedBright, WalletRedDark))),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Filled.AccountBalanceWallet,
-                contentDescription = "Wallet",
-                tint = Color.White,
-                modifier = Modifier.size(20.dp)
-            )
-        }
+        Image(
+            painter = painterResource(id = R.drawable.wallet_button),
+            contentDescription = "Wallet",
+            modifier = Modifier.height(46.dp)
+        )
     }
 }
