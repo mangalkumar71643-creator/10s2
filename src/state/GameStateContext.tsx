@@ -150,12 +150,12 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     (missionId: string) => {
       setMissions((prev) => {
         const mission = prev.find((m) => m.id === missionId);
-        if (!mission || mission.claimed || mission.progress < mission.target) return prev;
+        if (!mission || mission.claimed || coins < mission.target) return prev;
         addTransaction(mission.title, mission.reward, mission.icon);
         return prev.map((m) => (m.id === missionId ? { ...m, claimed: true } : m));
       });
     },
-    [addTransaction]
+    [addTransaction, coins]
   );
 
   const claimedToday = useMemo(() => {

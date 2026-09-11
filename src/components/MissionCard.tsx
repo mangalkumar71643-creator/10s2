@@ -16,20 +16,24 @@ const BADGE_RED = '#E4453A';
 const BADGE_GREEN = '#3FBE7A';
 
 export default function MissionCard({ mission, onClaim }: Props) {
-  const ready = mission.progress >= mission.target && !mission.claimed;
+  const reached = mission.progress >= mission.target;
+  const ready = reached && !mission.claimed;
   const shown = Math.min(mission.progress, mission.target);
   const progressFraction = Math.min(1, mission.progress / mission.target);
 
   return (
     <View style={styles.card}>
-      <View style={[styles.badge, { backgroundColor: mission.claimed ? BADGE_GREEN : BADGE_RED }]}>
-        <MaterialCommunityIcons name={mission.claimed ? 'check' : 'close'} size={24} color="#FFFFFF" />
+      <View style={[styles.badge, { backgroundColor: reached ? BADGE_GREEN : BADGE_RED }]}>
+        <MaterialCommunityIcons name={reached ? 'check' : 'close'} size={24} color="#FFFFFF" />
       </View>
 
       <View style={styles.middle}>
         <View style={styles.topRow}>
           <Text style={styles.title}>
-            {mission.title}: <Text style={styles.fraction}>{shown}/{mission.target}</Text>
+            {mission.title}:{' '}
+            <Text style={styles.fraction}>
+              {shown.toLocaleString('en-US')}/{mission.target.toLocaleString('en-US')}
+            </Text>
           </Text>
           <Text style={styles.reward}>+{mission.reward}</Text>
         </View>

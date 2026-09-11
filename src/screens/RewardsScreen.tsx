@@ -33,7 +33,7 @@ const INVITATION_MILESTONES: { count: number; reward: number }[] = [
 
 export default function RewardsScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
-  const { streak, claimedToday, claimDailyReward, missions, claimMission } = useGameState();
+  const { coins, streak, claimedToday, claimDailyReward, missions, claimMission } = useGameState();
   const [tab, setTab] = useState<Tab>('daily');
   const [shareInHindi, setShareInHindi] = useState(false);
   const [popup, setPopup] = useState<{ amount: number; title: string } | null>(null);
@@ -48,7 +48,7 @@ export default function RewardsScreen() {
 
   function handleClaimMission(missionId: string) {
     const mission = missions.find((m) => m.id === missionId);
-    if (!mission || mission.claimed || mission.progress < mission.target) return;
+    if (!mission || mission.claimed || coins < mission.target) return;
     claimMission(missionId);
     setPopup({ amount: mission.reward, title: mission.title });
   }
@@ -109,7 +109,11 @@ export default function RewardsScreen() {
 
           <Text style={styles.missionSectionTitle}>Daily Mission</Text>
           {missions.map((mission) => (
-            <MissionCard key={mission.id} mission={mission} onClaim={() => handleClaimMission(mission.id)} />
+            <MissionCard
+              key={mission.id}
+              mission={{ ...mission, progress: coins }}
+              onClaim={() => handleClaimMission(mission.id)}
+            />
           ))}
         </>
       ) : null}
