@@ -1,0 +1,7 @@
+<resources>
+    <color name="black">#000000</color>
+    <color name="nova_gold">#F5C542</color>
+    <color name="nova_gold_dark">#B8860B</color>
+    <color name="nova_red">#8B0000</color>
+    <color name="nova_red_bright">#D4232C</color>
+</resources>
