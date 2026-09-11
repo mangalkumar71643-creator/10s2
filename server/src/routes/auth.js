@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const db = require("../db");
 const { generateCode, deliverOtp, OTP_TTL_MS, MAX_ATTEMPTS } = require("../utils/otp");
 const { requireAuth } = require("../middleware/auth");
+const { JWT_SECRET } = require("../config");
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[6-9]\d{9}$/; // 10-digit Indian mobile number, no +91 prefix
 
 function signToken(user) {
-  return jwt.sign({ sub: user.id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+  return jwt.sign({ sub: user.id }, JWT_SECRET, { expiresIn: "30d" });
 }
 
 function publicUser(user) {

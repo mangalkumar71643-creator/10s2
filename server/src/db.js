@@ -1,7 +1,14 @@
 const path = require("path");
 const Database = require("better-sqlite3");
 
-const db = new Database(path.join(__dirname, "..", "novaplay.db"));
+// Vercel's serverless functions can only write under /tmp, and that storage
+// isn't durable across cold starts - fine for testing, not for real data.
+// Set up a proper hosted database before this needs to persist for real.
+const dbPath = process.env.VERCEL
+  ? "/tmp/novaplay.db"
+  : path.join(__dirname, "..", "novaplay.db");
+
+const db = new Database(dbPath);
 db.pragma("journal_mode = WAL");
 
 db.exec(`
