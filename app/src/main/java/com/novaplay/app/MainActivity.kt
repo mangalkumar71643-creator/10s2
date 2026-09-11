@@ -136,15 +136,15 @@ private fun HeroBanner() {
             contentScale = ContentScale.Fit
         )
 
-        // Diagonal shine band that swipes left-to-right over the artwork on a loop.
+        // Faint diagonal shine band that swipes left-to-right over the artwork on a loop.
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val bandWidth = size.width * 0.28f
+            val bandWidth = size.width * 0.22f
             val skew = size.height * 0.35f
             val centerX = size.width * sweep
             val brush = Brush.linearGradient(
                 colors = listOf(
                     Color.Transparent,
-                    Color.White.copy(alpha = 0.45f),
+                    NovaGold.copy(alpha = 0.16f),
                     Color.Transparent
                 ),
                 start = Offset(centerX - bandWidth, 0f),
