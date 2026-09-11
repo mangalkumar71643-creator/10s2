@@ -114,9 +114,11 @@ fun NovaPlayLoginScreen() {
 @Composable
 private fun HeroBanner() {
     val transition = rememberInfiniteTransition(label = "heroSweep")
+    // Goes a clean 0 -> 1 every cycle: no off-screen "dead time", so the band
+    // always visibly enters from the left and fully exits on the right before restarting.
     val sweep by transition.animateFloat(
-        initialValue = -0.5f,
-        targetValue = 1.5f,
+        initialValue = 0f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
             animation = tween(durationMillis = 2600, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
@@ -139,16 +141,19 @@ private fun HeroBanner() {
         // Faint diagonal shine band that swipes left-to-right over the artwork on a loop.
         Canvas(modifier = Modifier.fillMaxSize()) {
             val bandWidth = size.width * 0.22f
-            val skew = size.height * 0.35f
-            val centerX = size.width * sweep
+            // Modest horizontal tilt relative to bandWidth, not the full image height,
+            // so the band reads as a diagonal stripe instead of a near-horizontal one.
+            val tilt = bandWidth * 0.5f
+            // Travels from fully off-screen left to fully off-screen right.
+            val centerX = -bandWidth + sweep * (size.width + 2 * bandWidth)
             val brush = Brush.linearGradient(
                 colors = listOf(
                     Color.Transparent,
                     NovaGold.copy(alpha = 0.16f),
                     Color.Transparent
                 ),
-                start = Offset(centerX - bandWidth, 0f),
-                end = Offset(centerX + bandWidth - skew, size.height)
+                start = Offset(centerX - bandWidth - tilt, 0f),
+                end = Offset(centerX + bandWidth, size.height)
             )
             drawRect(brush = brush, blendMode = BlendMode.Plus)
         }
