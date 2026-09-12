@@ -3,7 +3,7 @@ import { ApiError } from "../middleware/errorHandler";
 import { comparePassword, hashPassword } from "../utils/password";
 import { signToken } from "../utils/jwt";
 import { isAtLeast18 } from "../utils/age";
-import { phoneVerifier } from "./phoneAuthService";
+import { consumeOtp, isRecentlyVerified, requestOtp as requestOtpCode, verifyOtp as verifyOtpCode } from "./otpService";
 
 export interface RegisterInput {
   email: string;
@@ -59,32 +59,59 @@ export function sanitizeUser<T extends { passwordHash: string | null }>(user: T)
   return rest;
 }
 
-export interface PhoneVerifyInput {
-  idToken: string;
-  firstName?: string;
-  lastName?: string;
-  dateOfBirth?: string;
-  country?: string;
+/** India-only for now — mirrors the mobile app's 10-digit local input. */
+function toE164(phone: string): string {
+  return phone.startsWith("+") ? phone : `+91${phone}`;
 }
 
-/**
- * Verifies the phone via `phoneVerifier` (mock or real Firebase Admin),
- * then either logs in the matching existing user or creates a new one.
- * New users must supply profile fields so age (18+) can be enforced
- * server-side — the mobile app collects these in a one-time "complete
- * your profile" step the first time a phone number is seen.
- */
-export async function verifyPhoneAndAuth(input: PhoneVerifyInput) {
-  const phone = await phoneVerifier.verifyIdToken(input.idToken);
+/** Step 1: generates and sends (or, in mock mode, returns) an OTP for a
+ * phone number. Same endpoint for both login and registration — which
+ * one it turns into is decided in `verifyOtpAndAuth` once the code is
+ * confirmed. */
+export async function sendPhoneOtp(phone: string) {
+  return requestOtpCode(toE164(phone));
+}
+
+/** Step 2: verifies the OTP. If the phone belongs to an existing user,
+ * logs them in directly. If it's brand new, leaves the phone in a
+ * "verified" state and asks the caller to complete registration —
+ * see `completePhoneRegistration`. */
+export async function verifyOtpAndAuth(phoneInput: string, code: string) {
+  const phone = toE164(phoneInput);
+  await verifyOtpCode(phone, code);
+
+  const existing = await prisma.user.findUnique({ where: { phone } });
+  if (!existing) {
+    throw new ApiError(428, "profile_required");
+  }
+
+  await consumeOtp(phone);
+  const token = signToken({ userId: existing.id, role: existing.role });
+  return { user: sanitizeUser(existing), token, isNewUser: false };
+}
+
+export interface CompleteProfileInput {
+  phone: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  country: string;
+}
+
+/** Step 3 (new users only): creates the account once the phone has been
+ * verified recently enough (see otpService.isRecentlyVerified) — the
+ * mobile app doesn't need to re-collect the OTP code for this step. */
+export async function completePhoneRegistration(input: CompleteProfileInput) {
+  const phone = toE164(input.phone);
+  if (!(await isRecentlyVerified(phone))) {
+    throw new ApiError(401, "Phone verification expired. Please verify your number again.");
+  }
 
   const existing = await prisma.user.findUnique({ where: { phone } });
   if (existing) {
+    await consumeOtp(phone);
     const token = signToken({ userId: existing.id, role: existing.role });
     return { user: sanitizeUser(existing), token, isNewUser: false };
-  }
-
-  if (!input.firstName || !input.lastName || !input.dateOfBirth || !input.country) {
-    throw new ApiError(428, "profile_required");
   }
 
   const dob = new Date(input.dateOfBirth);
@@ -106,6 +133,7 @@ export async function verifyPhoneAndAuth(input: PhoneVerifyInput) {
     },
   });
 
+  await consumeOtp(phone);
   const token = signToken({ userId: user.id, role: user.role });
   return { user: sanitizeUser(user), token, isNewUser: true };
 }

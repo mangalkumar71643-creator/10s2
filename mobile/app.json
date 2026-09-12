@@ -17,14 +17,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.novaplayhub",
-      "googleServicesFile": "./google-services.json"
+      "package": "com.anonymous.novaplayhub"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "@react-native-firebase/app"
-    ]
+    }
   }
 }

@@ -15,7 +15,7 @@ export interface BackendUser {
   role: 'USER' | 'ADMIN';
 }
 
-export interface PhoneVerifyResult {
+export interface AuthResult {
   user: BackendUser;
   token: string;
   isNewUser: boolean;
@@ -25,14 +25,34 @@ export function fetchBackendMe() {
   return apiFetch<BackendUser>('/auth/me');
 }
 
-export function phoneVerify(input: {
-  idToken: string;
-  firstName?: string;
-  lastName?: string;
-  dateOfBirth?: string;
-  country?: string;
+export interface OtpRequestResult {
+  /** Only present when the backend's SMS_PROVIDER_MODE=mock — shows the
+   * code on-screen for local testing since no real SMS is sent. */
+  devCode: string | null;
+}
+
+export function requestPhoneOtp(phone: string) {
+  return apiFetch<OtpRequestResult>('/auth/otp/request', {
+    method: 'POST',
+    body: JSON.stringify({ phone }),
+  });
+}
+
+export function verifyPhoneOtp(phone: string, code: string) {
+  return apiFetch<AuthResult>('/auth/otp/verify', {
+    method: 'POST',
+    body: JSON.stringify({ phone, code }),
+  });
+}
+
+export function completePhoneProfile(input: {
+  phone: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  country: string;
 }) {
-  return apiFetch<PhoneVerifyResult>('/auth/phone/verify', {
+  return apiFetch<AuthResult>('/auth/otp/complete-profile', {
     method: 'POST',
     body: JSON.stringify(input),
   });

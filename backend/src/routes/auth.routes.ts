@@ -1,7 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
-import { loginUser, registerUser, verifyPhoneAndAuth } from "../services/authService";
+import {
+  completePhoneRegistration,
+  loginUser,
+  registerUser,
+  sendPhoneOtp,
+  verifyOtpAndAuth,
+} from "../services/authService";
 import { requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { sanitizeUser } from "../services/authService";
@@ -40,20 +46,25 @@ router.post(
   })
 );
 
-const phoneVerifySchema = z.object({
-  idToken: z.string().min(1),
-  firstName: z.string().min(1).optional(),
-  lastName: z.string().min(1).optional(),
-  dateOfBirth: z.string().optional(),
-  country: z.string().min(2).optional(),
-});
+const otpRequestSchema = z.object({ phone: z.string().min(10).max(20) });
 
 router.post(
-  "/phone/verify",
+  "/otp/request",
   asyncHandler(async (req, res) => {
-    const input = phoneVerifySchema.parse(req.body);
+    const { phone } = otpRequestSchema.parse(req.body);
+    const result = await sendPhoneOtp(phone);
+    res.json(result);
+  })
+);
+
+const otpVerifySchema = z.object({ phone: z.string().min(10).max(20), code: z.string().length(6) });
+
+router.post(
+  "/otp/verify",
+  asyncHandler(async (req, res) => {
+    const { phone, code } = otpVerifySchema.parse(req.body);
     try {
-      const result = await verifyPhoneAndAuth(input);
+      const result = await verifyOtpAndAuth(phone, code);
       res.json(result);
     } catch (err) {
       if (err instanceof ApiError && err.message === "profile_required") {
@@ -61,6 +72,23 @@ router.post(
       }
       throw err;
     }
+  })
+);
+
+const completeProfileSchema = z.object({
+  phone: z.string().min(10).max(20),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  dateOfBirth: z.string(),
+  country: z.string().min(2),
+});
+
+router.post(
+  "/otp/complete-profile",
+  asyncHandler(async (req, res) => {
+    const input = completeProfileSchema.parse(req.body);
+    const result = await completePhoneRegistration(input);
+    res.json(result);
   })
 );
 

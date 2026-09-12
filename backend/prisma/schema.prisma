@@ -7,6 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// A one-time SMS login code for a phone number. Not linked to User by FK
+// since a brand-new phone number won't have a User row yet — request/
+// verify/complete-profile all key off the raw phone string instead.
+model PhoneOtp {
+  id         String    @id @default(uuid())
+  phone      String
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([phone])
+}
+
 enum Role {
   USER
   ADMIN

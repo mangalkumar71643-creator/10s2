@@ -20,9 +20,9 @@ machine's LAN IP for a physical device or Android emulator, not `localhost`).
 
 ## What's included
 
-- **Login/Register** — phone number + OTP (Firebase Phone Auth client-side; the backend verifies
-  the token server-side — see "Auth" below). New numbers go through `CompleteProfileScreen` to
-  collect name/DOB/country, enforcing the 18+ requirement server-side before an account exists.
+- **Login/Register** — phone number + OTP, entirely backend-owned (no Firebase — see "Auth"
+  below). New numbers go through `CompleteProfileScreen` to collect name/DOB/country, enforcing
+  the 18+ requirement server-side before an account exists.
 - **Home** — hero banner, quick filters, game categories, featured carousel, filtered game grid.
 - **Wallet** — real balance from the backend, deposit/withdraw (sandbox payment provider by
   default), transaction history.
@@ -40,13 +40,14 @@ machine's LAN IP for a physical device or Android emulator, not `localhost`).
   button.
 - **Ranking**, **VIP**, **Profile**, **Help Center**, **Notifications**, **Game Category browser**.
 
-## Auth: phone number + OTP
+## Auth: phone number + OTP (no Firebase)
 
-`src/state/AuthContext.tsx` uses Firebase Phone Auth client-side to send/verify the SMS code, then
-calls the backend's `/auth/phone/verify` with either a real Firebase ID token (once
-`PHONE_AUTH_MODE=live` and Firebase Admin is configured on the backend) or, in local dev
-(`PHONE_AUTH_MODE=mock`, the default), the phone number itself. The backend is what actually
-creates the account, issues the session JWT, and is the only thing that can create a wallet.
+`src/state/AuthContext.tsx` calls the backend directly — no Firebase SDK, no ID tokens. The
+backend generates the 6-digit code, hashes and stores it, and sends it via
+`backend/src/services/smsService.ts` (mock in dev — shows the code on-screen since no real SMS is
+sent; **Fast2SMS** in live mode, chosen over Firebase because it accepts UPI instead of requiring
+an international card for Firebase's Blaze plan). The backend is what actually creates the
+account, issues the session JWT, and is the only thing that can create a wallet.
 
 ## Project structure
 

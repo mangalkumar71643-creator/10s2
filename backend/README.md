@@ -20,7 +20,7 @@ password immediately in a real environment.
 | Area | Routes |
 |---|---|
 | Auth (email) | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
-| Auth (phone) | `POST /auth/phone/verify` — used by the mobile app; see below |
+| Auth (phone/OTP) | `POST /auth/otp/request`, `POST /auth/otp/verify`, `POST /auth/otp/complete-profile` — see below |
 | KYC | `POST /kyc/submit`, `GET /kyc/status` |
 | Wallet | `GET /wallet`, `POST /wallet/deposit`, `POST /wallet/withdraw`, `GET /wallet/transactions` |
 | Sports | `GET /sports`, `GET /sports/:sportId/events`, `GET /sports/events/:eventId` |
@@ -31,19 +31,29 @@ password immediately in a real environment.
 | Admin (role=ADMIN) | `/admin/sports`, `/admin/events`, `/admin/markets`, `/admin/selections/:id/odds`, `/admin/markets/:id/settle`, `/admin/users`, `/admin/kyc/:userId`, `/admin/bets`, `/admin/reports/summary` |
 
 All authenticated routes take `Authorization: Bearer <token>` from
-`/auth/login`, `/auth/register` or `/auth/phone/verify`.
+`/auth/login`, `/auth/register` or `/auth/otp/verify` /
+`/auth/otp/complete-profile`.
 
-### Phone auth (`POST /auth/phone/verify`)
+### Phone auth via OTP (no Firebase)
 
-Body: `{ idToken, firstName?, lastName?, dateOfBirth?, country? }`. In
-`PHONE_AUTH_MODE=mock` (default), `idToken` is just the E.164 phone number —
-nothing is actually verified, so this must never be used with real users.
-In `PHONE_AUTH_MODE=live` it's a real Firebase ID token, checked
-server-side (once you implement `LiveFirebasePhoneVerifier` in
-`src/services/phoneAuthService.ts` with `firebase-admin`). A brand-new
-phone number without the optional profile fields gets `428
-{"error":"profile_required"}` — resend with those fields to create the
-account (18+ enforced here too).
+The backend owns OTP generation and verification end to end — no
+Firebase, no ID tokens. Three steps:
+
+1. `POST /auth/otp/request { phone }` — generates a 6-digit code, stores
+   its hash (5 min expiry), and sends it via `src/services/smsService.ts`.
+   In `SMS_PROVIDER_MODE=mock` (default) no real SMS is sent; the response
+   includes `{ devCode }` so the mobile app can display it for testing —
+   never ship that mode to real users. `SMS_PROVIDER_MODE=live` sends a
+   real SMS via **Fast2SMS** (`FAST2SMS_API_KEY` — an Indian gateway that
+   accepts UPI, unlike Firebase's Blaze plan which needs an international
+   card).
+2. `POST /auth/otp/verify { phone, code }` — checks the code (max 5
+   attempts, then a new code is required). An existing phone number logs
+   straight in. A brand-new one gets `428 {"error":"profile_required"}`
+   and stays in a "verified" state for 10 minutes.
+3. `POST /auth/otp/complete-profile { phone, firstName, lastName, dateOfBirth, country }`
+   — only for new numbers, only within that 10-minute window (no need to
+   re-enter the code). Creates the account, enforcing 18+ server-side.
 
 ### Games (`POST /games/:gameKey/play`)
 
@@ -80,15 +90,16 @@ the Express app from `src/app.ts` (unchanged from local dev — only
 5. Point the mobile app's `API_BASE_URL` (`mobile/src/api/client.ts`) at
    the deployment's URL instead of `localhost`.
 
-## KYC, payments & phone auth are mocked
+## KYC, payments & SMS are mocked
 
 `src/services/kycService.ts`, `src/services/paymentService.ts` and
-`src/services/phoneAuthService.ts` each export an interface plus a
-`Mock*`/dev implementation used by default
-(`KYC_PROVIDER_MODE`/`PAYMENT_PROVIDER_MODE`/`PHONE_AUTH_MODE=mock`). No
-real money, real identity data, or real SMS verification ever happens
-through these. Before accepting real users, implement the `Live*` classes
-against a licensed KYC vendor, a gambling-licensed payment processor, and
-Firebase Admin, then flip the mode env vars to `live`. See the root
-`README.md` for the full compliance checklist, including the RNG
-certification requirement for `/games/:gameKey/play`.
+`src/services/smsService.ts` each export an interface plus a `Mock*`/dev
+implementation used by default
+(`KYC_PROVIDER_MODE`/`PAYMENT_PROVIDER_MODE`/`SMS_PROVIDER_MODE=mock`). No
+real money, real identity data, or real SMS ever moves through these.
+Before accepting real users, implement `LiveKycProvider` /
+`LivePaymentProvider` against a licensed KYC vendor and a
+gambling-licensed payment processor, get a `FAST2SMS_API_KEY`, then flip
+the mode env vars to `live`. See the root `README.md` for the full
+compliance checklist, including the RNG certification requirement for
+`/games/:gameKey/play`.

@@ -1,14 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ConfirmationResult, getAuth, signInWithPhoneNumber } from '@react-native-firebase/auth';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import {
+  AuthResult,
   BackendUser,
+  completePhoneProfile,
   fetchBackendMe,
-  phoneVerify,
-  PhoneVerifyResult,
-  setBackendDepositLimits,
+  requestPhoneOtp,
   selfExcludeBackend,
+  setBackendDepositLimits,
   submitBackendKyc,
+  verifyPhoneOtp,
 } from '../api/backend';
 import { ApiClientError, setBackendToken } from '../api/client';
 
@@ -17,15 +18,8 @@ const UID_MAP_KEY = 'novaplay:auth:uids:v1';
 const PASSWORD_STORAGE_KEY = 'novaplay:passwords:v1';
 const BACKEND_TOKEN_MAP_KEY = 'novaplay:auth:backendTokens:v1';
 
-// India-only for now — the login field only accepts a 10-digit local number,
-// so this is the one place that turns it into the E.164 shape Firebase needs.
-function toE164(phoneNumber: string): string {
-  return `+91${phoneNumber}`;
-}
-
-// Not real cryptography — there's no backend yet to hash server-side, so
-// this just keeps a plain password from sitting in AsyncStorage as-is.
-// One-way and deterministic, which is all an equality check needs.
+// Not real cryptography — there's no need for more than a one-way,
+// deterministic equality check for this local device-only shortcut.
 function simpleHash(input: string): string {
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
@@ -52,9 +46,8 @@ type AuthState = {
   pendingPhone: string | null;
   otpSent: boolean;
   otpError: string | null;
-  // Set only when real SMS delivery failed and a local testing code was
-  // generated instead — shown on screen so login can still be tested
-  // before real SMS delivery is configured. Always null once that's set up.
+  // Only set when the backend's SMS_PROVIDER_MODE=mock — no real SMS is
+  // sent, so the code is shown on-screen instead for local testing.
   devOtpCode: string | null;
   // Each returns null on success, or a human-readable error message on failure.
   requestOtp: (phone: string) => Promise<string | null>;
@@ -66,11 +59,8 @@ type AuthState = {
   loginWithPassword: (phone: string, password: string) => Promise<boolean>;
   logout: () => void;
 
-  // Real-money backend account (separate from the local phone/uid session
-  // above, which predates the backend). `backendUser` is the source of
-  // truth for KYC status, self-exclusion and deposit limits.
   backendUser: BackendUser | null;
-  // True once phone verification succeeds for a brand-new phone number —
+  // True once OTP verification succeeds for a brand-new phone number —
   // the backend needs name/DOB/country (for the 18+ check) before it will
   // create the account. RootNavigator shows CompleteProfileScreen while
   // this is true.
@@ -95,14 +85,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [uid, setUid] = useState<string | null>(null);
   const [avatarId, setAvatarIdState] = useState(1);
   const [pendingPhone, setPendingPhone] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
   const [hasLoginPassword, setHasLoginPassword] = useState(false);
   const [backendUser, setBackendUser] = useState<BackendUser | null>(null);
   const [needsProfile, setNeedsProfile] = useState(false);
-  const [pendingIdToken, setPendingIdToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!uid) {
@@ -165,79 +153,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // directly (rather than left in state) so callers get the real message
   // even though it's an async function whose enclosing render may already
   // be stale by the time it resolves.
-  const sendFirebaseOtp = useCallback(async (phoneNumber: string): Promise<string | null> => {
+  const requestOtpCode = useCallback(async (phoneNumber: string): Promise<string | null> => {
     setOtpError(null);
     setDevOtpCode(null);
     try {
-      const result = await signInWithPhoneNumber(getAuth(), toE164(phoneNumber));
-      setConfirmation(result);
+      const result = await requestPhoneOtp(phoneNumber);
       setPendingPhone(phoneNumber);
       setOtpSent(true);
+      setDevOtpCode(result.devCode);
       return null;
     } catch (err) {
-      // Real SMS delivery isn't configured/working yet (e.g. Firebase billing
-      // not enabled) — fall back to a locally-generated code so login can
-      // still be tested. Remove this fallback once real SMS delivery works.
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      setDevOtpCode(code);
-      setConfirmation(null);
-      setPendingPhone(phoneNumber);
-      setOtpSent(true);
       const message = err instanceof Error ? err.message : 'Could not send the verification code.';
       setOtpError(message);
-      return null;
+      return message;
     }
   }, []);
 
-  const requestOtp = useCallback((phoneNumber: string) => sendFirebaseOtp(phoneNumber), [sendFirebaseOtp]);
-  const resendOtp = useCallback((phoneNumber: string) => sendFirebaseOtp(phoneNumber), [sendFirebaseOtp]);
-
-  // Just confirms the SMS code with Firebase — doesn't touch any account
-  // state, since it's shared by both a fresh login and an already-logged-in
-  // user re-verifying their own number (e.g. before setting a password).
-  // Returns null on success, or the error message on failure.
-  const confirmFirebaseCode = useCallback(
-    async (code: string): Promise<string | null> => {
-      if (devOtpCode) {
-        if (code !== devOtpCode) return 'Incorrect code. Please try again.';
-        setDevOtpCode(null);
-        setOtpSent(false);
-        return null;
-      }
-      if (!confirmation) return 'No code was sent yet.';
-      try {
-        await confirmation.confirm(code);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Incorrect code. Please try again.';
-        setOtpError(message);
-        return message;
-      }
-      setConfirmation(null);
-      setOtpSent(false);
-      return null;
-    },
-    [confirmation, devOtpCode]
-  );
-
-  // Prefers a real Firebase ID token (works once PHONE_AUTH_MODE=live and
-  // Firebase Admin is configured server-side); falls back to the E.164
-  // phone number, which is what the backend's MockPhoneVerifier expects
-  // in local dev (PHONE_AUTH_MODE=mock, the default — see backend README).
-  const getIdTokenOrPhone = useCallback(async (phoneNumber: string, wasDevOtp: boolean): Promise<string> => {
-    if (!wasDevOtp) {
-      try {
-        const token = await getAuth().currentUser?.getIdToken();
-        if (token) return token;
-      } catch {
-        // fall through to the phone-number fallback
-      }
-    }
-    return toE164(phoneNumber);
-  }, []);
+  const requestOtp = requestOtpCode;
+  const resendOtp = requestOtpCode;
 
   // Persists the backend session (JWT + phone->uid map) and flips on
   // isAuthenticated. Shared by the direct-login and complete-profile paths.
-  const completeBackendLogin = useCallback(async (phoneNumber: string, result: PhoneVerifyResult) => {
+  const completeBackendLogin = useCallback(async (phoneNumber: string, result: AuthResult) => {
     await setBackendToken(result.token);
 
     const tokenMapRaw = await AsyncStorage.getItem(BACKEND_TOKEN_MAP_KEY).catch(() => null);
@@ -261,29 +198,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setBackendUser(result.user);
     setIsAuthenticated(true);
     setNeedsProfile(false);
-    setPendingIdToken(null);
+    setOtpSent(false);
+    setDevOtpCode(null);
     setPendingPhone(null);
   }, []);
 
   const verifyOtp = useCallback(
     async (code: string): Promise<string | null> => {
       if (!pendingPhone) return 'No code was sent yet.';
-      const wasDevOtp = !!devOtpCode;
-      const confirmError = await confirmFirebaseCode(code);
-      if (confirmError) return confirmError;
-
-      const phoneNumber = pendingPhone;
-      const idToken = await getIdTokenOrPhone(phoneNumber, wasDevOtp);
-
       try {
-        const result = await phoneVerify({ idToken });
-        await completeBackendLogin(phoneNumber, result);
+        const result = await verifyPhoneOtp(pendingPhone, code);
+        await completeBackendLogin(pendingPhone, result);
         return null;
       } catch (err) {
         if (err instanceof ApiClientError && err.status === 428) {
-          // Brand-new phone number — hold onto the token and let
-          // CompleteProfileScreen finish registration with name/DOB/country.
-          setPendingIdToken(idToken);
+          // Brand-new phone number — CompleteProfileScreen finishes
+          // registration with name/DOB/country; pendingPhone stays set,
+          // and the backend remembers this number was verified for the
+          // next 10 minutes so the code isn't needed again.
           setNeedsProfile(true);
           return null;
         }
@@ -292,33 +224,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return message;
       }
     },
-    [confirmFirebaseCode, devOtpCode, getIdTokenOrPhone, completeBackendLogin, pendingPhone]
+    [completeBackendLogin, pendingPhone]
   );
 
   const completeProfile = useCallback(
     async (fields: ProfileFields): Promise<string | null> => {
-      if (!pendingIdToken || !pendingPhone) return 'Your session expired — please verify your number again.';
+      if (!pendingPhone) return 'Your session expired — please verify your number again.';
       try {
-        const result = await phoneVerify({ idToken: pendingIdToken, ...fields });
+        const result = await completePhoneProfile({ phone: pendingPhone, ...fields });
         await completeBackendLogin(pendingPhone, result);
         return null;
       } catch (err) {
         return err instanceof Error ? err.message : 'Could not create your account. Please try again.';
       }
     },
-    [pendingIdToken, pendingPhone, completeBackendLogin]
+    [pendingPhone, completeBackendLogin]
   );
 
   // For an already-authenticated user re-verifying their own number (e.g.
   // before setting a login password) — confirms the code without touching
-  // phone/uid/avatar/isAuthenticated.
+  // phone/uid/avatar/isAuthenticated. Assumes `requestOtp(phone)` was
+  // already called with the user's current number.
   const verifyIdentityOtp = useCallback(
     async (code: string): Promise<string | null> => {
-      const confirmError = await confirmFirebaseCode(code);
-      if (!confirmError) setPendingPhone(null);
-      return confirmError;
+      if (!pendingPhone) return 'No code was sent yet.';
+      try {
+        await verifyPhoneOtp(pendingPhone, code);
+        setPendingPhone(null);
+        setOtpSent(false);
+        return null;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Incorrect code. Please try again.';
+        setOtpError(message);
+        return message;
+      }
     },
-    [confirmFirebaseCode]
+    [pendingPhone]
   );
 
   const setLoginPassword = useCallback(
@@ -385,7 +326,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAvatarIdState(1);
     setBackendUser(null);
     setNeedsProfile(false);
-    setPendingIdToken(null);
+    setPendingPhone(null);
     AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
     setBackendToken(null).catch(() => {});
   }, []);
