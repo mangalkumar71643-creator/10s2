@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  BET_STAKE
+  BET_PAYOUT
+  BET_REFUND
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum EventStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  CANCELLED
+}
+
+enum MarketStatus {
+  OPEN
+  SUSPENDED
+  SETTLED
+}
+
+enum BetStatus {
+  PENDING
+  WON
+  LOST
+  VOID
+}
+
+model User {
+  id                   String    @id @default(uuid())
+  email                String    @unique
+  passwordHash         String
+  firstName            String
+  lastName             String
+  dateOfBirth          DateTime
+  country              String
+  role                 Role      @default(USER)
+  kycStatus            KycStatus @default(NOT_STARTED)
+
+  // Responsible gambling
+  isSelfExcluded       Boolean   @default(false)
+  selfExclusionUntil   DateTime?
+  depositLimitDaily    Decimal?  @db.Decimal(12, 2)
+  depositLimitWeekly   Decimal?  @db.Decimal(12, 2)
+  depositLimitMonthly  Decimal?  @db.Decimal(12, 2)
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  wallet               Wallet?
+  transactions         Transaction[]
+  bets                 Bet[]
+  kycVerifications     KycVerification[]
+}
+
+model KycVerification {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id])
+  provider            String
+  providerReferenceId String?
+  status              KycStatus @default(PENDING)
+  rawResult           Json?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  balance   Decimal  @default(0) @db.Decimal(12, 2)
+  currency  String   @default("GBP")
+  updatedAt DateTime @updatedAt
+}
+
+model Transaction {
+  id                  String            @id @default(uuid())
+  userId              String
+  user                User              @relation(fields: [userId], references: [id])
+  type                TransactionType
+  amount              Decimal           @db.Decimal(12, 2)
+  status              TransactionStatus @default(PENDING)
+  provider            String?
+  providerReferenceId String?
+  betId               String?
+  bet                 Bet?              @relation(fields: [betId], references: [id])
+  createdAt           DateTime          @default(now())
+}
+
+model Sport {
+  id     String  @id @default(uuid())
+  name   String  @unique
+  slug   String  @unique
+  events Event[]
+}
+
+model Event {
+  id        String      @id @default(uuid())
+  sportId   String
+  sport     Sport       @relation(fields: [sportId], references: [id])
+  name      String
+  startTime DateTime
+  status    EventStatus @default(SCHEDULED)
+  markets   Market[]
+  createdAt DateTime    @default(now())
+}
+
+model Market {
+  id         String       @id @default(uuid())
+  eventId    String
+  event      Event        @relation(fields: [eventId], references: [id])
+  name       String
+  status     MarketStatus @default(OPEN)
+  selections Selection[]
+  createdAt  DateTime     @default(now())
+}
+
+model Selection {
+  id        String   @id @default(uuid())
+  marketId  String
+  market    Market   @relation(fields: [marketId], references: [id])
+  name      String
+  odds      Decimal  @db.Decimal(8, 2)
+  isWinner  Boolean?
+  bets      Bet[]
+}
+
+model Bet {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  selectionId     String
+  selection       Selection     @relation(fields: [selectionId], references: [id])
+  stake           Decimal       @db.Decimal(12, 2)
+  odds            Decimal       @db.Decimal(8, 2)
+  potentialPayout Decimal       @db.Decimal(12, 2)
+  status          BetStatus     @default(PENDING)
+  createdAt       DateTime      @default(now())
+  settledAt       DateTime?
+  transactions    Transaction[]
+}

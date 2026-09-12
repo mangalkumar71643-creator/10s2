@@ -1,0 +1,33 @@
+import express from "express";
+import cors from "cors";
+import { env } from "./config/env";
+import { errorHandler } from "./middleware/errorHandler";
+
+import authRoutes from "./routes/auth.routes";
+import kycRoutes from "./routes/kyc.routes";
+import walletRoutes from "./routes/wallet.routes";
+import sportsRoutes from "./routes/sports.routes";
+import betsRoutes from "./routes/bets.routes";
+import responsibleGamblingRoutes from "./routes/responsibleGambling.routes";
+import adminRoutes from "./routes/admin.routes";
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+app.use("/auth", authRoutes);
+app.use("/kyc", kycRoutes);
+app.use("/wallet", walletRoutes);
+app.use("/sports", sportsRoutes);
+app.use("/bets", betsRoutes);
+app.use("/responsible-gambling", responsibleGamblingRoutes);
+app.use("/admin", adminRoutes);
+
+app.use(errorHandler);
+
+app.listen(env.port, () => {
+  console.log(`NovaPlay backend listening on port ${env.port}`);
+});
