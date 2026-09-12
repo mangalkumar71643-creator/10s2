@@ -25,6 +25,9 @@ enum TransactionType {
   BET_STAKE
   BET_PAYOUT
   BET_REFUND
+  GAME_STAKE
+  GAME_PAYOUT
+  BONUS
 }
 
 enum TransactionStatus {
@@ -55,8 +58,9 @@ enum BetStatus {
 
 model User {
   id                   String    @id @default(uuid())
-  email                String    @unique
-  passwordHash         String
+  email                String?   @unique
+  passwordHash         String?
+  phone                String?   @unique
   firstName            String
   lastName             String
   dateOfBirth          DateTime
@@ -71,12 +75,17 @@ model User {
   depositLimitWeekly   Decimal?  @db.Decimal(12, 2)
   depositLimitMonthly  Decimal?  @db.Decimal(12, 2)
 
+  // Daily login bonus (server-authoritative — see gameEngineService)
+  dailyStreak          Int       @default(0)
+  lastDailyClaimAt     DateTime?
+
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
   wallet               Wallet?
   transactions         Transaction[]
   bets                 Bet[]
+  gameRounds           GameRound[]
   kycVerifications     KycVerification[]
 }
 
@@ -151,6 +160,22 @@ model Selection {
   odds      Decimal  @db.Decimal(8, 2)
   isWinner  Boolean?
   bets      Bet[]
+}
+
+// One round of a real-money "game" (see gameEngineService.ts). The RNG is
+// a simple, honest server-side implementation — it is NOT independently
+// certified. A real casino licence requires RNG certification from an
+// accredited testing lab; that is a compliance step outside this codebase.
+model GameRound {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  gameKey    String
+  stake      Decimal  @db.Decimal(12, 2)
+  multiplier Decimal  @db.Decimal(8, 4)
+  payout     Decimal  @db.Decimal(12, 2)
+  won        Boolean
+  createdAt  DateTime @default(now())
 }
 
 model Bet {

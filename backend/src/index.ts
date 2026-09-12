@@ -8,6 +8,7 @@ import kycRoutes from "./routes/kyc.routes";
 import walletRoutes from "./routes/wallet.routes";
 import sportsRoutes from "./routes/sports.routes";
 import betsRoutes from "./routes/bets.routes";
+import gamesRoutes from "./routes/games.routes";
 import responsibleGamblingRoutes from "./routes/responsibleGambling.routes";
 import adminRoutes from "./routes/admin.routes";
 
@@ -23,6 +24,7 @@ app.use("/kyc", kycRoutes);
 app.use("/wallet", walletRoutes);
 app.use("/sports", sportsRoutes);
 app.use("/bets", betsRoutes);
+app.use("/games", gamesRoutes);
 app.use("/responsible-gambling", responsibleGamblingRoutes);
 app.use("/admin", adminRoutes);
 

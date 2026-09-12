@@ -1,36 +1,66 @@
-# NovaPlay mobile
+# NovaPlay — Mobile App
 
-Expo (React Native + TypeScript) app consuming the `backend` API.
+A real-money gaming mobile app built with Expo (React Native + TypeScript). Coins are backed 1:1
+by real money — see the root `README.md` for the compliance checklist (licence verification, KYC,
+payment provider) before this goes anywhere near real users.
 
-## Setup
+## Run it
 
 ```bash
 npm install
+npx expo start
 ```
 
-Edit `src/api/client.ts` and set `API_BASE_URL` to your backend's address
-(use your machine's LAN IP, not `localhost`, when testing on a physical
-device or the Android emulator — `http://10.0.2.2:4000` for the Android
-emulator).
+Then scan the QR code with the **Expo Go** app on your Android/iOS phone, or press `a` / `i` to
+open an Android/iOS emulator, or `w` for a web preview.
 
-```bash
-npm start        # opens Expo dev tools; scan the QR code with Expo Go
-npm run android  # or npm run ios / npm run web
+You'll also need the `backend` API running (see `../backend/README.md`) — this app calls it for
+everything money-related. Edit `API_BASE_URL` in `src/api/client.ts` to point at it (use your
+machine's LAN IP for a physical device or Android emulator, not `localhost`).
+
+## What's included
+
+- **Login/Register** — phone number + OTP (Firebase Phone Auth client-side; the backend verifies
+  the token server-side — see "Auth" below). New numbers go through `CompleteProfileScreen` to
+  collect name/DOB/country, enforcing the 18+ requirement server-side before an account exists.
+- **Home** — hero banner, quick filters, game categories, featured carousel, filtered game grid.
+- **Wallet** — real balance from the backend, deposit/withdraw (sandbox payment provider by
+  default), transaction history.
+- **Game Detail** — "Play for Real" stakes Coins on a backend-settled round; the backend's
+  server-side RNG decides win/loss (see `backend/src/services/gameEngineService.ts` — **not**
+  independently certified, see root README).
+- **Rewards** — daily streak bonus (server-tracked, real money, fixed reward table shared with the
+  backend). Missions and VIP bonuses are still cosmetic/local-only — they don't move real money
+  yet (see the comment at the top of `GameStateContext.tsx`).
+- **Settings** — KYC submission, daily deposit limit, 30-day self-exclusion (all backend-enforced).
+- **Ranking**, **VIP**, **Profile**, **Help Center**, **Notifications**, **Game Category browser**.
+
+## Auth: phone number + OTP
+
+`src/state/AuthContext.tsx` uses Firebase Phone Auth client-side to send/verify the SMS code, then
+calls the backend's `/auth/phone/verify` with either a real Firebase ID token (once
+`PHONE_AUTH_MODE=live` and Firebase Admin is configured on the backend) or, in local dev
+(`PHONE_AUTH_MODE=mock`, the default), the phone number itself. The backend is what actually
+creates the account, issues the session JWT, and is the only thing that can create a wallet.
+
+## Project structure
+
+```
+src/
+  api/           backend HTTP client + typed endpoint calls (src/api/backend.ts)
+  theme/         design tokens (colors, gradients, spacing, typography)
+  data/          TypeScript models + mock data (game catalog, categories — not money)
+  services/      wallet/game service layer — now backed by the real API, not local mocks
+  state/         AuthContext (backend session) + GameStateContext (wallet, missions, favorites)
+  components/    reusable UI building blocks
+  navigation/    bottom tabs + root stack
+  screens/       one file per screen
 ```
 
-## Screens
+## Coins are real money now
 
-- **Login / Register** — register enforces an 18+ age gate on the entered
-  date of birth (also re-checked server-side).
-- **Home** — sports tabs, upcoming events with live odds.
-- **Event** — markets, selections, bet slip with stake input and potential
-  payout.
-- **Wallet** — balance, deposit/withdraw (sandbox payment provider — see
-  root README for going live with a real processor).
-- **Profile** — KYC submission, deposit limits, self-exclusion, logout.
-
-## Next step: web
-
-Once this is stable, the same backend API can serve a React web app
-(consider `react-native-web` to reuse these screens directly, or a
-separate React app under `/web` calling the same endpoints).
+Nothing in this app should ever credit the wallet on the client — every path that adds or removes
+Coins (deposit, withdraw, game stake/payout, daily bonus) goes through a backend endpoint that
+enforces KYC status, self-exclusion and deposit limits. Missions and VIP bonuses are deliberately
+*not* wired to the wallet yet, because their "progress" isn't server-verified — see the comment in
+`GameStateContext.tsx` before enabling real payouts there.

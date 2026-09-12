@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
-import { asyncHandler } from "../middleware/errorHandler";
-import { loginUser, registerUser } from "../services/authService";
+import { asyncHandler, ApiError } from "../middleware/errorHandler";
+import { loginUser, registerUser, verifyPhoneAndAuth } from "../services/authService";
 import { requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { sanitizeUser } from "../services/authService";
@@ -37,6 +37,30 @@ router.post(
     const { email, password } = loginSchema.parse(req.body);
     const result = await loginUser(email, password);
     res.json(result);
+  })
+);
+
+const phoneVerifySchema = z.object({
+  idToken: z.string().min(1),
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  dateOfBirth: z.string().optional(),
+  country: z.string().min(2).optional(),
+});
+
+router.post(
+  "/phone/verify",
+  asyncHandler(async (req, res) => {
+    const input = phoneVerifySchema.parse(req.body);
+    try {
+      const result = await verifyPhoneAndAuth(input);
+      res.json(result);
+    } catch (err) {
+      if (err instanceof ApiError && err.message === "profile_required") {
+        return res.status(428).json({ error: "profile_required" });
+      }
+      throw err;
+    }
   })
 );
 

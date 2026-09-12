@@ -1,121 +1,149 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { fetchEvents, fetchSports } from "../api/endpoints";
-import { EventItem, Sport } from "../types";
-import { useAuth } from "../context/AuthContext";
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
+import React from 'react';
+import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import ScreenContainer from '../components/ScreenContainer';
+import { AVATARS } from '../data/avatars';
+import { BottomTabParamList } from '../navigation/types';
+import { useAuth } from '../state/AuthContext';
+import { useGameState } from '../state/GameStateContext';
 
-export default function HomeScreen({ navigation }: any) {
-  const { user, logout } = useAuth();
-  const [sports, setSports] = useState<Sport[]>([]);
-  const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
+const TOP_BAR_HEIGHT = 69;
 
-  const load = useCallback(async () => {
-    const sportsList = await fetchSports();
-    setSports(sportsList);
-    const active = selectedSport ?? sportsList[0] ?? null;
-    setSelectedSport(active);
-    if (active) {
-      setEvents(await fetchEvents(active.id));
-    }
-  }, [selectedSport]);
+const WALLET_BUTTON_ASPECT = 2172 / 724;
+const WALLET_BUTTON_HEIGHT = 63;
+// The balance text was baked into wallet-button.png at 543x181; these are
+// that glyph's position/size scaled into the button's rendered dimensions.
+const WALLET_BUTTON_SOURCE_HEIGHT = 181;
+const WALLET_BALANCE_SCALE = WALLET_BUTTON_HEIGHT / WALLET_BUTTON_SOURCE_HEIGHT;
+const WALLET_BALANCE_LEFT = 132 * WALLET_BALANCE_SCALE;
+const WALLET_BALANCE_TOP = 58 * WALLET_BALANCE_SCALE;
+const WALLET_BALANCE_WIDTH = 205 * WALLET_BALANCE_SCALE;
+const WALLET_BALANCE_HEIGHT = 52 * WALLET_BALANCE_SCALE;
 
-  useEffect(() => {
-    load();
-  }, []);
+const TOP_BAR_ICON_GAP = 10;
+const TOP_BAR_ICON_OFFSET_Y = 7;
 
-  async function onSelectSport(sport: Sport) {
-    setSelectedSport(sport);
-    setEvents(await fetchEvents(sport.id));
-  }
+const NOVAPLAY_BADGE_SIZE = 40;
+const GIFT_ICON_SIZE = 40;
+const PROFILE_ICON_SIZE = 44;
 
-  async function onRefresh() {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  }
+const CONTROL_PANEL_ASPECT = 1536 / 530;
+
+// Reference frame the requested top/bottom/height pixel values were measured
+// against (the device screenshot used to position this element).
+const REFERENCE_HEIGHT = 2800;
+const PANEL_TOP = 890;
+const PANEL_HEIGHT = 408;
+
+// All content and navigation elements were intentionally stripped from this
+// screen — new custom buttons/UI go here next.
+export default function HomeScreen() {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
+  const { avatarId } = useAuth();
+  const { coins } = useGameState();
+  const panelHeight = screenHeight * (PANEL_HEIGHT / REFERENCE_HEIGHT);
+  const panelWidth = panelHeight * CONTROL_PANEL_ASPECT;
+  const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
+  const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
+  const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>NovaPlay</Text>
-        <TouchableOpacity onPress={() => navigation.navigate("Wallet")}>
-          <Text style={styles.headerLink}>Wallet</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
-          <Text style={styles.headerLink}>Profile</Text>
-        </TouchableOpacity>
+    <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.png')}>
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: TOP_BAR_HEIGHT,
+          backgroundColor: '#151112',
+        }}
+      >
+        <Image
+          source={require('../../assets/novaplay-badge.png')}
+          style={{
+            position: 'absolute',
+            width: NOVAPLAY_BADGE_SIZE,
+            height: NOVAPLAY_BADGE_SIZE,
+            left: walletButtonLeft - NOVAPLAY_BADGE_SIZE - TOP_BAR_ICON_GAP,
+            top: (TOP_BAR_HEIGHT - NOVAPLAY_BADGE_SIZE) / 2 + TOP_BAR_ICON_OFFSET_Y,
+          }}
+          resizeMode="contain"
+        />
+        <Pressable
+          onPress={() => navigation.navigate('Wallet')}
+          style={{
+            position: 'absolute',
+            left: walletButtonLeft,
+            top: (TOP_BAR_HEIGHT - WALLET_BUTTON_HEIGHT) / 2 + TOP_BAR_ICON_OFFSET_Y + 5,
+          }}
+        >
+          <Image
+            source={require('../../assets/wallet-button.png')}
+            style={{ width: walletButtonWidth, height: WALLET_BUTTON_HEIGHT }}
+            resizeMode="contain"
+          />
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.5}
+            style={{
+              position: 'absolute',
+              left: WALLET_BALANCE_LEFT,
+              top: WALLET_BALANCE_TOP,
+              width: WALLET_BALANCE_WIDTH,
+              height: WALLET_BALANCE_HEIGHT,
+              lineHeight: WALLET_BALANCE_HEIGHT,
+              color: '#FFFFFF',
+              fontSize: 13,
+              fontWeight: '800',
+            }}
+          >
+            {coins.toLocaleString('en-IN')}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => navigation.navigate('Rewards')}
+          style={{
+            position: 'absolute',
+            left: walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP,
+            top: (TOP_BAR_HEIGHT - GIFT_ICON_SIZE) / 2 + TOP_BAR_ICON_OFFSET_Y,
+          }}
+        >
+          <Image
+            source={require('../../assets/gift-icon.png')}
+            style={{ width: GIFT_ICON_SIZE, height: GIFT_ICON_SIZE }}
+            resizeMode="contain"
+          />
+        </Pressable>
+        <Pressable
+          onPress={() => (navigation as any).navigate('Profile')}
+          style={{
+            position: 'absolute',
+            left: walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP + GIFT_ICON_SIZE + TOP_BAR_ICON_GAP,
+            top: (TOP_BAR_HEIGHT - PROFILE_ICON_SIZE) / 2 + TOP_BAR_ICON_OFFSET_Y,
+          }}
+        >
+          <Image
+            source={AVATARS[avatarId - 1]}
+            style={{ width: PROFILE_ICON_SIZE, height: PROFILE_ICON_SIZE, borderRadius: PROFILE_ICON_SIZE / 2 }}
+            resizeMode="cover"
+          />
+        </Pressable>
       </View>
-
-      {user?.isSelfExcluded && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>Your account is self-excluded. Betting is disabled.</Text>
-        </View>
-      )}
-
-      <FlatList
-        horizontal
-        data={sports}
-        keyExtractor={(s) => s.id}
-        style={styles.sportsRow}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.sportChip, selectedSport?.id === item.id && styles.sportChipActive]}
-            onPress={() => onSelectSport(item)}
-          >
-            <Text style={styles.sportChipText}>{item.name}</Text>
-          </TouchableOpacity>
-        )}
+      <Image
+        source={require('../../assets/control-panel.png')}
+        style={{
+          position: 'absolute',
+          top: panelTop,
+          left: (screenWidth - panelWidth) / 2,
+          width: panelWidth,
+          height: panelHeight,
+        }}
+        resizeMode="contain"
       />
-
-      <FlatList
-        data={events}
-        keyExtractor={(e) => e.id}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ padding: 16, gap: 12 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.eventCard}
-            onPress={() => navigation.navigate("Event", { eventId: item.id })}
-          >
-            <Text style={styles.eventName}>{item.name}</Text>
-            <Text style={styles.eventTime}>{new Date(item.startTime).toLocaleString()}</Text>
-            {item.markets[0] && (
-              <View style={styles.oddsRow}>
-                {item.markets[0].selections.map((s) => (
-                  <View key={s.id} style={styles.oddsPill}>
-                    <Text style={styles.oddsPillName}>{s.name}</Text>
-                    <Text style={styles.oddsPillValue}>{s.odds}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={<Text style={styles.empty}>No upcoming events for this sport yet.</Text>}
-      />
-    </View>
+    </ScreenContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0B1220" },
-  header: { flexDirection: "row", alignItems: "center", padding: 16, gap: 16 },
-  title: { color: "#fff", fontSize: 22, fontWeight: "700", flex: 1 },
-  headerLink: { color: "#3B82F6", fontWeight: "600" },
-  banner: { backgroundColor: "#7F1D1D", padding: 10 },
-  bannerText: { color: "#fff", textAlign: "center" },
-  sportsRow: { flexGrow: 0, paddingHorizontal: 12 },
-  sportChip: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, backgroundColor: "#141C2E", marginHorizontal: 4 },
-  sportChipActive: { backgroundColor: "#3B82F6" },
-  sportChipText: { color: "#fff" },
-  eventCard: { backgroundColor: "#141C2E", borderRadius: 12, padding: 16 },
-  eventName: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  eventTime: { color: "#8b93a7", marginTop: 4 },
-  oddsRow: { flexDirection: "row", gap: 8, marginTop: 12 },
-  oddsPill: { flex: 1, backgroundColor: "#0B1220", borderRadius: 8, padding: 8, alignItems: "center" },
-  oddsPillName: { color: "#8b93a7", fontSize: 12 },
-  oddsPillValue: { color: "#fff", fontWeight: "700", marginTop: 2 },
-  empty: { color: "#8b93a7", textAlign: "center", marginTop: 40 },
-});

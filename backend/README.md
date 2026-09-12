@@ -19,24 +19,40 @@ password immediately in a real environment.
 
 | Area | Routes |
 |---|---|
-| Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
+| Auth (email) | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` |
+| Auth (phone) | `POST /auth/phone/verify` — used by the mobile app; see below |
 | KYC | `POST /kyc/submit`, `GET /kyc/status` |
 | Wallet | `GET /wallet`, `POST /wallet/deposit`, `POST /wallet/withdraw`, `GET /wallet/transactions` |
 | Sports | `GET /sports`, `GET /sports/:sportId/events`, `GET /sports/events/:eventId` |
 | Bets | `POST /bets`, `GET /bets` |
+| Games (real-money) | `GET /games/config`, `POST /games/:gameKey/play`, `GET /games/history`, `GET /games/daily-bonus/status`, `POST /games/daily-bonus/claim` |
 | Responsible gambling | `PUT /responsible-gambling/deposit-limits`, `POST /responsible-gambling/self-exclude` |
 | Admin (role=ADMIN) | `/admin/sports`, `/admin/events`, `/admin/markets`, `/admin/selections/:id/odds`, `/admin/markets/:id/settle`, `/admin/users`, `/admin/kyc/:userId`, `/admin/bets`, `/admin/reports/summary` |
 
 All authenticated routes take `Authorization: Bearer <token>` from
-`/auth/login` or `/auth/register`.
+`/auth/login`, `/auth/register` or `/auth/phone/verify`.
 
-## KYC & payments are mocked
+### Phone auth (`POST /auth/phone/verify`)
 
-`src/services/kycService.ts` and `src/services/paymentService.ts` each
-export an interface plus a `Mock*Provider` used when
-`KYC_PROVIDER_MODE`/`PAYMENT_PROVIDER_MODE` are `mock` (the default). No
-real money or real identity data ever moves through these. Before
-accepting real users, implement the `Live*Provider` classes against a
-licensed KYC vendor and a gambling-licensed payment processor, and flip
-the mode env vars to `live`. See the root `README.md` for the full
-compliance checklist.
+Body: `{ idToken, firstName?, lastName?, dateOfBirth?, country? }`. In
+`PHONE_AUTH_MODE=mock` (default), `idToken` is just the E.164 phone number —
+nothing is actually verified, so this must never be used with real users.
+In `PHONE_AUTH_MODE=live` it's a real Firebase ID token, checked
+server-side (once you implement `LiveFirebasePhoneVerifier` in
+`src/services/phoneAuthService.ts` with `firebase-admin`). A brand-new
+phone number without the optional profile fields gets `428
+{"error":"profile_required"}` — resend with those fields to create the
+account (18+ enforced here too).
+
+## KYC, payments & phone auth are mocked
+
+`src/services/kycService.ts`, `src/services/paymentService.ts` and
+`src/services/phoneAuthService.ts` each export an interface plus a
+`Mock*`/dev implementation used by default
+(`KYC_PROVIDER_MODE`/`PAYMENT_PROVIDER_MODE`/`PHONE_AUTH_MODE=mock`). No
+real money, real identity data, or real SMS verification ever happens
+through these. Before accepting real users, implement the `Live*` classes
+against a licensed KYC vendor, a gambling-licensed payment processor, and
+Firebase Admin, then flip the mode env vars to `live`. See the root
+`README.md` for the full compliance checklist, including the RNG
+certification requirement for `/games/:gameKey/play`.

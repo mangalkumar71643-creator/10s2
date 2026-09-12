@@ -1,34 +1,43 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { deposit, fetchWallet, withdraw } from "../api/endpoints";
-import { Wallet } from "../types";
-import { ApiClientError } from "../api/client";
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import React, { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import AmountInputModal from '../components/AmountInputModal';
+import ScreenContainer from '../components/ScreenContainer';
+import { ApiClientError } from '../api/client';
+import { BottomTabParamList, RootStackParamList } from '../navigation/types';
+import { useAuth } from '../state/AuthContext';
+import { useGameState } from '../state/GameStateContext';
+import * as walletService from '../services/walletService';
+import { colors, gradients, radius, spacing, typography } from '../theme';
+
+const CARD_TEXT_COLOR = '#5C3A0E';
 
 export default function WalletScreen() {
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [amount, setAmount] = useState("20");
+  const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
+  const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { coins, refreshWallet } = useGameState();
+  const { backendUser } = useAuth();
+  const [modal, setModal] = useState<'deposit' | 'withdraw' | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => setWallet(await fetchWallet()), []);
+  const kycApproved = backendUser?.kycStatus === 'APPROVED';
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  async function handle(action: "deposit" | "withdraw") {
-    const value = Number(amount);
-    if (!value || value <= 0) {
-      Alert.alert("Invalid amount", "Enter an amount greater than 0.");
-      return;
-    }
+  async function handleConfirm(amount: number) {
+    if (!modal) return;
     setBusy(true);
     try {
-      const updated = action === "deposit" ? await deposit(value) : await withdraw(value);
-      setWallet(updated);
+      if (modal === 'deposit') await walletService.deposit(amount);
+      else await walletService.withdraw(amount);
+      await refreshWallet();
+      setModal(null);
     } catch (err) {
       Alert.alert(
-        action === "deposit" ? "Deposit failed" : "Withdrawal failed",
-        err instanceof ApiClientError ? err.message : "Please try again."
+        modal === 'deposit' ? 'Deposit failed' : 'Withdrawal failed',
+        err instanceof ApiClientError ? err.message : 'Please try again.'
       );
     } finally {
       setBusy(false);
@@ -36,57 +45,131 @@ export default function WalletScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Wallet</Text>
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Balance</Text>
-        {wallet ? (
-          <Text style={styles.balance}>
-            {wallet.currency} {Number(wallet.balance).toFixed(2)}
+    <ScreenContainer contentStyle={styles.content}>
+      <View style={styles.header}>
+        <Pressable onPress={() => navigation.navigate('Home')} style={styles.headerButton}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color={colors.gold} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Wallet</Text>
+        <View style={styles.headerRight}>
+          <Pressable onPress={() => rootNavigation.navigate('Help')} style={styles.headerButton}>
+            <MaterialCommunityIcons name="headset" size={24} color={colors.gold} />
+          </Pressable>
+          <Pressable onPress={() => rootNavigation.navigate('History')} style={styles.headerButton}>
+            <MaterialCommunityIcons name="clock-time-four-outline" size={24} color={colors.gold} />
+          </Pressable>
+        </View>
+      </View>
+
+      <LinearGradient colors={gradients.goldButton} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balanceCard}>
+        <MaterialCommunityIcons
+          name="wallet-outline"
+          size={110}
+          color={CARD_TEXT_COLOR}
+          style={styles.balanceCardIcon}
+        />
+        <Text style={styles.balanceLabel}>My Balance</Text>
+        <Text style={styles.balanceValue}>{coins.toLocaleString('en-IN')} Coins</Text>
+      </LinearGradient>
+
+      {!kycApproved ? (
+        <View style={styles.kycBanner}>
+          <MaterialCommunityIcons name="shield-alert-outline" size={18} color={colors.gold} />
+          <Text style={styles.kycBannerText}>
+            Verify your identity (KYC) in Settings before you can deposit, withdraw or play for real money.
           </Text>
-        ) : (
-          <ActivityIndicator color="#fff" />
-        )}
+        </View>
+      ) : null}
+
+      <View style={styles.actionRow}>
+        <Pressable
+          style={[styles.actionButton, styles.depositButton]}
+          onPress={() => setModal('deposit')}
+          disabled={!kycApproved}
+        >
+          <MaterialCommunityIcons name="bank-transfer-in" size={18} color={colors.background} />
+          <Text style={styles.actionButtonText}>Deposit</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.actionButton, styles.withdrawButton]}
+          onPress={() => setModal('withdraw')}
+          disabled={!kycApproved}
+        >
+          <MaterialCommunityIcons name="bank-transfer-out" size={18} color={colors.textPrimary} />
+          <Text style={[styles.actionButtonText, { color: colors.textPrimary }]}>Withdraw</Text>
+        </Pressable>
       </View>
 
-      <Text style={styles.noteText}>
-        Payments run through a sandbox provider in this build — no real money moves until a
-        licensed payment processor is wired in. See backend/README.md.
-      </Text>
-
-      <TextInput style={styles.input} keyboardType="decimal-pad" value={amount} onChangeText={setAmount} />
-
-      <View style={styles.row}>
-        <TouchableOpacity style={[styles.button, styles.deposit]} onPress={() => handle("deposit")} disabled={busy}>
-          <Text style={styles.buttonText}>Deposit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.withdraw]} onPress={() => handle("withdraw")} disabled={busy}>
-          <Text style={styles.buttonText}>Withdraw</Text>
-        </TouchableOpacity>
+      <View style={styles.tipsBlock}>
+        <Text style={styles.tipsTitle}>About your balance:</Text>
+        <Text style={styles.tipsText}>
+          Coins are backed 1:1 by real money. Deposits and withdrawals run through a sandbox payment
+          provider in this build — see backend/README.md to connect a real, licensed processor. 18+ only —
+          please gamble responsibly.
+        </Text>
       </View>
-    </View>
+
+      <AmountInputModal
+        visible={modal !== null}
+        title={modal === 'deposit' ? 'Deposit' : 'Withdraw'}
+        confirmLabel={modal === 'deposit' ? 'Deposit' : 'Withdraw'}
+        helperText={modal === 'deposit' ? 'Add coins to your balance.' : 'Move coins out to your bank/UPI.'}
+        busy={busy}
+        onConfirm={handleConfirm}
+        onClose={() => setModal(null)}
+      />
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0B1220", padding: 20 },
-  title: { color: "#fff", fontSize: 24, fontWeight: "700", marginBottom: 20 },
-  balanceCard: { backgroundColor: "#141C2E", borderRadius: 12, padding: 24, alignItems: "center", marginBottom: 16 },
-  balanceLabel: { color: "#8b93a7", marginBottom: 8 },
-  balance: { color: "#fff", fontSize: 32, fontWeight: "700" },
-  noteText: { color: "#8b93a7", fontSize: 12, marginBottom: 16, lineHeight: 18 },
-  input: {
-    backgroundColor: "#141C2E",
-    color: "#fff",
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#26314A",
+  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xl,
   },
-  row: { flexDirection: "row", gap: 12 },
-  button: { flex: 1, borderRadius: 8, padding: 14, alignItems: "center" },
-  deposit: { backgroundColor: "#22C55E" },
-  withdraw: { backgroundColor: "#3B82F6" },
-  buttonText: { color: "#fff", fontWeight: "600" },
+  headerButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  headerRight: { flexDirection: 'row' },
+  headerTitle: { color: colors.gold, fontSize: typography.xl, fontWeight: '800' },
+  balanceCard: {
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: spacing.xxl,
+  },
+  balanceCardIcon: { position: 'absolute', right: -10, bottom: -10, opacity: 0.25, transform: [{ rotate: '-8deg' }] },
+  balanceLabel: { color: CARD_TEXT_COLOR, fontSize: typography.lg, fontWeight: '700', marginBottom: spacing.md },
+  balanceValue: { color: CARD_TEXT_COLOR, fontSize: typography.display, fontWeight: '800' },
+  tipsBlock: { marginBottom: spacing.xxl },
+  tipsTitle: { color: colors.textPrimary, fontSize: typography.lg, fontWeight: '700', marginBottom: spacing.sm },
+  tipsText: { color: colors.textSecondary, fontSize: typography.sm, lineHeight: 20 },
+  kycBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  kycBannerText: { color: colors.textSecondary, fontSize: typography.xs, flex: 1, lineHeight: 16 },
+  actionRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xxl },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.md,
+  },
+  depositButton: { backgroundColor: colors.gold },
+  withdrawButton: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong },
+  actionButtonText: { color: colors.background, fontWeight: '800', fontSize: typography.sm },
 });

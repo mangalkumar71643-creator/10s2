@@ -1,7 +1,8 @@
-# NovaPlay Betting Platform
+# NovaPlay
 
-A real-money sports betting platform: one backend API shared by a mobile app
-(built first) and, later, a web app.
+A real-money gaming platform: one backend API shared by a mobile app (the
+user's own NovaPlay app, extended with real wallet/KYC/RNG) and, later, a
+web app.
 
 ## ⚠️ Legal & compliance — read before going live
 
@@ -32,6 +33,16 @@ real customer you are responsible for:
   product before launch. This is a heavily regulated industry and the
   consequences of operating without a valid licence are criminal, not just
   civil.
+- **RNG certification**: the "Games" section in the mobile app stakes real
+  money on outcomes decided by `backend/src/services/gameEngineService.ts`.
+  That RNG is an honest, server-side implementation, but it is **not**
+  independently certified — real casino licences require certification from
+  an accredited testing lab (e.g. GLI, iTech Labs, BMM) before real players
+  can use it.
+- **Phone auth**: `backend/src/services/phoneAuthService.ts` verifies phone
+  numbers in "mock" mode (trusts the client) until you configure Firebase
+  Admin and set `PHONE_AUTH_MODE=live` — mock mode must never be used with
+  real users.
 
 ## Architecture
 
