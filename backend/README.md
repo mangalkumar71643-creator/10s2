@@ -60,6 +60,26 @@ its hash can be recomputed and verified independently. This proves the
 *process* wasn't tampered with — it is not the same as accredited RNG
 certification, which a real licence still requires.
 
+## Deploying to Vercel
+
+This backend runs as a Vercel serverless function: `api/index.ts` exports
+the Express app from `src/app.ts` (unchanged from local dev — only
+`src/index.ts`'s `app.listen()` is skipped in serverless mode), and
+`vercel.json` rewrites every request path to that one function.
+
+1. In the Vercel project's **Settings → General → Root Directory**, set it
+   to `backend` (this repo has multiple apps at the root).
+2. In **Storage**, create a Postgres database and connect it to the
+   project — this sets `DATABASE_URL` (or an equivalent env var; if it's
+   named differently, e.g. `POSTGRES_PRISMA_URL`, add a `DATABASE_URL` env
+   var pointing to the same pooled connection string so Prisma finds it).
+3. Set `JWT_SECRET` (any long random string) as an env var.
+4. After the first successful deploy, run `npm run prisma:deploy` (applies
+   migrations) and optionally `npm run prisma:seed` against that same
+   `DATABASE_URL` from your local machine or a one-off script.
+5. Point the mobile app's `API_BASE_URL` (`mobile/src/api/client.ts`) at
+   the deployment's URL instead of `localhost`.
+
 ## KYC, payments & phone auth are mocked
 
 `src/services/kycService.ts`, `src/services/paymentService.ts` and
