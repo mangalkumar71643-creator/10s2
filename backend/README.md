@@ -26,6 +26,7 @@ password immediately in a real environment.
 | Sports | `GET /sports`, `GET /sports/:sportId/events`, `GET /sports/events/:eventId` |
 | Bets | `POST /bets`, `GET /bets` |
 | Games (real-money) | `GET /games/config`, `POST /games/:gameKey/play`, `GET /games/history`, `GET /games/daily-bonus/status`, `POST /games/daily-bonus/claim` |
+| Provably fair | `GET /games/fairness`, `PUT /games/fairness/client-seed`, `POST /games/fairness/rotate`, `GET /games/fairness/history` |
 | Responsible gambling | `PUT /responsible-gambling/deposit-limits`, `POST /responsible-gambling/self-exclude` |
 | Admin (role=ADMIN) | `/admin/sports`, `/admin/events`, `/admin/markets`, `/admin/selections/:id/odds`, `/admin/markets/:id/settle`, `/admin/users`, `/admin/kyc/:userId`, `/admin/bets`, `/admin/reports/summary` |
 
@@ -43,6 +44,21 @@ server-side (once you implement `LiveFirebasePhoneVerifier` in
 phone number without the optional profile fields gets `428
 {"error":"profile_required"}` — resend with those fields to create the
 account (18+ enforced here too).
+
+### Games (`POST /games/:gameKey/play`)
+
+Body: `{ stake, gameType: "coinflip" | "dice", target? }` (`target`, 2-98,
+only applies to `dice` — the roll-under number the player picked; its
+payout multiplier is always `rtp * 100 / target` so every target has the
+same expected value). Outcomes are computed via
+`src/services/fairnessService.ts` + `src/utils/rng.ts`: a secret
+per-user server seed (committed via its SHA-256 hash, exposed through
+`GET /games/fairness`) combined with a client seed and an incrementing
+nonce through HMAC-SHA256. Rotating the seed (`POST
+/games/fairness/rotate`) reveals the old one so every round played under
+its hash can be recomputed and verified independently. This proves the
+*process* wasn't tampered with — it is not the same as accredited RNG
+certification, which a real licence still requires.
 
 ## KYC, payments & phone auth are mocked
 

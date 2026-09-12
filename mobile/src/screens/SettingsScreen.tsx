@@ -1,7 +1,7 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import AmountInputModal from '../components/AmountInputModal';
 import AppHeader from '../components/AppHeader';
@@ -11,6 +11,12 @@ import { IconName } from '../data/models';
 import { RootStackParamList } from '../navigation/types';
 import { colors, radius, spacing, typography } from '../theme';
 import { useAuth } from '../state/AuthContext';
+import { ApiClientError } from '../api/client';
+import { fetchFairnessStatus, rotateFairnessSeed } from '../api/backend';
+
+function truncateHash(hash: string): string {
+  return `${hash.slice(0, 10)}…${hash.slice(-6)}`;
+}
 
 const KYC_LABELS: Record<string, string> = {
   NOT_STARTED: 'Not started',
@@ -29,6 +35,34 @@ export default function SettingsScreen() {
   const [kycBusy, setKycBusy] = useState(false);
   const [limitModalOpen, setLimitModalOpen] = useState(false);
   const [limitBusy, setLimitBusy] = useState(false);
+  const [seedHash, setSeedHash] = useState<string | null>(null);
+  const [clientSeed, setClientSeed] = useState<string | null>(null);
+  const [rotating, setRotating] = useState(false);
+
+  useEffect(() => {
+    fetchFairnessStatus()
+      .then((status) => {
+        setSeedHash(status.serverSeedHash);
+        setClientSeed(status.clientSeed);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleRotateSeed() {
+    setRotating(true);
+    try {
+      const result = await rotateFairnessSeed();
+      setSeedHash(result.newServerSeedHash);
+      Alert.alert(
+        'Seed rotated',
+        `Your previous server seed is now revealed:\n\n${result.revealedServerSeed}\n\nYou can hash it yourself (SHA-256) and confirm it matches the hash shown before rotation.`
+      );
+    } catch (err) {
+      Alert.alert('Failed', err instanceof ApiClientError ? err.message : 'Could not rotate seed.');
+    } finally {
+      setRotating(false);
+    }
+  }
 
   async function handleSubmitKyc() {
     setKycBusy(true);
@@ -126,6 +160,23 @@ export default function SettingsScreen() {
         <NavRow icon="cash-lock" label="Set Daily Deposit Limit" onPress={() => setLimitModalOpen(true)} />
         <NavRow icon="account-cancel-outline" label="Self-Exclude (30 days)" onPress={handleSelfExclude} last />
       </View>
+
+      <SectionHeader title="Provably Fair" />
+      <View style={styles.card}>
+        {seedHash ? <InfoRow icon="lock-check-outline" label="Active seed hash" value={truncateHash(seedHash)} /> : null}
+        {clientSeed ? <InfoRow icon="key-outline" label="Client seed" value={clientSeed} /> : null}
+        <NavRow
+          icon="refresh"
+          label={rotating ? 'Rotating…' : 'Rotate & Verify Seed'}
+          onPress={handleRotateSeed}
+          last
+        />
+      </View>
+      <Text style={styles.fairnessExplainer}>
+        Every game round is computed from this seed pair via HMAC-SHA256 — rotating reveals the old
+        seed so you can independently confirm past rounds weren't tampered with. This proves the
+        process is fair; it is not the same as accredited RNG certification.
+      </Text>
 
       <Pressable onPress={handleLogout} style={styles.logoutButton}>
         <MaterialCommunityIcons name="logout" size={18} color={colors.negative} />
@@ -230,6 +281,13 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   version: { color: colors.textMuted, fontSize: typography.xs, textAlign: 'center', marginTop: spacing.sm },
+  fairnessExplainer: {
+    color: colors.textMuted,
+    fontSize: typography.xs,
+    lineHeight: 16,
+    paddingHorizontal: spacing.xl,
+    marginTop: spacing.sm,
+  },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',

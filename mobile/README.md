@@ -29,10 +29,15 @@ machine's LAN IP for a physical device or Android emulator, not `localhost`).
 - **Game Detail** — "Play for Real" stakes Coins on a backend-settled round; the backend's
   server-side RNG decides win/loss (see `backend/src/services/gameEngineService.ts` — **not**
   independently certified, see root README).
+- **Dice** (Home → "Dice" button) — pick a roll-under target (2-98) and see the win chance/payout
+  multiplier update live before staking; a genuinely different risk/reward mechanic from the
+  arcade games' fixed coin-flip. Every round is "provably fair" — see Settings.
 - **Rewards** — daily streak bonus (server-tracked, real money, fixed reward table shared with the
   backend). Missions and VIP bonuses are still cosmetic/local-only — they don't move real money
   yet (see the comment at the top of `GameStateContext.tsx`).
-- **Settings** — KYC submission, daily deposit limit, 30-day self-exclusion (all backend-enforced).
+- **Settings** — KYC submission, daily deposit limit, 30-day self-exclusion (all backend-enforced),
+  and a Provably Fair section showing your active seed hash/client seed with a rotate-and-verify
+  button.
 - **Ranking**, **VIP**, **Profile**, **Help Center**, **Notifications**, **Game Category browser**.
 
 ## Auth: phone number + OTP

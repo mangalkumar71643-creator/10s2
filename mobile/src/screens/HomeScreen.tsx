@@ -1,12 +1,16 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { AVATARS } from '../data/avatars';
-import { BottomTabParamList } from '../navigation/types';
+import { BottomTabParamList, RootStackParamList } from '../navigation/types';
 import { useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
+import { colors, gradients, radius, spacing, typography } from '../theme';
 
 const TOP_BAR_HEIGHT = 69;
 
@@ -41,6 +45,7 @@ const PANEL_HEIGHT = 408;
 export default function HomeScreen() {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
+  const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { avatarId } = useAuth();
   const { coins } = useGameState();
   const panelHeight = screenHeight * (PANEL_HEIGHT / REFERENCE_HEIGHT);
@@ -144,6 +149,42 @@ export default function HomeScreen() {
         }}
         resizeMode="contain"
       />
+
+      <View
+        style={{
+          position: 'absolute',
+          top: panelTop + panelHeight + spacing.lg,
+          left: spacing.lg,
+          right: spacing.lg,
+          flexDirection: 'row',
+          gap: spacing.md,
+        }}
+      >
+        <Pressable style={{ flex: 1 }} onPress={() => rootNavigation.navigate('GameCategory', {})}>
+          <LinearGradient colors={gradients.goldButton} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={homeStyles.actionButton}>
+            <MaterialCommunityIcons name="controller-classic-outline" size={18} color={colors.background} />
+            <Text style={homeStyles.actionButtonText}>Games</Text>
+          </LinearGradient>
+        </Pressable>
+        <Pressable style={{ flex: 1 }} onPress={() => rootNavigation.navigate('DiceGame')}>
+          <LinearGradient colors={gradients.crimsonButton} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={homeStyles.actionButton}>
+            <MaterialCommunityIcons name="dice-multiple-outline" size={18} color={colors.textPrimary} />
+            <Text style={[homeStyles.actionButtonText, { color: colors.textPrimary }]}>Dice</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
     </ScreenContainer>
   );
 }
+
+const homeStyles = {
+  actionButton: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: spacing.sm,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.md,
+  },
+  actionButtonText: { color: colors.background, fontWeight: '800' as const, fontSize: typography.sm },
+};

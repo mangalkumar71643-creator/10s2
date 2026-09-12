@@ -1,18 +1,39 @@
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
 import { env } from "../config/env";
-import { secureRandomFloat } from "../utils/rng";
+import { fairRandomFloat } from "../utils/rng";
 import { assertCanTransact } from "./responsibleGamblingService";
+import { nextRoundSeedMaterial } from "./fairnessService";
+
+export type GameType = "coinflip" | "dice";
+
+export interface PlayGameInput {
+  userId: string;
+  gameKey: string;
+  gameType: GameType;
+  stake: number;
+  /** dice only: roll-under target, 2-98. Lower target = lower win chance,
+   * higher multiplier. */
+  target?: number;
+}
+
+const DICE_MIN_TARGET = 2;
+const DICE_MAX_TARGET = 98;
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
 
 /**
- * Real-money "play a game" wagering engine. The RNG here is a simple,
- * honest server-side implementation (crypto-random, computed server-side
- * so the client can never influence or predict it) — but it is NOT
- * independently certified. Real gambling licences require RNG
- * certification from an accredited testing lab (e.g. GLI, iTech Labs)
- * before this can be used with real customers. See root README.
+ * Real-money "play a game" wagering engine. Outcomes are provably fair
+ * (see fairnessService.ts / rng.ts) — computed server-side from a secret
+ * seed the client cannot see or influence in advance, but independently
+ * verifiable once that seed is later revealed. This is NOT the same as
+ * accredited RNG certification, which a real gambling licence still
+ * requires before real customers can play — see root README.
  */
-export async function playGame(userId: string, gameKey: string, stake: number) {
+export async function playGame(input: PlayGameInput) {
+  const { userId, gameKey, gameType, stake } = input;
   await assertCanTransact(userId);
 
   const { minStake, maxStake, rtp, winMultiplier } = env.games;
@@ -25,9 +46,28 @@ export async function playGame(userId: string, gameKey: string, stake: number) {
     throw new ApiError(400, "Insufficient balance");
   }
 
-  const winProbability = rtp / winMultiplier;
-  const won = secureRandomFloat() < winProbability;
-  const payout = won ? Math.round(stake * winMultiplier * 100) / 100 : 0;
+  const { serverSeed, serverSeedHash, clientSeed, nonce } = await nextRoundSeedMaterial(userId);
+  const roll = fairRandomFloat(serverSeed, clientSeed, nonce);
+
+  let won: boolean;
+  let multiplier: number;
+  let target: number | null = null;
+
+  if (gameType === "dice") {
+    target = Math.min(DICE_MAX_TARGET, Math.max(DICE_MIN_TARGET, Math.round(input.target ?? 50)));
+    // Player wins if the roll (0-100) lands under their chosen target —
+    // a lower target is less likely to hit but pays out more, and the
+    // multiplier is set so the long-run expected value always equals rtp
+    // regardless of which target the player picks.
+    won = roll * 100 < target;
+    multiplier = won ? round2((rtp * 100) / target) : 0;
+  } else {
+    const winProbability = rtp / winMultiplier;
+    won = roll < winProbability;
+    multiplier = won ? winMultiplier : 0;
+  }
+
+  const payout = won ? round2(stake * multiplier) : 0;
 
   await prisma.$transaction([
     prisma.wallet.update({ where: { userId }, data: { balance: { decrement: stake } } }),
@@ -49,10 +89,15 @@ export async function playGame(userId: string, gameKey: string, stake: number) {
     data: {
       userId,
       gameKey,
+      gameType,
+      target,
       stake,
-      multiplier: won ? winMultiplier : 0,
+      multiplier,
       payout,
       won,
+      serverSeedHash,
+      clientSeed,
+      nonce,
     },
   });
 

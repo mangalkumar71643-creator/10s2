@@ -24,4 +24,5 @@ export type RootStackParamList = {
   History: undefined;
   GameCategory: { categoryId?: GameCategoryId };
   GameDetail: { gameId: string };
+  DiceGame: undefined;
 };

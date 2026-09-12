@@ -105,24 +105,63 @@ export function fetchGameConfig() {
   return apiFetch<GameConfig>('/games/config');
 }
 
+export type GameType = 'coinflip' | 'dice';
+
 export interface GameRoundResult {
   round: {
     id: string;
     gameKey: string;
+    gameType: GameType;
+    target: number | null;
     stake: string;
     multiplier: string;
     payout: string;
     won: boolean;
+    serverSeedHash: string;
+    clientSeed: string;
+    nonce: number;
     createdAt: string;
   };
   newBalance: string;
 }
 
-export function playGameForReal(gameKey: string, stake: number) {
+export function playGameForReal(
+  gameKey: string,
+  stake: number,
+  gameType: GameType = 'coinflip',
+  target?: number
+) {
   return apiFetch<GameRoundResult>(`/games/${gameKey}/play`, {
     method: 'POST',
-    body: JSON.stringify({ stake }),
+    body: JSON.stringify({ stake, gameType, target }),
   });
+}
+
+export interface FairnessStatus {
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+}
+
+export function fetchFairnessStatus() {
+  return apiFetch<FairnessStatus>('/games/fairness');
+}
+
+export function setFairnessClientSeed(clientSeed: string) {
+  return apiFetch<FairnessStatus>('/games/fairness/client-seed', {
+    method: 'PUT',
+    body: JSON.stringify({ clientSeed }),
+  });
+}
+
+export interface RotateSeedResult {
+  revealedServerSeed: string;
+  revealedServerSeedHash: string;
+  newServerSeedHash: string;
+}
+
+export function rotateFairnessSeed() {
+  return apiFetch<RotateSeedResult>('/games/fairness/rotate', { method: 'POST' });
 }
 
 export interface DailyBonusStatus {

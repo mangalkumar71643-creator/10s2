@@ -79,10 +79,20 @@ model User {
   dailyStreak          Int       @default(0)
   lastDailyClaimAt     DateTime?
 
+  // Provably-fair game RNG state — see fairnessService.ts. serverSeed is
+  // never exposed to the client until rotated; serverSeedHash is shown
+  // upfront so a player can verify, after rotation, that it wasn't
+  // changed mid-play.
+  fairnessServerSeed     String?
+  fairnessServerSeedHash String?
+  fairnessClientSeed     String?
+  fairnessNonce          Int      @default(0)
+
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
   wallet               Wallet?
+  revealedSeeds        RevealedServerSeed[]
   transactions         Transaction[]
   bets                 Bet[]
   gameRounds           GameRound[]
@@ -162,20 +172,39 @@ model Selection {
   bets      Bet[]
 }
 
-// One round of a real-money "game" (see gameEngineService.ts). The RNG is
-// a simple, honest server-side implementation — it is NOT independently
-// certified. A real casino licence requires RNG certification from an
-// accredited testing lab; that is a compliance step outside this codebase.
+// One round of a real-money "game" (see gameEngineService.ts). Outcomes
+// are "provably fair" (HMAC-SHA256 of serverSeed/clientSeed/nonce — see
+// fairnessService.ts) — a player can independently recompute the result
+// once serverSeedHash's underlying seed is revealed via seed rotation.
+// This is NOT the same as accredited RNG certification, which a real
+// casino licence still requires; that is a compliance step outside this
+// codebase.
 model GameRound {
-  id         String   @id @default(uuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id])
-  gameKey    String
-  stake      Decimal  @db.Decimal(12, 2)
-  multiplier Decimal  @db.Decimal(8, 4)
-  payout     Decimal  @db.Decimal(12, 2)
-  won        Boolean
-  createdAt  DateTime @default(now())
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  gameKey        String
+  gameType       String   // "coinflip" | "dice"
+  target         Int?     // dice only: the roll-under target the player chose
+  stake          Decimal  @db.Decimal(12, 2)
+  multiplier     Decimal  @db.Decimal(8, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  won            Boolean
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+}
+
+// A server seed's value is only ever revealed once rotated out — this is
+// what lets a player verify past rounds played under its hash.
+model RevealedServerSeed {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  serverSeed     String
+  serverSeedHash String
+  createdAt      DateTime @default(now())
 }
 
 model Bet {
