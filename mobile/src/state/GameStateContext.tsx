@@ -27,6 +27,14 @@ type GameState = {
   loading: boolean;
   user: User | null;
   coins: number;
+  withdrawable: number;
+  lockedBonus: number;
+  wageringRequired: number;
+  wageringProgress: number;
+  payoutUpiId: string | null;
+  firstDepositBonusClaimed: boolean;
+  dailyWithdrawalLimit: number;
+  remainingWithdrawalLimit: number;
   transactions: WalletTransaction[];
   missions: Mission[];
   achievements: Achievement[];
@@ -52,6 +60,14 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [coins, setCoins] = useState(0);
+  const [withdrawable, setWithdrawable] = useState(0);
+  const [lockedBonus, setLockedBonus] = useState(0);
+  const [wageringRequired, setWageringRequired] = useState(0);
+  const [wageringProgress, setWageringProgress] = useState(0);
+  const [payoutUpiId, setPayoutUpiId] = useState<string | null>(null);
+  const [firstDepositBonusClaimed, setFirstDepositBonusClaimed] = useState(false);
+  const [dailyWithdrawalLimit, setDailyWithdrawalLimit] = useState(0);
+  const [remainingWithdrawalLimit, setRemainingWithdrawalLimit] = useState(0);
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [missions, setMissions] = useState<Mission[]>(initialMissions);
   const [achievements] = useState<Achievement[]>(initialAchievements);
@@ -65,6 +81,14 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const refreshWallet = useCallback(async () => {
     const [wallet, dailyStatus] = await Promise.all([fetchWallet(), fetchDailyBonusStatus()]);
     setCoins(wallet.coins);
+    setWithdrawable(wallet.withdrawable);
+    setLockedBonus(wallet.lockedBonus);
+    setWageringRequired(wallet.wageringRequired);
+    setWageringProgress(wallet.wageringProgress);
+    setPayoutUpiId(wallet.payoutUpiId);
+    setFirstDepositBonusClaimed(wallet.firstDepositBonusClaimed);
+    setDailyWithdrawalLimit(wallet.dailyWithdrawalLimit);
+    setRemainingWithdrawalLimit(wallet.remainingWithdrawalLimit);
     setTransactions(wallet.transactions);
     setStreak(dailyStatus.dailyStreak);
     setClaimedToday(dailyStatus.claimedToday);
@@ -116,6 +140,14 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       refreshWallet().catch(() => {});
     } else {
       setCoins(0);
+      setWithdrawable(0);
+      setLockedBonus(0);
+      setWageringRequired(0);
+      setWageringProgress(0);
+      setPayoutUpiId(null);
+      setFirstDepositBonusClaimed(false);
+      setDailyWithdrawalLimit(0);
+      setRemainingWithdrawalLimit(0);
       setTransactions([]);
       setStreak(0);
       setClaimedToday(false);
@@ -187,6 +219,14 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     loading,
     user,
     coins,
+    withdrawable,
+    lockedBonus,
+    wageringRequired,
+    wageringProgress,
+    payoutUpiId,
+    firstDepositBonusClaimed,
+    dailyWithdrawalLimit,
+    remainingWithdrawalLimit,
     transactions,
     missions,
     achievements,

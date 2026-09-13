@@ -2,9 +2,11 @@ import { WalletTransaction } from '../data/models';
 import { IconName } from '../data/models';
 import {
   BackendTransaction,
+  BackendWallet,
   depositToWallet,
   fetchBackendTransactions,
   fetchBackendWallet,
+  setPayoutUpiId as setPayoutUpiIdRequest,
   withdrawFromWallet,
 } from '../api/backend';
 
@@ -17,6 +19,7 @@ const TX_ICONS: Record<BackendTransaction['type'], IconName> = {
   GAME_STAKE: 'controller-classic-outline',
   GAME_PAYOUT: 'trophy-outline',
   BONUS: 'gift-outline',
+  DEPOSIT_BONUS: 'gift-outline',
 };
 
 const TX_TITLES: Record<BackendTransaction['type'], string> = {
@@ -28,9 +31,17 @@ const TX_TITLES: Record<BackendTransaction['type'], string> = {
   GAME_STAKE: 'Game stake',
   GAME_PAYOUT: 'Game win',
   BONUS: 'Bonus credit',
+  DEPOSIT_BONUS: 'Deposit bonus',
 };
 
-const CREDIT_TYPES = new Set<BackendTransaction['type']>(['DEPOSIT', 'BET_PAYOUT', 'GAME_PAYOUT', 'BONUS', 'BET_REFUND']);
+const CREDIT_TYPES = new Set<BackendTransaction['type']>([
+  'DEPOSIT',
+  'BET_PAYOUT',
+  'GAME_PAYOUT',
+  'BONUS',
+  'BET_REFUND',
+  'DEPOSIT_BONUS',
+]);
 
 function mapTransaction(tx: BackendTransaction): WalletTransaction {
   const signedAmount = CREDIT_TYPES.has(tx.type) ? Number(tx.amount) : -Number(tx.amount);
@@ -46,20 +57,54 @@ function mapTransaction(tx: BackendTransaction): WalletTransaction {
   };
 }
 
+export interface WalletSummary {
+  coins: number;
+  withdrawable: number;
+  lockedBonus: number;
+  wageringRequired: number;
+  wageringProgress: number;
+  payoutUpiId: string | null;
+  firstDepositBonusClaimed: boolean;
+  dailyWithdrawalLimit: number;
+  remainingWithdrawalLimit: number;
+  transactions: WalletTransaction[];
+}
+
+function toSummary(wallet: BackendWallet, transactions: WalletTransaction[]): WalletSummary {
+  return {
+    coins: Number(wallet.balance),
+    withdrawable: wallet.withdrawable,
+    lockedBonus: Number(wallet.lockedBonus),
+    wageringRequired: Number(wallet.wageringRequired),
+    wageringProgress: Number(wallet.wageringProgress),
+    payoutUpiId: wallet.payoutUpiId,
+    firstDepositBonusClaimed: wallet.firstDepositBonusClaimed,
+    dailyWithdrawalLimit: wallet.dailyWithdrawalLimit,
+    remainingWithdrawalLimit: wallet.remainingWithdrawalLimit,
+    transactions,
+  };
+}
+
 /** Real wallet balance + transaction history from the backend — this is
  * the money-authoritative source; nothing in the app should mutate coins
  * locally anymore. */
-export async function fetchWallet(): Promise<{ coins: number; transactions: WalletTransaction[] }> {
+export async function fetchWallet(): Promise<WalletSummary> {
   const [wallet, transactions] = await Promise.all([fetchBackendWallet(), fetchBackendTransactions()]);
-  return { coins: Number(wallet.balance), transactions: transactions.map(mapTransaction) };
+  return toSummary(wallet, transactions.map(mapTransaction));
 }
 
-export async function deposit(amount: number): Promise<number> {
-  const wallet = await depositToWallet(amount);
-  return Number(wallet.balance);
+/** Returns the new balance plus how much first-deposit bonus (if any) was
+ * granted by this deposit, so the UI can show what actually landed. */
+export async function deposit(amount: number): Promise<{ newBalance: number; bonusGranted: number }> {
+  const result = await depositToWallet(amount);
+  return { newBalance: Number(result.balance), bonusGranted: result.bonusGranted };
 }
 
 export async function withdraw(amount: number): Promise<number> {
   const wallet = await withdrawFromWallet(amount);
   return Number(wallet.balance);
+}
+
+export async function setPayoutUpiId(upiId: string): Promise<void> {
+  await setPayoutUpiIdRequest(upiId);
 }

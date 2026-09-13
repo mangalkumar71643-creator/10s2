@@ -62,6 +62,18 @@ export interface BackendWallet {
   id: string;
   balance: string;
   currency: string;
+  lockedBonus: string;
+  wageringRequired: string;
+  wageringProgress: string;
+  payoutUpiId: string | null;
+  firstDepositBonusClaimed: boolean;
+  withdrawable: number;
+  dailyWithdrawalLimit: number;
+  remainingWithdrawalLimit: number;
+}
+
+export interface DepositResult extends BackendWallet {
+  bonusGranted: number;
 }
 
 export function fetchBackendWallet() {
@@ -78,7 +90,8 @@ export interface BackendTransaction {
     | 'BET_REFUND'
     | 'GAME_STAKE'
     | 'GAME_PAYOUT'
-    | 'BONUS';
+    | 'BONUS'
+    | 'DEPOSIT_BONUS';
   amount: string;
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
   createdAt: string;
@@ -89,11 +102,15 @@ export function fetchBackendTransactions() {
 }
 
 export function depositToWallet(amount: number) {
-  return apiFetch<BackendWallet>('/wallet/deposit', { method: 'POST', body: JSON.stringify({ amount }) });
+  return apiFetch<DepositResult>('/wallet/deposit', { method: 'POST', body: JSON.stringify({ amount }) });
 }
 
 export function withdrawFromWallet(amount: number) {
   return apiFetch<BackendWallet>('/wallet/withdraw', { method: 'POST', body: JSON.stringify({ amount }) });
+}
+
+export function setPayoutUpiId(upiId: string) {
+  return apiFetch<BackendWallet>('/wallet/payout-account', { method: 'PUT', body: JSON.stringify({ upiId }) });
 }
 
 export function submitBackendKyc(documentType: string, documentReference: string) {
