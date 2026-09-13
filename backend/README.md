@@ -97,6 +97,10 @@ path to the API function first) just to satisfy that check.
 4. After the first successful deploy, run `npm run prisma:deploy` (applies
    migrations) and optionally `npm run prisma:seed` against that same
    `DATABASE_URL` from your local machine or a one-off script.
+   (Note: use the Vercel dashboard's Deployments list to redeploy the
+   specific deployment tied to this branch — the Environment Variables
+   page's generic "Redeploy" banner can redeploy whatever deployment is
+   currently pinned as Production, even one from a different branch.)
 5. Point the mobile app's `API_BASE_URL` (`mobile/src/api/client.ts`) at
    the deployment's URL instead of `localhost`.
 
