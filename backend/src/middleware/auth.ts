@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { verifyChatToken, verifyToken } from "../utils/jwt";
+import { prisma } from "../db/prismaClient";
 
 declare global {
   namespace Express {
@@ -10,13 +11,26 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Missing or invalid Authorization header" });
   }
   try {
     const payload = verifyToken(header.slice("Bearer ".length));
+    // Checked on every request (not just at login) so an admin ban takes
+    // effect immediately for an already-logged-in, still-valid token.
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { isBanned: true, banReason: true },
+    });
+    if (user?.isBanned) {
+      return res.status(403).json({
+        error: user.banReason
+          ? `Your account has been suspended: ${user.banReason}`
+          : "Your account has been suspended.",
+      });
+    }
     req.user = { userId: payload.userId, role: payload.role };
     next();
   } catch {

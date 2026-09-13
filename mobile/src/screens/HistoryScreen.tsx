@@ -19,7 +19,7 @@ const RANGES: { label: string; days: Range }[] = [
 // Deposits and withdrawals are tagged with these two icons when they're
 // recorded, so this screen can pull the real transaction list instead of
 // keeping its own separate (and possibly stale) copy.
-const DEPOSIT_WITHDRAW_ICONS = ['bank-transfer-in', 'bank-transfer-out'];
+const DEPOSIT_WITHDRAW_ICONS = ['bank-transfer-in', 'bank-transfer-out', 'bank-transfer'];
 
 export default function HistoryScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -64,6 +64,11 @@ export default function HistoryScreen() {
               <View style={styles.rowMiddle}>
                 <Text style={styles.rowTitle}>{t.title}</Text>
                 <Text style={styles.rowTimestamp}>{t.timestamp}</Text>
+                {t.status === 'PENDING' ? (
+                  <Text style={styles.rowStatusPending}>Pending admin approval</Text>
+                ) : t.status === 'FAILED' ? (
+                  <Text style={styles.rowStatusFailed}>Rejected — refunded</Text>
+                ) : null}
               </View>
               <Text style={[styles.rowAmount, t.amount < 0 && styles.rowAmountNegative]}>
                 {t.amount >= 0 ? '+' : ''}
@@ -133,6 +138,8 @@ const styles = StyleSheet.create({
   rowMiddle: { flex: 1 },
   rowTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: typography.sm },
   rowTimestamp: { color: colors.textMuted, fontSize: typography.xs, marginTop: 2 },
+  rowStatusPending: { color: colors.gold, fontSize: typography.xs, fontWeight: '700', marginTop: 2 },
+  rowStatusFailed: { color: colors.negative, fontSize: typography.xs, fontWeight: '700', marginTop: 2 },
   rowAmount: { color: colors.positive, fontWeight: '800', fontSize: typography.md },
   rowAmountNegative: { color: colors.negative },
 });

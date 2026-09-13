@@ -26,6 +26,10 @@ export type WalletTransaction = {
   icon: IconName;
   timestamp: string;
   timestampISO: string;
+  /** Only meaningful for withdrawals — PENDING (awaiting admin approval)
+   * or FAILED (rejected & refunded) get a status badge in History; other
+   * transaction types are always COMPLETED. */
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
 };
 
 export type GameCategoryId =

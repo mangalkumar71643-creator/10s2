@@ -94,7 +94,7 @@ export default function WithdrawScreen() {
       await refreshWallet();
       Alert.alert(
         'Withdrawal requested',
-        `₹${amount.toLocaleString('en-IN')} will be sent to your bank account ending ${payoutAccountNumber?.slice(-4)}.`,
+        `₹${amount.toLocaleString('en-IN')} is on its way to your bank account ending ${payoutAccountNumber?.slice(-4)} — pending admin approval before it's sent.`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (err) {

@@ -44,6 +44,7 @@ enum TransactionType {
   GAME_PAYOUT
   BONUS
   DEPOSIT_BONUS
+  WITHDRAWAL_REVERSAL
 }
 
 enum TransactionStatus {
@@ -93,6 +94,13 @@ model User {
   country              String
   role                 Role      @default(USER)
   kycStatus            KycStatus @default(NOT_STARTED)
+
+  // Admin-initiated ban (distinct from the user's own isSelfExcluded) —
+  // for rule violations. Checked in middleware/auth.ts's requireAuth so a
+  // ban takes effect immediately, not just on the next login.
+  isBanned             Boolean   @default(false)
+  banReason            String?
+  bannedAt             DateTime?
 
   // Responsible gambling
   isSelfExcluded       Boolean   @default(false)

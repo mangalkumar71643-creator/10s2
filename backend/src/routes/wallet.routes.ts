@@ -33,7 +33,11 @@ async function buildWalletView(userId: string) {
       },
     }),
     prisma.transaction.aggregate({
-      where: { userId, type: "WITHDRAWAL", status: "COMPLETED", createdAt: { gte: startOfDay() } },
+      // PENDING counts too so a still-unapproved withdrawal already
+      // earmarked against the daily limit — otherwise a user could
+      // submit several pending requests to bypass it before any are
+      // approved.
+      where: { userId, type: "WITHDRAWAL", status: { in: ["PENDING", "COMPLETED"] }, createdAt: { gte: startOfDay() } },
       _sum: { amount: true },
     }),
   ]);
@@ -200,22 +204,13 @@ router.post(
       throw new ApiError(400, `This would exceed today's withdrawal limit. Remaining today: ₹${view.remainingWithdrawalLimit.toFixed(2)}.`);
     }
 
-    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId } });
-    const result = await paymentProvider.withdraw({ userId, amount, currency: wallet.currency });
-    if (result.status !== "COMPLETED") {
-      throw new ApiError(502, "Withdrawal could not be completed by the payment provider.");
-    }
-
+    // Withdrawals now require manual admin approval (see admin.routes.ts
+    // PATCH /admin/withdrawals/:id/approve|reject) rather than completing
+    // instantly — the amount is deducted right away so the funds are
+    // earmarked and can't be double-spent while the request is pending.
     await prisma.$transaction([
       prisma.transaction.create({
-        data: {
-          userId,
-          type: "WITHDRAWAL",
-          amount,
-          status: "COMPLETED",
-          provider: result.provider,
-          providerReferenceId: result.providerReferenceId,
-        },
+        data: { userId, type: "WITHDRAWAL", amount, status: "PENDING" },
       }),
       prisma.wallet.update({
         where: { userId },

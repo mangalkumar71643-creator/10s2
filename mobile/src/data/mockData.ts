@@ -8,7 +8,6 @@ import {
   Mission,
   User,
   VipLevelDef,
-  WalletTransaction,
 } from './models';
 
 export const initialUser: User = {
@@ -201,19 +200,6 @@ export const dailyRewardTrack: DailyRewardDay[] = [
   { day: 5, amount: 350 },
   { day: 6, amount: 500 },
   { day: 7, amount: 1000 },
-];
-
-function hoursAgoISO(hours: number) {
-  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-}
-
-export const initialWalletTransactions: WalletTransaction[] = [
-  { id: 't-1', title: 'Daily Bonus', amount: 500, type: 'earn', icon: 'gift-outline', timestamp: 'Today, 08:30 AM', timestampISO: hoursAgoISO(2) },
-  { id: 't-2', title: 'Neon Rush Reward', amount: 120, type: 'earn', icon: 'controller-classic-outline', timestamp: 'Today, 07:45 AM', timestampISO: hoursAgoISO(3) },
-  { id: 't-3', title: 'Achievement', amount: 300, type: 'earn', icon: 'medal-outline', timestamp: 'Yesterday, 10:15 PM', timestampISO: hoursAgoISO(20) },
-  { id: 't-4', title: 'Daily Mission', amount: 250, type: 'earn', icon: 'clipboard-check-outline', timestamp: 'Yesterday, 06:20 PM', timestampISO: hoursAgoISO(24) },
-  { id: 't-5', title: 'Lucky Spin', amount: 180, type: 'earn', icon: 'ferris-wheel', timestamp: 'Yesterday, 12:10 PM', timestampISO: hoursAgoISO(30) },
-  { id: 't-6', title: 'Game Entry', amount: -50, type: 'spend', icon: 'gamepad-variant-outline', timestamp: 'Yesterday, 11:58 AM', timestampISO: hoursAgoISO(31) },
 ];
 
 export const vipLevels: VipLevelDef[] = [

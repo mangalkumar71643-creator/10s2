@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>NovaPlay Admin</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #170709;
+    --surface: #2A0F14;
+    --surface-alt: #33141A;
+    --border: rgba(240, 185, 61, 0.28);
+    --border-strong: rgba(240, 185, 61, 0.55);
+    --gold: #F0B93D;
+    --crimson: #C4172C;
+    --crimson-light: #FF4D5E;
+    --text: #FFFFFF;
+    --text-secondary: #CBB4B8;
+    --text-muted: #8E7377;
+    --positive: #3ECF8E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    padding-bottom: 60px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--gold); }
+  .sub { color: var(--text-muted); font-size: 13px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    max-width: 420px;
+    margin: 60px auto;
+  }
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin: 12px 0 6px; }
+  input, select, textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+  }
+  button {
+    border: none;
+    border-radius: 10px;
+    background: var(--crimson);
+    color: #fff;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 10px 16px;
+  }
+  button:hover { background: var(--crimson-light); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: transparent; border: 1px solid var(--border); color: var(--gold); }
+  button.full { width: 100%; margin-top: 16px; padding: 12px; }
+  button.small { padding: 6px 12px; font-size: 12px; }
+  button.positive { background: var(--positive); color: #0a2417; }
+  #error { color: var(--crimson-light); font-size: 13px; margin-top: 10px; min-height: 16px; }
+  #shell { display: none; }
+  #topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    background: var(--surface); position: sticky; top: 0; z-index: 5;
+  }
+  #topbar h1 { font-size: 17px; }
+  #logout { margin-left: auto; background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+  #tabs { display: flex; gap: 4px; padding: 10px 20px 0; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    background: transparent; color: var(--text-muted); border: none; border-radius: 10px 10px 0 0;
+    padding: 10px 16px; font-size: 13px; font-weight: 700; white-space: nowrap;
+  }
+  .tab-btn.active { background: var(--bg); color: var(--gold); }
+  .panel { display: none; padding: 20px; max-width: 900px; margin: 0 auto; }
+  .panel.active { display: block; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .row > * { flex: 1; min-width: 140px; }
+  .item {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 10px;
+  }
+  .item-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+  .item-title { font-weight: 700; font-size: 14px; }
+  .item-meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+  .item-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .badge.pending { background: rgba(240,185,61,0.18); color: var(--gold); }
+  .badge.approved { background: rgba(62,207,142,0.18); color: var(--positive); }
+  .badge.rejected, .badge.banned, .badge.failed { background: rgba(196,23,44,0.25); color: var(--crimson-light); }
+  .empty { color: var(--text-muted); font-size: 13px; padding: 20px 0; text-align: center; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .stat-value { font-size: 22px; font-weight: 800; color: var(--gold); }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .section-divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+  .selection-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .selection-row input { flex: 1; }
+  .selection-row button { flex: 0 0 auto; }
+
+  #threadOverlay {
+    display: none; position: fixed; inset: 0; background: rgba(9, 2, 3, 0.72);
+    align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  #threadPanel {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
+    width: 100%; max-width: 480px; height: min(640px, 90vh);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #threadHeader { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  #threadMessages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .tbubble { max-width: 78%; padding: 9px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+  .tbubble.USER { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); }
+  .tbubble.ADMIN { align-self: flex-end; background: var(--crimson); color: #fff; }
+  .tmeta { font-size: 10px; opacity: 0.65; margin-top: 3px; }
+  #threadComposer { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); }
+  #threadText { flex: 1; resize: none; max-height: 90px; }
+</style>
+</head>
+<body>
+
+<div id="loginView" class="card">
+  <h1>NovaPlay Admin</h1>
+  <div class="sub">Staff login required.</div>
+  <label for="email">Email</label>
+  <input id="email" type="email" autocomplete="username" />
+  <label for="password">Password</label>
+  <input id="password" type="password" autocomplete="current-password" />
+  <button id="loginBtn" class="full">Log In</button>
+  <div id="error"></div>
+</div>
+
+<div id="shell">
+  <div id="topbar">
+    <h1>NovaPlay Admin</h1>
+    <button id="logout">Log out</button>
+  </div>
+  <div id="tabs">
+    <button class="tab-btn active" data-tab="users">Users</button>
+    <button class="tab-btn" data-tab="withdrawals">Withdrawals</button>
+    <button class="tab-btn" data-tab="sports">Sports &amp; Markets</button>
+    <button class="tab-btn" data-tab="support">Support Chat</button>
+    <button class="tab-btn" data-tab="reports">Reports</button>
+  </div>
+
+  <div class="panel active" id="panel-users">
+    <div class="row">
+      <input id="userSearch" placeholder="Search name, email or phone…" />
+      <button id="userSearchBtn">Search</button>
+    </div>
+    <div id="usersList"></div>
+  </div>
+
+  <div class="panel" id="panel-withdrawals">
+    <div class="row">
+      <select id="withdrawalStatus">
+        <option value="PENDING">Pending</option>
+        <option value="COMPLETED">Completed</option>
+        <option value="FAILED">Rejected</option>
+        <option value="">All</option>
+      </select>
+      <button id="withdrawalRefresh">Refresh</button>
+    </div>
+    <div id="withdrawalsList"></div>
+  </div>
+
+  <div class="panel" id="panel-sports">
+    <h2>Create Sport</h2>
+    <div class="row">
+      <input id="sportName" placeholder="Name (e.g. Cricket)" />
+      <input id="sportSlug" placeholder="Slug (e.g. cricket)" />
+      <button id="createSportBtn">Create</button>
+    </div>
+
+    <hr class="section-divider" />
+
+    <h2>Sport</h2>
+    <div class="row">
+      <select id="sportSelect"></select>
+      <button id="refreshSportsBtn" class="secondary">Refresh sports</button>
+    </div>
+
+    <h2>Create Event</h2>
+    <div class="row">
+      <input id="eventName" placeholder="Event name (e.g. Team A vs Team B)" />
+      <input id="eventStart" type="datetime-local" />
+      <button id="createEventBtn">Create</button>
+    </div>
+
+    <h2>Events</h2>
+    <div id="eventsList"></div>
+  </div>
+
+  <div class="panel" id="panel-support">
+    <div class="section-title" style="font-size:15px;font-weight:800;margin-bottom:10px;">Priority — Open (<span id="openCount">0</span>)</div>
+    <div id="openList"></div>
+    <div class="section-title" style="font-size:15px;font-weight:800;margin:20px 0 10px;">Resolved</div>
+    <div id="resolvedList"></div>
+  </div>
+
+  <div class="panel" id="panel-reports">
+    <div class="stat-grid" id="statGrid"></div>
+    <button id="reportsRefresh" class="secondary">Refresh</button>
+  </div>
+</div>
+
+<div id="threadOverlay">
+  <div id="threadPanel">
+    <div id="threadHeader">
+      <div>
+        <div class="item-title" id="threadName"></div>
+        <div class="item-meta" id="threadContact"></div>
+      </div>
+      <button id="threadClose" class="secondary small">Close</button>
+    </div>
+    <div id="threadMessages"></div>
+    <div id="threadComposer">
+      <textarea id="threadText" rows="1" placeholder="Reply…"></textarea>
+      <button id="threadSend">Send</button>
+    </div>
+    <div style="padding:10px 16px;border-top:1px solid var(--border);">
+      <button id="threadResolve" class="secondary full">Mark Resolved</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var API = location.origin;
+  var TOKEN_KEY = 'novaplay_admin_token';
+  var token = null;
+
+  function getToken() { return localStorage.getItem(TOKEN_KEY); }
+  function setToken(t) { localStorage.setItem(TOKEN_KEY, t); token = t; }
+  function clearToken() { localStorage.removeItem(TOKEN_KEY); token = null; }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function api(path, options) {
+    options = options || {};
+    var headers = options.headers || {};
+    headers['Authorization'] = 'Bearer ' + token;
+    if (options.body) headers['Content-Type'] = 'application/json';
+    return fetch(API + path, { method: options.method || 'GET', headers: headers, body: options.body })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (!r.ok) {
+            var message = (r.status === 401 || r.status === 403) ? (body.error || 'Session expired') : (body.error || 'Request failed');
+            var err = new Error(message);
+            err.authError = r.status === 401 || r.status === 403;
+            throw err;
+          }
+          return body;
+        });
+      });
+  }
+
+  // --- Login ---
+
+  var loginView = document.getElementById('loginView');
+  var shell = document.getElementById('shell');
+  var errorEl = document.getElementById('error');
+
+  function showApp() {
+    loginView.style.display = 'none';
+    shell.style.display = 'block';
+    loadUsers();
+  }
+  function showLogin() {
+    loginView.style.display = 'block';
+    shell.style.display = 'none';
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', function () {
+    errorEl.textContent = '';
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+    if (!email || !password) { errorEl.textContent = 'Enter email and password.'; return; }
+    fetch(API + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password }),
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.body.error || 'Login failed');
+        if (res.body.user.role !== 'ADMIN') throw new Error('This account is not an admin.');
+        setToken(res.body.token);
+        showApp();
+      })
+      .catch(function (err) { errorEl.textContent = err.message; });
+  });
+
+  document.getElementById('logout').addEventListener('click', function () {
+    clearToken();
+    showLogin();
+  });
+
+  // --- Tabs ---
+
+  document.querySelectorAll('.tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.getAttribute('data-tab')).classList.add('active');
+      var tab = btn.getAttribute('data-tab');
+      if (tab === 'withdrawals') loadWithdrawals();
+      if (tab === 'sports') loadSports();
+      if (tab === 'support') loadTickets();
+      if (tab === 'reports') loadReports();
+    });
+  });
+
+  // --- Users ---
+
+  function userRowHtml(u) {
+    var name = [u.firstName, u.lastName].filter(Boolean).join(' ');
+    var contact = u.email || u.phone || '';
+    var kycBadge = '<span class="badge ' + (u.kycStatus === 'APPROVED' ? 'approved' : u.kycStatus === 'REJECTED' ? 'rejected' : 'pending') + '">KYC: ' + u.kycStatus + '</span>';
+    var banBadge = u.isBanned ? ' <span class="badge banned">BANNED</span>' : '';
+    var actions = '';
+    if (u.kycStatus === 'PENDING') {
+      actions += '<button class="small positive" data-action="kyc-approve" data-id="' + u.id + '">Approve KYC</button>';
+      actions += '<button class="small secondary" data-action="kyc-reject" data-id="' + u.id + '">Reject KYC</button>';
+    }
+    if (u.isBanned) {
+      actions += '<button class="small positive" data-action="unban" data-id="' + u.id + '">Unban</button>';
+    } else {
+      actions += '<button class="small" data-action="ban" data-id="' + u.id + '">Ban</button>';
+    }
+    return (
+      '<div class="item">' +
+        '<div class="item-top">' +
+          '<div>' +
+            '<div class="item-title">' + escapeHtml(name || 'Unnamed') + '</div>' +
+            '<div class="item-meta">' + escapeHtml(contact) + ' · joined ' + new Date(u.createdAt).toLocaleDateString() + '</div>' +
+            (u.isBanned ? '<div class="item-meta">Reason: ' + escapeHtml(u.banReason || '—') + '</div>' : '') +
+          '</div>' +
+          '<div>' + kycBadge + banBadge + '</div>' +
+        '</div>' +
+        '<div class="item-actions">' + actions + '</div>' +
+      '</div>'
+    );
+  }
+
+  function loadUsers() {
+    var search = document.getElementById('userSearch').value.trim();
+    var qs = search ? '?search=' + encodeURIComponent(search) : '';
+    api('/admin/users' + qs).then(function (users) {
+      document.getElementById('usersList').innerHTML = users.length
+        ? users.map(userRowHtml).join('')
+        : '<div class="empty">No users found.</div>';
+
+      document.querySelectorAll('#usersList button[data-action]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-id');
+          var action = btn.getAttribute('data-action');
+          if (action === 'kyc-approve') {
+            api('/admin/kyc/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'APPROVED' }) }).then(loadUsers);
+          } else if (action === 'kyc-reject') {
+            api('/admin/kyc/' + id, { method: 'PATCH', body: JSON.stringify({ status: 'REJECTED' }) }).then(loadUsers);
+          } else if (action === 'ban') {
+            var reason = prompt('Reason for banning this user:');
+            if (!reason) return;
+            api('/admin/users/' + id + '/ban', { method: 'PATCH', body: JSON.stringify({ reason: reason }) }).then(loadUsers);
+          } else if (action === 'unban') {
+            if (!confirm('Unban this user?')) return;
+            api('/admin/users/' + id + '/unban', { method: 'PATCH' }).then(loadUsers);
+          }
+        });
+      });
+    }).catch(function (err) { if (err.authError) showLogin(); else alert(err.message); });
+  }
+  document.getElementById('userSearchBtn').addEventListener('click', loadUsers);
+  document.getElementById('userSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadUsers(); });
+
+  // --- Withdrawals ---
+
+  function withdrawalRowHtml(w) {
+    var name = w.user ? [w.user.firstName, w.user.lastName].filter(Boolean).join(' ') : 'Unknown';
+    var contact = w.user ? (w.user.email || w.user.phone || '') : '';
+    var bank = w.user && w.user.payoutAccountHolderName
+      ? escapeHtml(w.user.payoutAccountHolderName) + ' · ' + escapeHtml(w.user.payoutAccountNumber) + ' · IFSC ' + escapeHtml(w.user.payoutIfsc)
+      : 'No bank account on file';
+    var statusClass = w.status === 'COMPLETED' ? 'approved' : w.status === 'FAILED' ? 'failed' : 'pending';
+    var actions = w.status === 'PENDING'
+      ? '<button class="small positive" data-action="approve" data-id="' + w.id + '">Approve &amp; pay out</button>' +
+        '<button class="small secondary" data-action="reject" data-id="' + w.id + '">Reject &amp; refund</button>'
+      : '';
+    return (
+      '<div class="item">' +
+        '<div class="item-top">' +
+          '<div>' +
+            '<div class="item-title">₹' + Number(w.amount).toLocaleString('en-IN') + ' — ' + escapeHtml(name) + '</div>' +
+            '<div class="item-meta">' + escapeHtml(contact) + ' · ' + new Date(w.createdAt).toLocaleString() + '</div>' +
+            '<div class="item-meta">' + bank + '</div>' +
+          '</div>' +
+          '<span class="badge ' + statusClass + '">' + w.status + '</span>' +
+        '</div>' +
+        '<div class="item-actions">' + actions + '</div>' +
+      '</div>'
+    );
+  }
+
+  function loadWithdrawals() {
+    var status = document.getElementById('withdrawalStatus').value;
+    var qs = status ? '?status=' + status : '';
+    api('/admin/withdrawals' + qs).then(function (withdrawals) {
+      document.getElementById('withdrawalsList').innerHTML = withdrawals.length
+        ? withdrawals.map(withdrawalRowHtml).join('')
+        : '<div class="empty">No withdrawals here.</div>';
+
+      document.querySelectorAll('#withdrawalsList button[data-action]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-id');
+          var action = btn.getAttribute('data-action');
+          if (action === 'approve') {
+            if (!confirm('Confirm this payout has actually been sent to the customer’s bank account?')) return;
+            btn.disabled = true;
+            api('/admin/withdrawals/' + id + '/approve', { method: 'POST' }).then(loadWithdrawals).catch(function (err) { alert(err.message); loadWithdrawals(); });
+          } else if (action === 'reject') {
+            if (!confirm('Reject this withdrawal and refund the customer’s balance?')) return;
+            btn.disabled = true;
+            api('/admin/withdrawals/' + id + '/reject', { method: 'POST' }).then(loadWithdrawals).catch(function (err) { alert(err.message); loadWithdrawals(); });
+          }
+        });
+      });
+    }).catch(function (err) { if (err.authError) showLogin(); else alert(err.message); });
+  }
+  document.getElementById('withdrawalRefresh').addEventListener('click', loadWithdrawals);
+  document.getElementById('withdrawalStatus').addEventListener('change', loadWithdrawals);
+
+  // --- Sports & Markets ---
+
+  var sportsCache = [];
+
+  function loadSports() {
+    fetch(API + '/sports').then(function (r) { return r.json(); }).then(function (sports) {
+      sportsCache = sports;
+      var select = document.getElementById('sportSelect');
+      var prev = select.value;
+      select.innerHTML = sports.map(function (s) { return '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>'; }).join('');
+      if (prev && sports.some(function (s) { return s.id === prev; })) select.value = prev;
+      if (select.value) loadEvents(select.value);
+      else document.getElementById('eventsList').innerHTML = '<div class="empty">Create a sport first.</div>';
+    });
+  }
+
+  document.getElementById('createSportBtn').addEventListener('click', function () {
+    var name = document.getElementById('sportName').value.trim();
+    var slug = document.getElementById('sportSlug').value.trim();
+    if (!name || !slug) { alert('Enter a name and slug.'); return; }
+    api('/admin/sports', { method: 'POST', body: JSON.stringify({ name: name, slug: slug }) })
+      .then(function () {
+        document.getElementById('sportName').value = '';
+        document.getElementById('sportSlug').value = '';
+        loadSports();
+      })
+      .catch(function (err) { alert(err.message); });
+  });
+
+  document.getElementById('refreshSportsBtn').addEventListener('click', loadSports);
+  document.getElementById('sportSelect').addEventListener('change', function () {
+    loadEvents(this.value);
+  });
+
+  document.getElementById('createEventBtn').addEventListener('click', function () {
+    var sportId = document.getElementById('sportSelect').value;
+    var name = document.getElementById('eventName').value.trim();
+    var start = document.getElementById('eventStart').value;
+    if (!sportId) { alert('Create/select a sport first.'); return; }
+    if (!name || !start) { alert('Enter an event name and start time.'); return; }
+    api('/admin/events', { method: 'POST', body: JSON.stringify({ sportId: sportId, name: name, startTime: new Date(start).toISOString() }) })
+      .then(function () {
+        document.getElementById('eventName').value = '';
+        document.getElementById('eventStart').value = '';
+        loadEvents(sportId);
+      })
+      .catch(function (err) { alert(err.message); });
+  });
+
+  function selectionRowHtml(sel, marketOpen) {
+    var oddsInput = marketOpen
+      ? '<input type="number" step="0.01" value="' + sel.odds + '" data-odds-for="' + sel.id + '" style="width:70px;display:inline-block;" />'
+      : sel.odds;
+    var winnerTag = sel.isWinner === true ? ' 🏆' : '';
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;">' +
+      '<span style="flex:1;">' + escapeHtml(sel.name) + winnerTag + '</span>' + oddsInput +
+      (marketOpen ? '<button class="small secondary" data-save-odds="' + sel.id + '">Save</button>' : '') +
+    '</div>';
+  }
+
+  function marketHtml(market) {
+    var open = market.status === 'OPEN';
+    var selectionOptions = market.selections.map(function (s) { return '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>'; }).join('');
+    return (
+      '<div class="item">' +
+        '<div class="item-top"><div class="item-title">' + escapeHtml(market.name) + '</div><span class="badge ' + (open ? 'pending' : 'approved') + '">' + market.status + '</span></div>' +
+        '<div style="margin-top:10px;">' + market.selections.map(function (s) { return selectionRowHtml(s, open); }).join('') + '</div>' +
+        (open ? (
+          '<div class="row" style="margin-top:10px;">' +
+            '<select data-winner-select="' + market.id + '">' + selectionOptions + '</select>' +
+            '<button class="small" data-settle="' + market.id + '">Settle (pay winners)</button>' +
+          '</div>'
+        ) : '') +
+      '</div>'
+    );
+  }
+
+  // Keyed by eventId so multiple events shown at once each keep their own
+  // in-progress "new market" selection rows instead of sharing one buffer.
+  var selectionsBufferByEvent = {};
+  function renderSelectionsBuffer(eventId) {
+    var buffer = selectionsBufferByEvent[eventId] || [];
+    var container = document.getElementById('newMarketSelections-' + eventId);
+    if (!container) return;
+    container.innerHTML = buffer.map(function (_, i) {
+      return '<div class="selection-row">' +
+        '<input placeholder="Selection name" data-sel-name="' + eventId + ':' + i + '" value="' + escapeHtml(buffer[i].name) + '" />' +
+        '<input placeholder="Odds" type="number" step="0.01" data-sel-odds="' + eventId + ':' + i + '" value="' + buffer[i].odds + '" style="max-width:90px;" />' +
+        '<button class="small secondary" data-remove-sel="' + eventId + ':' + i + '">✕</button>' +
+      '</div>';
+    }).join('');
+    container.querySelectorAll('[data-sel-name]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var parts = el.getAttribute('data-sel-name').split(':');
+        selectionsBufferByEvent[parts[0]][+parts[1]].name = el.value;
+      });
+    });
+    container.querySelectorAll('[data-sel-odds]').forEach(function (el) {
+      el.addEventListener('input', function () {
+        var parts = el.getAttribute('data-sel-odds').split(':');
+        selectionsBufferByEvent[parts[0]][+parts[1]].odds = el.value;
+      });
+    });
+    container.querySelectorAll('[data-remove-sel]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var parts = el.getAttribute('data-remove-sel').split(':');
+        selectionsBufferByEvent[parts[0]].splice(+parts[1], 1);
+        renderSelectionsBuffer(parts[0]);
+      });
+    });
+  }
+
+  function eventHtml(event) {
+    var id = 'mkform-' + event.id;
+    var html = '<div class="item">' +
+      '<div class="item-title">' + escapeHtml(event.name) + '</div>' +
+      '<div class="item-meta">' + new Date(event.startTime).toLocaleString() + ' · ' + event.status + '</div>' +
+      '<div style="margin-top:10px;">' + event.markets.map(marketHtml).join('') + '</div>' +
+      '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">' +
+        '<div class="item-meta" style="margin-bottom:6px;">Add market</div>' +
+        '<input id="newMarketName-' + event.id + '" placeholder="Market name (e.g. Match Winner)" style="margin-bottom:8px;" />' +
+        '<div id="newMarketSelections-' + event.id + '"></div>' +
+        '<div class="row" style="margin-top:6px;">' +
+          '<button class="small secondary" data-add-sel-row="' + event.id + '">+ Add selection</button>' +
+          '<button class="small" data-create-market="' + event.id + '">Create market</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+    return html;
+  }
+
+  function loadEvents(sportId) {
+    fetch(API + '/sports/' + sportId + '/events').then(function (r) { return r.json(); }).then(function (events) {
+      document.getElementById('eventsList').innerHTML = events.length
+        ? events.map(eventHtml).join('')
+        : '<div class="empty">No events yet for this sport.</div>';
+
+      // Odds save buttons
+      document.querySelectorAll('[data-save-odds]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var selId = btn.getAttribute('data-save-odds');
+          var input = document.querySelector('[data-odds-for="' + selId + '"]');
+          api('/admin/selections/' + selId + '/odds', { method: 'PATCH', body: JSON.stringify({ odds: Number(input.value) }) })
+            .then(function () { loadEvents(sportId); })
+            .catch(function (err) { alert(err.message); });
+        });
+      });
+
+      // Settle buttons
+      document.querySelectorAll('[data-settle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var marketId = btn.getAttribute('data-settle');
+          var winnerSelect = document.querySelector('[data-winner-select="' + marketId + '"]');
+          if (!confirm('Settle this market? Winners will be paid out immediately and this cannot be undone.')) return;
+          api('/admin/markets/' + marketId + '/settle', { method: 'POST', body: JSON.stringify({ winningSelectionId: winnerSelect.value }) })
+            .then(function () { loadEvents(sportId); })
+            .catch(function (err) { alert(err.message); });
+        });
+      });
+
+      // New-market selection rows (only one form active at a time, keyed by whichever "+ Add selection" was last clicked)
+      document.querySelectorAll('[data-add-sel-row]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var eventId = btn.getAttribute('data-add-sel-row');
+          if (!selectionsBufferByEvent[eventId]) selectionsBufferByEvent[eventId] = [];
+          selectionsBufferByEvent[eventId].push({ name: '', odds: '2.0' });
+          renderSelectionsBuffer(eventId);
+        });
+      });
+
+      document.querySelectorAll('[data-create-market]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var eventId = btn.getAttribute('data-create-market');
+          var nameInput = document.getElementById('newMarketName-' + eventId);
+          var buffer = selectionsBufferByEvent[eventId] || [];
+          var selections = buffer.filter(function (s) { return s.name.trim(); }).map(function (s) { return { name: s.name.trim(), odds: Number(s.odds) }; });
+          if (!nameInput.value.trim() || selections.length < 2) { alert('Enter a market name and at least 2 selections.'); return; }
+          api('/admin/markets', { method: 'POST', body: JSON.stringify({ eventId: eventId, name: nameInput.value.trim(), selections: selections }) })
+            .then(function () { delete selectionsBufferByEvent[eventId]; loadEvents(sportId); })
+            .catch(function (err) { alert(err.message); });
+        });
+      });
+    });
+  }
+
+  // --- Support Chat (same as admin-support.html) ---
+
+  var ticketsById = {};
+  var openTicketId = null;
+  var threadPollInterval = null;
+
+  function ticketHtml(t) {
+    var name = t.user ? [t.user.firstName, t.user.lastName].filter(Boolean).join(' ') : 'Unknown';
+    var contact = t.user ? (t.user.email || t.user.phone || '') : '';
+    var when = new Date(t.createdAt).toLocaleString();
+    var lastMsg = t.messages && t.messages[0] ? t.messages[0].text : t.message;
+    return (
+      '<div class="item" style="cursor:pointer;" data-id="' + t.id + '">' +
+        '<div class="item-top"><div>' +
+          '<div class="item-title">' + escapeHtml(t.topic) + '</div>' +
+          '<div class="item-meta">' + escapeHtml(name) + (contact ? ' · ' + escapeHtml(contact) : '') + ' · ' + when + '</div>' +
+        '</div></div>' +
+        (lastMsg ? '<div class="item-meta" style="margin-top:8px;">' + escapeHtml(lastMsg) + '</div>' : '') +
+      '</div>'
+    );
+  }
+
+  function loadTickets() {
+    api('/admin/support-tickets').then(function (tickets) {
+      ticketsById = {};
+      tickets.forEach(function (t) { ticketsById[t.id] = t; });
+      var open = tickets.filter(function (t) { return t.status === 'OPEN'; });
+      var resolved = tickets.filter(function (t) { return t.status === 'RESOLVED'; });
+      document.getElementById('openCount').textContent = open.length;
+      document.getElementById('openList').innerHTML = open.length ? open.map(ticketHtml).join('') : '<div class="empty">No open conversations. 🎉</div>';
+      document.getElementById('resolvedList').innerHTML = resolved.length ? resolved.map(ticketHtml).join('') : '<div class="empty">Nothing resolved yet.</div>';
+      document.querySelectorAll('#panel-support .item[data-id]').forEach(function (el) {
+        el.addEventListener('click', function () { openThread(el.getAttribute('data-id')); });
+      });
+    }).catch(function (err) { if (err.authError) showLogin(); else alert(err.message); });
+  }
+
+  var threadOverlay = document.getElementById('threadOverlay');
+  var threadMessages = document.getElementById('threadMessages');
+  var threadText = document.getElementById('threadText');
+
+  function openThread(id) {
+    openTicketId = id;
+    var t = ticketsById[id];
+    document.getElementById('threadName').textContent = t.user ? [t.user.firstName, t.user.lastName].filter(Boolean).join(' ') : 'Unknown';
+    document.getElementById('threadContact').textContent = t.user ? (t.user.email || t.user.phone || '') : '';
+    threadOverlay.style.display = 'flex';
+    loadThread();
+    if (threadPollInterval) clearInterval(threadPollInterval);
+    threadPollInterval = setInterval(loadThread, 4000);
+  }
+  function closeThread() {
+    threadOverlay.style.display = 'none';
+    openTicketId = null;
+    if (threadPollInterval) { clearInterval(threadPollInterval); threadPollInterval = null; }
+  }
+  document.getElementById('threadClose').addEventListener('click', closeThread);
+
+  function tbubbleHtml(m) {
+    var time = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return '<div class="tbubble ' + m.sender + '">' + escapeHtml(m.text) + '<div class="tmeta">' + time + '</div></div>';
+  }
+  function loadThread() {
+    if (!openTicketId) return;
+    api('/admin/support-tickets/' + openTicketId + '/messages').then(function (messages) {
+      threadMessages.innerHTML = messages.length ? messages.map(tbubbleHtml).join('') : '<div class="empty">No messages yet.</div>';
+      threadMessages.scrollTop = threadMessages.scrollHeight;
+    });
+  }
+  document.getElementById('threadSend').addEventListener('click', function () {
+    var text = threadText.value.trim();
+    if (!text || !openTicketId) return;
+    api('/admin/support-tickets/' + openTicketId + '/reply', { method: 'POST', body: JSON.stringify({ text: text }) })
+      .then(function () { threadText.value = ''; loadThread(); });
+  });
+  threadText.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('threadSend').click(); }
+  });
+  document.getElementById('threadResolve').addEventListener('click', function () {
+    if (!openTicketId) return;
+    api('/admin/support-tickets/' + openTicketId + '/resolve', { method: 'PATCH' }).then(function () { closeThread(); loadTickets(); });
+  });
+
+  // --- Reports ---
+
+  function loadReports() {
+    api('/admin/reports/summary').then(function (r) {
+      document.getElementById('statGrid').innerHTML =
+        '<div class="stat-card"><div class="stat-value">' + Number(r.totalStaked).toLocaleString('en-IN') + '</div><div class="stat-label">Total staked (₹)</div></div>' +
+        '<div class="stat-card"><div class="stat-value">' + Number(r.totalPayout).toLocaleString('en-IN') + '</div><div class="stat-label">Total paid out (₹)</div></div>' +
+        '<div class="stat-card"><div class="stat-value">' + r.betCount + '</div><div class="stat-label">Bets placed</div></div>' +
+        '<div class="stat-card"><div class="stat-value">' + r.userCount + '</div><div class="stat-label">Registered users</div></div>';
+    }).catch(function (err) { if (err.authError) showLogin(); else alert(err.message); });
+  }
+  document.getElementById('reportsRefresh').addEventListener('click', loadReports);
+
+  // --- Boot ---
+
+  if (getToken()) { token = getToken(); showApp(); } else { showLogin(); }
+</script>
+
+</body>
+</html>

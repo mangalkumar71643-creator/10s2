@@ -20,6 +20,7 @@ const TX_ICONS: Record<BackendTransaction['type'], IconName> = {
   GAME_PAYOUT: 'trophy-outline',
   BONUS: 'gift-outline',
   DEPOSIT_BONUS: 'gift-outline',
+  WITHDRAWAL_REVERSAL: 'bank-transfer',
 };
 
 const TX_TITLES: Record<BackendTransaction['type'], string> = {
@@ -32,6 +33,7 @@ const TX_TITLES: Record<BackendTransaction['type'], string> = {
   GAME_PAYOUT: 'Game win',
   BONUS: 'Bonus credit',
   DEPOSIT_BONUS: 'Deposit bonus',
+  WITHDRAWAL_REVERSAL: 'Withdrawal reversed',
 };
 
 const CREDIT_TYPES = new Set<BackendTransaction['type']>([
@@ -41,6 +43,7 @@ const CREDIT_TYPES = new Set<BackendTransaction['type']>([
   'BONUS',
   'BET_REFUND',
   'DEPOSIT_BONUS',
+  'WITHDRAWAL_REVERSAL',
 ]);
 
 function mapTransaction(tx: BackendTransaction): WalletTransaction {
@@ -54,6 +57,7 @@ function mapTransaction(tx: BackendTransaction): WalletTransaction {
     icon: TX_ICONS[tx.type],
     timestamp: created.toLocaleString(),
     timestampISO: tx.createdAt,
+    status: tx.status,
   };
 }
 
@@ -106,6 +110,9 @@ export async function deposit(amount: number): Promise<{ newBalance: number; bon
   return { newBalance: Number(result.balance), bonusGranted: result.bonusGranted };
 }
 
+/** Withdrawals now go to PENDING until an admin approves them (see
+ * backend/public/admin.html) — this returns the new balance (already
+ * reduced, so the amount can't be double-spent while pending). */
 export async function withdraw(amount: number): Promise<number> {
   const wallet = await withdrawFromWallet(amount);
   return Number(wallet.balance);

@@ -45,11 +45,18 @@ export async function registerUser(input: RegisterInput) {
   return { user: sanitizeUser(user), token };
 }
 
+function assertNotBanned(user: { isBanned: boolean; banReason: string | null }) {
+  if (user.isBanned) {
+    throw new ApiError(403, user.banReason ? `Your account has been suspended: ${user.banReason}` : "Your account has been suspended.");
+  }
+}
+
 export async function loginUser(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.passwordHash || !(await comparePassword(password, user.passwordHash))) {
     throw new ApiError(401, "Invalid email or password");
   }
+  assertNotBanned(user);
   const token = signToken({ userId: user.id, role: user.role });
   return { user: sanitizeUser(user), token };
 }
@@ -84,6 +91,7 @@ export async function verifyOtpAndAuth(phoneInput: string, code: string) {
   if (!existing) {
     throw new ApiError(428, "profile_required");
   }
+  assertNotBanned(existing);
 
   await consumeOtp(phone);
   const token = signToken({ userId: existing.id, role: existing.role });
@@ -109,6 +117,7 @@ export async function completePhoneRegistration(input: CompleteProfileInput) {
 
   const existing = await prisma.user.findUnique({ where: { phone } });
   if (existing) {
+    assertNotBanned(existing);
     await consumeOtp(phone);
     const token = signToken({ userId: existing.id, role: existing.role });
     return { user: sanitizeUser(existing), token, isNewUser: false };

@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { asyncHandler } from "../middleware/errorHandler";
+import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { settleMarket } from "../services/betService";
+import { paymentProvider } from "../services/paymentService";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -85,15 +86,30 @@ router.post(
 router.get(
   "/users",
   asyncHandler(async (req, res) => {
+    const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
     const users = await prisma.user.findMany({
+      where: search
+        ? {
+            OR: [
+              { email: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search } },
+              { firstName: { contains: search, mode: "insensitive" } },
+              { lastName: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : undefined,
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
         email: true,
+        phone: true,
         firstName: true,
         lastName: true,
         kycStatus: true,
         isSelfExcluded: true,
+        isBanned: true,
+        banReason: true,
+        bannedAt: true,
         role: true,
         createdAt: true,
       },
@@ -112,6 +128,32 @@ router.patch(
       where: { id: req.params.userId },
       data: { kycStatus: status },
       select: { id: true, kycStatus: true },
+    });
+    res.json(user);
+  })
+);
+
+const banSchema = z.object({ reason: z.string().trim().min(1).max(500) });
+router.patch(
+  "/users/:userId/ban",
+  asyncHandler(async (req, res) => {
+    const { reason } = banSchema.parse(req.body);
+    const user = await prisma.user.update({
+      where: { id: req.params.userId },
+      data: { isBanned: true, banReason: reason, bannedAt: new Date() },
+      select: { id: true, isBanned: true, banReason: true, bannedAt: true },
+    });
+    res.json(user);
+  })
+);
+
+router.patch(
+  "/users/:userId/unban",
+  asyncHandler(async (req, res) => {
+    const user = await prisma.user.update({
+      where: { id: req.params.userId },
+      data: { isBanned: false, banReason: null, bannedAt: null },
+      select: { id: true, isBanned: true },
     });
     res.json(user);
   })
@@ -144,6 +186,84 @@ router.get(
       betCount,
       userCount,
     });
+  })
+);
+
+// --- Withdrawals (require manual approval — see wallet.routes.ts POST /withdraw) ---
+
+const withdrawalStatusQuery = z.enum(["PENDING", "COMPLETED", "FAILED"]).optional();
+router.get(
+  "/withdrawals",
+  asyncHandler(async (req, res) => {
+    const status = withdrawalStatusQuery.parse(req.query.status);
+    const withdrawals = await prisma.transaction.findMany({
+      where: { type: "WITHDRAWAL", status },
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            payoutAccountHolderName: true,
+            payoutAccountNumber: true,
+            payoutIfsc: true,
+          },
+        },
+      },
+      take: 200,
+    });
+    res.json(withdrawals);
+  })
+);
+
+router.post(
+  "/withdrawals/:transactionId/approve",
+  asyncHandler(async (req, res) => {
+    const transaction = await prisma.transaction.findUniqueOrThrow({ where: { id: req.params.transactionId } });
+    if (transaction.type !== "WITHDRAWAL" || transaction.status !== "PENDING") {
+      throw new ApiError(400, "This withdrawal is not pending.");
+    }
+    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: transaction.userId } });
+    const result = await paymentProvider.withdraw({
+      userId: transaction.userId,
+      amount: Number(transaction.amount),
+      currency: wallet.currency,
+    });
+    if (result.status !== "COMPLETED") {
+      throw new ApiError(502, "Withdrawal could not be completed by the payment provider.");
+    }
+    const updated = await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { status: "COMPLETED", provider: result.provider, providerReferenceId: result.providerReferenceId },
+    });
+    res.json(updated);
+  })
+);
+
+router.post(
+  "/withdrawals/:transactionId/reject",
+  asyncHandler(async (req, res) => {
+    const transaction = await prisma.transaction.findUniqueOrThrow({ where: { id: req.params.transactionId } });
+    if (transaction.type !== "WITHDRAWAL" || transaction.status !== "PENDING") {
+      throw new ApiError(400, "This withdrawal is not pending.");
+    }
+    // Refund the earmarked amount (it was deducted the moment the
+    // withdrawal was requested — see wallet.routes.ts) and record the
+    // reversal as its own transaction so the customer's history stays
+    // accurate rather than showing a debit for money that never left.
+    const [updated] = await prisma.$transaction([
+      prisma.transaction.update({ where: { id: transaction.id }, data: { status: "FAILED" } }),
+      prisma.wallet.update({
+        where: { userId: transaction.userId },
+        data: { balance: { increment: transaction.amount } },
+      }),
+      prisma.transaction.create({
+        data: { userId: transaction.userId, type: "WITHDRAWAL_REVERSAL", amount: transaction.amount, status: "COMPLETED" },
+      }),
+    ]);
+    res.json(updated);
   })
 );
 
