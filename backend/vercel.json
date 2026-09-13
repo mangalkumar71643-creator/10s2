@@ -1,5 +1,5 @@
 {
-  "buildCommand": "echo 'No static build needed — api/index.ts is deployed as a serverless function.'",
+  "buildCommand": "npx prisma db push --accept-data-loss --skip-generate",
   "outputDirectory": "public",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
 }
