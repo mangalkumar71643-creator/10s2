@@ -69,7 +69,7 @@ export default function WalletScreen() {
           style={styles.balanceCardIcon}
         />
         <Text style={styles.balanceLabel}>My Balance</Text>
-        <Text style={styles.balanceValue}>{coins.toLocaleString('en-IN')} Coins</Text>
+        <Text style={styles.balanceValue}>₹{coins.toFixed(2)}</Text>
       </LinearGradient>
 
       {!kycApproved ? (
@@ -81,32 +81,42 @@ export default function WalletScreen() {
         </View>
       ) : null}
 
-      <View style={styles.actionRow}>
-        <Pressable
-          style={[styles.actionButton, styles.depositButton]}
-          onPress={() => setModal('deposit')}
-          disabled={!kycApproved}
-        >
-          <MaterialCommunityIcons name="bank-transfer-in" size={18} color={colors.background} />
-          <Text style={styles.actionButtonText}>Deposit</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.actionButton, styles.withdrawButton]}
-          onPress={() => setModal('withdraw')}
-          disabled={!kycApproved}
-        >
-          <MaterialCommunityIcons name="bank-transfer-out" size={18} color={colors.textPrimary} />
-          <Text style={[styles.actionButtonText, { color: colors.textPrimary }]}>Withdraw</Text>
-        </Pressable>
+      <View style={styles.tipsBlock}>
+        <Text style={styles.tipsTitle}>Deposit tips:</Text>
+        <Text style={styles.tipsText}>
+          Deposits are credited within 1-5 minutes. Contact customer service to resolve any deposit issues.
+        </Text>
       </View>
 
       <View style={styles.tipsBlock}>
-        <Text style={styles.tipsTitle}>About your balance:</Text>
+        <Text style={styles.tipsTitle}>Withdraw tips:</Text>
         <Text style={styles.tipsText}>
-          Coins are backed 1:1 by real money. Deposits and withdrawals run through a sandbox payment
-          provider in this build — see backend/README.md to connect a real, licensed processor. 18+ only —
-          please gamble responsibly.
+          Normally, the withdrawal amount will be credited to your account within 2 hours, but it may take
+          up to 24 hours at the most.
         </Text>
+      </View>
+
+      <View style={styles.actionRow}>
+        <Pressable style={{ flex: 1 }} onPress={() => setModal('withdraw')} disabled={!kycApproved}>
+          <LinearGradient
+            colors={gradients.crimsonButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.actionButton}
+          >
+            <Text style={[styles.actionButtonText, { color: colors.textPrimary }]}>Withdraw</Text>
+          </LinearGradient>
+        </Pressable>
+        <Pressable style={{ flex: 1 }} onPress={() => setModal('deposit')} disabled={!kycApproved}>
+          <LinearGradient
+            colors={gradients.goldButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.actionButton}
+          >
+            <Text style={styles.actionButtonText}>Deposit</Text>
+          </LinearGradient>
+        </Pressable>
       </View>
 
       <AmountInputModal
@@ -159,17 +169,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   kycBannerText: { color: colors.textSecondary, fontSize: typography.xs, flex: 1, lineHeight: 16 },
-  actionRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xxl },
+  actionRow: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg, marginBottom: spacing.xxl },
   actionButton: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    borderRadius: radius.pill,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
   },
-  depositButton: { backgroundColor: colors.gold },
-  withdrawButton: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.borderStrong },
-  actionButtonText: { color: colors.background, fontWeight: '800', fontSize: typography.sm },
+  actionButtonText: { color: colors.background, fontWeight: '800', fontSize: typography.md },
 });
