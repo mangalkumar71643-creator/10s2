@@ -77,13 +77,17 @@ the Express app from `src/app.ts` (unchanged from local dev — only
 `src/index.ts`'s `app.listen()` is skipped in serverless mode), and
 `vercel.json` rewrites every request path to that one function.
 
-1. In the Vercel project's **Settings → General → Root Directory**, set it
-   to `backend` (this repo has multiple apps at the root).
+1. In the Vercel project's **Settings → Build and Deployment → Root
+   Directory**, set it to `backend` (this repo has multiple apps at the
+   root — Vercel's own docs say "General" but it actually lives under
+   "Build and Deployment").
 2. In **Storage**, create a Postgres database and connect it to the
    project — this sets `DATABASE_URL` (or an equivalent env var; if it's
    named differently, e.g. `POSTGRES_PRISMA_URL`, add a `DATABASE_URL` env
    var pointing to the same pooled connection string so Prisma finds it).
-3. Set `JWT_SECRET` (any long random string) as an env var.
+3. Set `JWT_SECRET` (any long random string) as an env var — required at
+   runtime; the deploy will build fine without it but every request will
+   500 until it's set.
 4. After the first successful deploy, run `npm run prisma:deploy` (applies
    migrations) and optionally `npm run prisma:seed` against that same
    `DATABASE_URL` from your local machine or a one-off script.
