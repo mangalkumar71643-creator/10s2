@@ -104,10 +104,11 @@ model User {
   fairnessClientSeed     String?
   fairnessNonce          Int      @default(0)
 
-  // Payout destination for withdrawals — a UPI ID is enough for the mock
-  // provider today; a real payment processor may need more (bank
-  // account + IFSC), added here when that integration happens.
-  payoutUpiId          String?
+  // Payout bank account for withdrawals. Required before a withdrawal is
+  // accepted — see the check in wallet.routes.ts POST /withdraw.
+  payoutAccountHolderName String?
+  payoutAccountNumber     String?
+  payoutIfsc              String?
 
   // One-time first-deposit bonus, see paymentService.ts / wallet.routes.ts.
   firstDepositBonusClaimed Boolean @default(false)

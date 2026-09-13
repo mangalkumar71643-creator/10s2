@@ -23,7 +23,15 @@ function startOfDay(): Date {
 async function buildWalletView(userId: string) {
   const [wallet, user, todaysWithdrawals] = await Promise.all([
     prisma.wallet.findUniqueOrThrow({ where: { userId } }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { payoutUpiId: true, firstDepositBonusClaimed: true } }),
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        payoutAccountHolderName: true,
+        payoutAccountNumber: true,
+        payoutIfsc: true,
+        firstDepositBonusClaimed: true,
+      },
+    }),
     prisma.transaction.aggregate({
       where: { userId, type: "WITHDRAWAL", status: "COMPLETED", createdAt: { gte: startOfDay() } },
       _sum: { amount: true },
@@ -36,7 +44,10 @@ async function buildWalletView(userId: string) {
 
   return {
     ...wallet,
-    payoutUpiId: user.payoutUpiId,
+    payoutAccountHolderName: user.payoutAccountHolderName,
+    payoutAccountNumber: user.payoutAccountNumber,
+    payoutIfsc: user.payoutIfsc,
+    hasPayoutAccount: Boolean(user.payoutAccountHolderName && user.payoutAccountNumber && user.payoutIfsc),
     firstDepositBonusClaimed: user.firstDepositBonusClaimed,
     withdrawable,
     dailyWithdrawalLimit: env.wallet.dailyWithdrawalLimit,
@@ -132,14 +143,28 @@ router.post(
   })
 );
 
-const payoutAccountSchema = z.object({ upiId: z.string().min(3).max(64).regex(/^[\w.\-]+@[\w.\-]+$/, "Enter a valid UPI ID") });
+const payoutAccountSchema = z.object({
+  accountHolderName: z.string().trim().min(2, "Enter the account holder's name").max(120),
+  accountNumber: z
+    .string()
+    .trim()
+    .regex(/^\d{9,18}$/, "Enter a valid account number"),
+  ifsc: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/, "Enter a valid 11-character IFSC code")
+    .transform((v) => v.toUpperCase()),
+});
 
 router.put(
   "/payout-account",
   requireAuth,
   asyncHandler(async (req, res) => {
-    const { upiId } = payoutAccountSchema.parse(req.body);
-    await prisma.user.update({ where: { id: req.user!.userId }, data: { payoutUpiId: upiId } });
+    const { accountHolderName, accountNumber, ifsc } = payoutAccountSchema.parse(req.body);
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { payoutAccountHolderName: accountHolderName, payoutAccountNumber: accountNumber, payoutIfsc: ifsc },
+    });
     res.json(await buildWalletView(req.user!.userId));
   })
 );
@@ -153,9 +178,12 @@ router.post(
 
     await assertCanTransact(userId);
 
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { payoutUpiId: true } });
-    if (!user.payoutUpiId) {
-      throw new ApiError(400, "Add a UPI ID before withdrawing.");
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { payoutAccountHolderName: true, payoutAccountNumber: true, payoutIfsc: true },
+    });
+    if (!user.payoutAccountHolderName || !user.payoutAccountNumber || !user.payoutIfsc) {
+      throw new ApiError(400, "Add your bank account before withdrawing.");
     }
 
     const view = await buildWalletView(userId);
