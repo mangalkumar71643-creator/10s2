@@ -77,9 +77,11 @@ the Express app from `src/app.ts` (unchanged from local dev — only
 `src/index.ts`'s `app.listen()` is skipped in serverless mode), and
 `vercel.json` rewrites every request path to that one function.
 `vercel.json`'s `buildCommand` is a no-op — without it, Vercel runs this
-package's own `build` script (`tsc`, meant for traditional hosting) and
-then fails looking for a static `public/` output directory that an
-API-only project never has.
+package's own `build` script (`tsc`, meant for traditional hosting).
+Either way, having a `build` script in package.json at all makes Vercel
+require a static output directory, so `public/index.html` is a trivial
+placeholder (never actually served — the catch-all rewrite sends every
+path to the API function first) just to satisfy that check.
 
 1. In the Vercel project's **Settings → Build and Deployment → Root
    Directory**, set it to `backend` (this repo has multiple apps at the

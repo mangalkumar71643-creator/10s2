@@ -1,4 +1,5 @@
 {
   "buildCommand": "echo 'No static build needed — api/index.ts is deployed as a serverless function.'",
+  "outputDirectory": "public",
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
 }
