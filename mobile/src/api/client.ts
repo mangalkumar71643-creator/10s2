@@ -1,9 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Point this at your backend. For a physical device / Android emulator,
-// replace localhost with your machine's LAN IP (Android emulator:
-// http://10.0.2.2:4000).
-export const API_BASE_URL = 'http://localhost:4000';
+// Live NovaPlay backend on Vercel.
+export const API_BASE_URL = 'https://novaplay-server.vercel.app';
 
 const TOKEN_KEY = 'novaplay:backendToken:v1';
 
