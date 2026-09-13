@@ -1,11 +1,10 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
+import { Alert, LayoutAnimation, Linking, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import AppHeader from '../components/AppHeader';
 import ScreenContainer from '../components/ScreenContainer';
-import { RootStackParamList } from '../navigation/types';
+import { API_BASE_URL, ApiClientError } from '../api/client';
+import { startChatSession } from '../api/backend';
 import { colors, radius, spacing, typography } from '../theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -18,8 +17,19 @@ const FAQS: { question: string; answer: string }[] = [
     answer: 'Coins are NovaPlay’s real-money balance — 1 Coin is backed 1:1 by real money. You must be 18+ and complete identity verification (KYC) to deposit, withdraw or play.',
   },
   {
-    question: 'How do I add or withdraw Coins?',
-    answer: 'Go to Wallet to deposit or withdraw. Withdrawals go back to your original payment method and may take time to process once a licensed payment provider is connected.',
+    question: 'Deposit not arrived',
+    answer:
+      'A successful deposit is usually credited within a couple of minutes — check Wallet → transaction history. If it still isn’t there after 30 minutes but money left your account, use Live Support below.',
+  },
+  {
+    question: 'Unable to add bank account',
+    answer:
+      'Account Number must be 9–18 digits and IFSC must be exactly 11 characters in the format HDFC0001234 (4 letters, a zero, then 6 letters/digits). Check for extra spaces.',
+  },
+  {
+    question: 'Unable to withdraw cash',
+    answer:
+      'Withdrawals need: a saved bank account, KYC approval, an amount within your remaining daily limit, and no pending wagering requirement on a locked deposit bonus. Check all four on the Withdraw screen.',
   },
   {
     question: 'How do I earn a bonus?',
@@ -41,9 +51,9 @@ const FAQS: { question: string; answer: string }[] = [
       'Achievements track your progress toward specific milestones, like playing your first game or reaching a certain level. Completing one unlocks a badge on your profile.',
   },
   {
-    question: 'How do game outcomes work?',
+    question: 'Game rules & fairness',
     answer:
-      'Every round is decided by a server-side random number generator when you stake Coins — the app itself never decides win or loss. Please play responsibly and only stake what you can afford to lose.',
+      'Every round is decided by a server-side, provably-fair RNG — the app itself never decides win or loss. You can verify past rounds and rotate your seed from Settings → Provably Fair.',
   },
   {
     question: 'What if I need to stop playing?',
@@ -53,21 +63,33 @@ const FAQS: { question: string; answer: string }[] = [
 ];
 
 export default function HelpScreen() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const [connecting, setConnecting] = useState(false);
 
   function toggle(index: number) {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setOpenIndex((prev) => (prev === index ? null : index));
   }
 
+  async function openLiveSupport() {
+    setConnecting(true);
+    try {
+      const { chatToken } = await startChatSession();
+      await Linking.openURL(`${API_BASE_URL}/chat.html?token=${encodeURIComponent(chatToken)}`);
+    } catch (err) {
+      Alert.alert('Could not connect', err instanceof ApiClientError ? err.message : 'Please try again.');
+    } finally {
+      setConnecting(false);
+    }
+  }
+
   return (
     <ScreenContainer>
       <AppHeader showBack title="Help Center" showCoins={false} showNotifications={false} showProfile={false} />
 
-      <Pressable style={styles.topContactButton} onPress={() => navigation.navigate('ContactSupport')}>
+      <Pressable style={styles.topContactButton} onPress={openLiveSupport} disabled={connecting}>
         <MaterialCommunityIcons name="headset" size={18} color={colors.textPrimary} />
-        <Text style={styles.topContactButtonText}>Contact Customer Service</Text>
+        <Text style={styles.topContactButtonText}>{connecting ? 'Connecting…' : 'Contact Customer Service'}</Text>
       </Pressable>
 
       <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
@@ -87,10 +109,10 @@ export default function HelpScreen() {
         })}
       </View>
 
-      <Pressable style={styles.contactCard} onPress={() => navigation.navigate('ContactSupport')}>
+      <Pressable style={styles.contactCard} onPress={openLiveSupport} disabled={connecting}>
         <MaterialCommunityIcons name="lifebuoy" size={22} color={colors.gold} />
         <Text style={styles.contactTitle}>Still need help?</Text>
-        <Text style={styles.contactBody}>Contact Customer Service for account or transaction issues.</Text>
+        <Text style={styles.contactBody}>Tap here — it opens a live chat with our team in your browser.</Text>
       </Pressable>
     </ScreenContainer>
   );
