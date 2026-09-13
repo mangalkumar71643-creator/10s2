@@ -26,4 +26,17 @@ export const env = {
     // from rtp / winMultiplier so the long-run expected value matches rtp.
     winMultiplier: Number(process.env.GAME_WIN_MULTIPLIER ?? 2),
   },
+
+  wallet: {
+    // First-deposit-only bonus: min(amount * percent, cap). Credited
+    // straight into balance (so it's immediately playable) but locked
+    // from withdrawal until wageringMultiplier x the bonus is staked —
+    // see paymentService.ts / gameEngineService.ts.
+    firstDepositBonusPercent: Number(process.env.FIRST_DEPOSIT_BONUS_PERCENT ?? 0.15),
+    firstDepositBonusCap: Number(process.env.FIRST_DEPOSIT_BONUS_CAP ?? 500),
+    wageringMultiplier: Number(process.env.WAGERING_MULTIPLIER ?? 3),
+    // Total COMPLETED withdrawals per calendar day, across all payment
+    // methods, enforced server-side in wallet.routes.ts.
+    dailyWithdrawalLimit: Number(process.env.DAILY_WITHDRAWAL_LIMIT ?? 50000),
+  },
 };

@@ -69,8 +69,26 @@ export async function playGame(input: PlayGameInput) {
 
   const payout = won ? round2(stake * multiplier) : 0;
 
+  // Every real-money stake counts toward unlocking a locked deposit bonus
+  // (see wallet.routes.ts POST /deposit) — once cumulative stakes reach
+  // wageringRequired, the bonus becomes withdrawable and the tracking
+  // fields reset to 0. Wallets with no active bonus (the common case)
+  // just get the plain balance decrement, unchanged from before.
+  const lockedBonus = Number(wallet.lockedBonus);
+  const walletUpdateData: Record<string, unknown> = { balance: { decrement: stake } };
+  if (lockedBonus > 0) {
+    const newProgress = Number(wallet.wageringProgress) + stake;
+    if (newProgress >= Number(wallet.wageringRequired)) {
+      walletUpdateData.lockedBonus = 0;
+      walletUpdateData.wageringRequired = 0;
+      walletUpdateData.wageringProgress = 0;
+    } else {
+      walletUpdateData.wageringProgress = { increment: stake };
+    }
+  }
+
   await prisma.$transaction([
-    prisma.wallet.update({ where: { userId }, data: { balance: { decrement: stake } } }),
+    prisma.wallet.update({ where: { userId }, data: walletUpdateData }),
     prisma.transaction.create({
       data: { userId, type: "GAME_STAKE", amount: stake, status: "COMPLETED" },
     }),
