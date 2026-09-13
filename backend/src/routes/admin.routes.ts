@@ -147,4 +147,29 @@ router.get(
   })
 );
 
+// --- Support tickets (escalations from the in-app FAQ) ---
+
+router.get(
+  "/support-tickets",
+  asyncHandler(async (_req, res) => {
+    const tickets = await prisma.supportTicket.findMany({
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      include: { user: { select: { firstName: true, lastName: true, email: true, phone: true } } },
+      take: 200,
+    });
+    res.json(tickets);
+  })
+);
+
+router.patch(
+  "/support-tickets/:ticketId/resolve",
+  asyncHandler(async (req, res) => {
+    const ticket = await prisma.supportTicket.update({
+      where: { id: req.params.ticketId },
+      data: { status: "RESOLVED", resolvedAt: new Date() },
+    });
+    res.json(ticket);
+  })
+);
+
 export default router;

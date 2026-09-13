@@ -119,6 +119,21 @@ export function setPayoutBankAccount(accountHolderName: string, accountNumber: s
   });
 }
 
+export interface SupportTicketResult {
+  id: string;
+  topic: string;
+  message: string | null;
+  status: 'OPEN' | 'RESOLVED';
+  createdAt: string;
+}
+
+export function escalateSupportTicket(topic: string, message?: string) {
+  return apiFetch<SupportTicketResult>('/support/escalate', {
+    method: 'POST',
+    body: JSON.stringify({ topic, message }),
+  });
+}
+
 export function submitBackendKyc(documentType: string, documentReference: string) {
   return apiFetch('/kyc/submit', {
     method: 'POST',

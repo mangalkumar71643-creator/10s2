@@ -72,6 +72,11 @@ enum BetStatus {
   VOID
 }
 
+enum SupportTicketStatus {
+  OPEN
+  RESOLVED
+}
+
 model User {
   id                   String    @id @default(uuid())
   email                String?   @unique
@@ -122,6 +127,7 @@ model User {
   bets                 Bet[]
   gameRounds           GameRound[]
   kycVerifications     KycVerification[]
+  supportTickets       SupportTicket[]
 }
 
 model KycVerification {
@@ -240,6 +246,20 @@ model RevealedServerSeed {
   serverSeed     String
   serverSeedHash String
   createdAt      DateTime @default(now())
+}
+
+// Raised when a user's issue isn't solved by the in-app FAQ (see
+// support.routes.ts). Shown to staff on the priority support dashboard
+// (public/admin-support.html) so real escalations get a real response.
+model SupportTicket {
+  id         String              @id @default(uuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id])
+  topic      String
+  message    String?
+  status     SupportTicketStatus @default(OPEN)
+  createdAt  DateTime            @default(now())
+  resolvedAt DateTime?
 }
 
 model Bet {

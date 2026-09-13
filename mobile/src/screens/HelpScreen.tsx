@@ -1,8 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
 import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import AppHeader from '../components/AppHeader';
 import ScreenContainer from '../components/ScreenContainer';
+import { RootStackParamList } from '../navigation/types';
 import { colors, radius, spacing, typography } from '../theme';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -50,6 +53,7 @@ const FAQS: { question: string; answer: string }[] = [
 ];
 
 export default function HelpScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   function toggle(index: number) {
@@ -60,6 +64,11 @@ export default function HelpScreen() {
   return (
     <ScreenContainer>
       <AppHeader showBack title="Help Center" showCoins={false} showNotifications={false} showProfile={false} />
+
+      <Pressable style={styles.topContactButton} onPress={() => navigation.navigate('ContactSupport')}>
+        <MaterialCommunityIcons name="headset" size={18} color={colors.textPrimary} />
+        <Text style={styles.topContactButtonText}>Contact Customer Service</Text>
+      </Pressable>
 
       <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
 
@@ -78,16 +87,28 @@ export default function HelpScreen() {
         })}
       </View>
 
-      <View style={styles.contactCard}>
+      <Pressable style={styles.contactCard} onPress={() => navigation.navigate('ContactSupport')}>
         <MaterialCommunityIcons name="lifebuoy" size={22} color={colors.gold} />
         <Text style={styles.contactTitle}>Still need help?</Text>
-        <Text style={styles.contactBody}>Reach out from Settings → Account for further support.</Text>
-      </View>
+        <Text style={styles.contactBody}>Contact Customer Service for account or transaction issues.</Text>
+      </Pressable>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  topContactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    backgroundColor: colors.crimson,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+  },
+  topContactButtonText: { color: colors.textPrimary, fontWeight: '800', fontSize: typography.sm },
   sectionTitle: { color: colors.textPrimary, fontWeight: '800', fontSize: typography.lg, paddingHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.md },
   list: { paddingHorizontal: spacing.lg },
   card: {

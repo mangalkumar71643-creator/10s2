@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>NovaPlay Support Priority Queue</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #170709;
+    --surface: #2A0F14;
+    --surface-alt: #33141A;
+    --border: rgba(240, 185, 61, 0.28);
+    --gold: #F0B93D;
+    --crimson: #C4172C;
+    --crimson-light: #FF4D5E;
+    --text: #FFFFFF;
+    --text-secondary: #CBB4B8;
+    --text-muted: #8E7377;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    padding: 20px;
+    padding-bottom: 60px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+  label { display: block; font-size: 13px; color: var(--text-secondary); margin: 12px 0 6px; }
+  input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+    color: var(--text);
+    font-size: 14px;
+  }
+  button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: var(--crimson);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--crimson-light); }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--gold);
+    margin-top: 8px;
+    width: auto;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  #error { color: var(--crimson-light); font-size: 13px; margin-top: 10px; min-height: 16px; }
+  #dashboard { display: none; max-width: 760px; margin: 0 auto; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .section-title { font-size: 15px; font-weight: 800; margin: 24px 0 10px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--crimson-light); }
+  .dot.resolved { background: #3ECF8E; }
+  .ticket {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .ticket-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .topic { font-weight: 700; font-size: 14px; }
+  .meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+  .msg { color: var(--text-secondary); font-size: 13px; margin-top: 8px; line-height: 1.4; }
+  .empty { color: var(--text-muted); font-size: 13px; padding: 12px 0; }
+  #logout { color: var(--text-muted); font-size: 12px; background: none; border: none; width: auto; padding: 4px 8px; text-decoration: underline; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="loginView" class="card">
+  <h1>NovaPlay Support</h1>
+  <div class="sub">Staff login required to view the priority queue.</div>
+  <label for="email">Email</label>
+  <input id="email" type="email" autocomplete="username" />
+  <label for="password">Password</label>
+  <input id="password" type="password" autocomplete="current-password" />
+  <button id="loginBtn">Log In</button>
+  <div id="error"></div>
+</div>
+
+<div id="dashboard">
+  <div class="topbar">
+    <div>
+      <h1>Support Priority Queue</h1>
+      <div class="sub">Escalations from the in-app FAQ that a customer couldn't self-solve.</div>
+    </div>
+    <button id="logout">Log out</button>
+  </div>
+
+  <div class="section-title"><span class="dot"></span>Priority — Open (<span id="openCount">0</span>)</div>
+  <div id="openList"></div>
+
+  <div class="section-title"><span class="dot resolved"></span>Resolved</div>
+  <div id="resolvedList"></div>
+</div>
+
+<script>
+  var API = location.origin;
+  var TOKEN_KEY = 'novaplay_admin_token';
+
+  var loginView = document.getElementById('loginView');
+  var dashboard = document.getElementById('dashboard');
+  var errorEl = document.getElementById('error');
+
+  function getToken() { return localStorage.getItem(TOKEN_KEY); }
+  function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
+  function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
+  function showLogin() {
+    loginView.style.display = 'block';
+    dashboard.style.display = 'none';
+  }
+  function showDashboard() {
+    loginView.style.display = 'none';
+    dashboard.style.display = 'block';
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', function () {
+    errorEl.textContent = '';
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('password').value;
+    if (!email || !password) {
+      errorEl.textContent = 'Enter email and password.';
+      return;
+    }
+    fetch(API + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: password }),
+    })
+      .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+      .then(function (res) {
+        if (!res.ok) { throw new Error(res.body.error || 'Login failed'); }
+        if (res.body.user.role !== 'ADMIN') { throw new Error('This account is not an admin.'); }
+        setToken(res.body.token);
+        loadTickets();
+      })
+      .catch(function (err) { errorEl.textContent = err.message; });
+  });
+
+  document.getElementById('logout').addEventListener('click', function () {
+    clearToken();
+    showLogin();
+  });
+
+  function ticketHtml(t) {
+    var name = t.user ? [t.user.firstName, t.user.lastName].filter(Boolean).join(' ') : 'Unknown';
+    var contact = t.user ? (t.user.email || t.user.phone || '') : '';
+    var when = new Date(t.createdAt).toLocaleString();
+    var resolveBtn = t.status === 'OPEN'
+      ? '<button class="secondary" data-id="' + t.id + '">Mark Resolved</button>'
+      : '';
+    return (
+      '<div class="ticket">' +
+        '<div class="ticket-top">' +
+          '<div>' +
+            '<div class="topic">' + escapeHtml(t.topic) + '</div>' +
+            '<div class="meta">' + escapeHtml(name) + (contact ? ' · ' + escapeHtml(contact) : '') + ' · ' + when + '</div>' +
+          '</div>' +
+        '</div>' +
+        (t.message ? '<div class="msg">' + escapeHtml(t.message) + '</div>' : '') +
+        resolveBtn +
+      '</div>'
+    );
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function loadTickets() {
+    var token = getToken();
+    if (!token) { showLogin(); return; }
+    fetch(API + '/admin/support-tickets', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) {
+        if (r.status === 401 || r.status === 403) { clearToken(); showLogin(); throw new Error('Session expired'); }
+        return r.json();
+      })
+      .then(function (tickets) {
+        showDashboard();
+        var open = tickets.filter(function (t) { return t.status === 'OPEN'; });
+        var resolved = tickets.filter(function (t) { return t.status === 'RESOLVED'; });
+        document.getElementById('openCount').textContent = open.length;
+        document.getElementById('openList').innerHTML = open.length
+          ? open.map(ticketHtml).join('')
+          : '<div class="empty">No open escalations. 🎉</div>';
+        document.getElementById('resolvedList').innerHTML = resolved.length
+          ? resolved.map(ticketHtml).join('')
+          : '<div class="empty">Nothing resolved yet.</div>';
+
+        document.querySelectorAll('#openList button[data-id]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-id');
+            btn.disabled = true;
+            fetch(API + '/admin/support-tickets/' + id + '/resolve', {
+              method: 'PATCH',
+              headers: { Authorization: 'Bearer ' + token },
+            }).then(loadTickets);
+          });
+        });
+      })
+      .catch(function () {});
+  }
+
+  if (getToken()) { loadTickets(); } else { showLogin(); }
+</script>
+
+</body>
+</html>

@@ -10,6 +10,7 @@ import betsRoutes from "./routes/bets.routes";
 import gamesRoutes from "./routes/games.routes";
 import responsibleGamblingRoutes from "./routes/responsibleGambling.routes";
 import adminRoutes from "./routes/admin.routes";
+import supportRoutes from "./routes/support.routes";
 
 export const app = express();
 
@@ -26,5 +27,6 @@ app.use("/bets", betsRoutes);
 app.use("/games", gamesRoutes);
 app.use("/responsible-gambling", responsibleGamblingRoutes);
 app.use("/admin", adminRoutes);
+app.use("/support", supportRoutes);
 
 app.use(errorHandler);

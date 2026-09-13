@@ -23,4 +23,5 @@ export type RootStackParamList = {
   History: undefined;
   Deposit: undefined;
   Withdraw: undefined;
+  ContactSupport: undefined;
 };
