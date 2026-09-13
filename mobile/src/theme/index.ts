@@ -31,6 +31,7 @@ export const gradients = {
   crimsonButton: [colors.crimsonLight, colors.crimson, colors.crimsonDark] as const,
   card: [colors.surfaceAlt, colors.surface] as const,
   balanceCard: ['#3A1409', '#2A0F14', '#170709'] as const,
+  peachCard: ['#FFCB8E', '#E8935A', '#B85F2E'] as const,
   vipCard: ['#3B2508', '#1F0B0E'] as const,
   rankGold: ['#FFE9A8', '#F0B93D', '#8A6110'] as const,
   rankSilver: ['#F1F3F6', '#B9C1CB', '#6E767F'] as const,

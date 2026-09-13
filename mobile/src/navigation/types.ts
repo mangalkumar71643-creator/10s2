@@ -21,4 +21,5 @@ export type RootStackParamList = {
   Notifications: undefined;
   BalanceRecords: undefined;
   History: undefined;
+  Deposit: undefined;
 };

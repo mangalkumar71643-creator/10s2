@@ -21,24 +21,19 @@ export default function WalletScreen() {
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { coins, refreshWallet } = useGameState();
   const { backendUser } = useAuth();
-  const [modal, setModal] = useState<'deposit' | 'withdraw' | null>(null);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const kycApproved = backendUser?.kycStatus === 'APPROVED';
 
-  async function handleConfirm(amount: number) {
-    if (!modal) return;
+  async function handleWithdraw(amount: number) {
     setBusy(true);
     try {
-      if (modal === 'deposit') await walletService.deposit(amount);
-      else await walletService.withdraw(amount);
+      await walletService.withdraw(amount);
       await refreshWallet();
-      setModal(null);
+      setWithdrawModalOpen(false);
     } catch (err) {
-      Alert.alert(
-        modal === 'deposit' ? 'Deposit failed' : 'Withdrawal failed',
-        err instanceof ApiClientError ? err.message : 'Please try again.'
-      );
+      Alert.alert('Withdrawal failed', err instanceof ApiClientError ? err.message : 'Please try again.');
     } finally {
       setBusy(false);
     }
@@ -97,7 +92,7 @@ export default function WalletScreen() {
       </View>
 
       <View style={styles.actionRow}>
-        <Pressable style={{ flex: 1 }} onPress={() => setModal('withdraw')} disabled={!kycApproved}>
+        <Pressable style={{ flex: 1 }} onPress={() => setWithdrawModalOpen(true)} disabled={!kycApproved}>
           <LinearGradient
             colors={gradients.crimsonButton}
             start={{ x: 0, y: 0 }}
@@ -107,7 +102,7 @@ export default function WalletScreen() {
             <Text style={[styles.actionButtonText, { color: colors.textPrimary }]}>Withdraw</Text>
           </LinearGradient>
         </Pressable>
-        <Pressable style={{ flex: 1 }} onPress={() => setModal('deposit')} disabled={!kycApproved}>
+        <Pressable style={{ flex: 1 }} onPress={() => rootNavigation.navigate('Deposit')} disabled={!kycApproved}>
           <LinearGradient
             colors={gradients.goldButton}
             start={{ x: 0, y: 0 }}
@@ -120,13 +115,13 @@ export default function WalletScreen() {
       </View>
 
       <AmountInputModal
-        visible={modal !== null}
-        title={modal === 'deposit' ? 'Deposit' : 'Withdraw'}
-        confirmLabel={modal === 'deposit' ? 'Deposit' : 'Withdraw'}
-        helperText={modal === 'deposit' ? 'Add coins to your balance.' : 'Move coins out to your bank/UPI.'}
+        visible={withdrawModalOpen}
+        title="Withdraw"
+        confirmLabel="Withdraw"
+        helperText="Move coins out to your bank/UPI."
         busy={busy}
-        onConfirm={handleConfirm}
-        onClose={() => setModal(null)}
+        onConfirm={handleWithdraw}
+        onClose={() => setWithdrawModalOpen(false)}
       />
     </ScreenContainer>
   );
