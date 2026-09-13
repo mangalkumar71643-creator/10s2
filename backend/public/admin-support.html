@@ -82,13 +82,57 @@
     border-radius: 12px;
     padding: 14px 16px;
     margin-bottom: 10px;
+    cursor: pointer;
   }
+  .ticket:hover { border-color: var(--borderStrong, var(--gold)); }
   .ticket-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
   .topic { font-weight: 700; font-size: 14px; }
   .meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
   .msg { color: var(--text-secondary); font-size: 13px; margin-top: 8px; line-height: 1.4; }
   .empty { color: var(--text-muted); font-size: 13px; padding: 12px 0; }
   #logout { color: var(--text-muted); font-size: 12px; background: none; border: none; width: auto; padding: 4px 8px; text-decoration: underline; cursor: pointer; }
+
+  #threadOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 2, 3, 0.72);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 10;
+  }
+  #threadPanel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    height: min(640px, 90vh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #threadHeader {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #threadHeader .name { font-weight: 700; font-size: 14px; }
+  #threadHeader .contact { font-size: 12px; color: var(--text-muted); }
+  #threadClose { width: auto; margin: 0; padding: 6px 10px; background: transparent; border: 1px solid var(--border); color: var(--text-muted); font-size: 12px; }
+  #threadMessages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .tbubble { max-width: 78%; padding: 9px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+  .tbubble.USER { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); }
+  .tbubble.ADMIN { align-self: flex-end; background: var(--crimson); color: #fff; }
+  .tmeta { font-size: 10px; opacity: 0.65; margin-top: 3px; }
+  #threadComposer { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); }
+  #threadText { flex: 1; resize: none; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; color: var(--text); padding: 9px 10px; font-size: 13px; font-family: inherit; max-height: 90px; }
+  #threadSend { width: auto; margin: 0; padding: 0 16px; }
+  #threadFooter { padding: 10px 16px; border-top: 1px solid var(--border); }
+  #threadResolve { margin: 0; }
 </style>
 </head>
 <body>
@@ -108,7 +152,7 @@
   <div class="topbar">
     <div>
       <h1>Support Priority Queue</h1>
-      <div class="sub">Escalations from the in-app FAQ that a customer couldn't self-solve.</div>
+      <div class="sub">Live Support conversations — tap one to reply.</div>
     </div>
     <button id="logout">Log out</button>
   </div>
@@ -120,6 +164,26 @@
   <div id="resolvedList"></div>
 </div>
 
+<div id="threadOverlay">
+  <div id="threadPanel">
+    <div id="threadHeader">
+      <div>
+        <div class="name" id="threadName"></div>
+        <div class="contact" id="threadContact"></div>
+      </div>
+      <button id="threadClose">Close</button>
+    </div>
+    <div id="threadMessages"></div>
+    <div id="threadComposer">
+      <textarea id="threadText" rows="1" placeholder="Reply…"></textarea>
+      <button id="threadSend">Send</button>
+    </div>
+    <div id="threadFooter">
+      <button id="threadResolve" class="secondary">Mark Resolved</button>
+    </div>
+  </div>
+</div>
+
 <script>
   var API = location.origin;
   var TOKEN_KEY = 'novaplay_admin_token';
@@ -127,6 +191,9 @@
   var loginView = document.getElementById('loginView');
   var dashboard = document.getElementById('dashboard');
   var errorEl = document.getElementById('error');
+  var ticketsById = {};
+  var openTicketId = null;
+  var threadPollInterval = null;
 
   function getToken() { return localStorage.getItem(TOKEN_KEY); }
   function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
@@ -169,31 +236,28 @@
     showLogin();
   });
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
   function ticketHtml(t) {
     var name = t.user ? [t.user.firstName, t.user.lastName].filter(Boolean).join(' ') : 'Unknown';
     var contact = t.user ? (t.user.email || t.user.phone || '') : '';
     var when = new Date(t.createdAt).toLocaleString();
-    var resolveBtn = t.status === 'OPEN'
-      ? '<button class="secondary" data-id="' + t.id + '">Mark Resolved</button>'
-      : '';
+    var lastMsg = t.messages && t.messages[0] ? t.messages[0].text : t.message;
     return (
-      '<div class="ticket">' +
+      '<div class="ticket" data-id="' + t.id + '">' +
         '<div class="ticket-top">' +
           '<div>' +
             '<div class="topic">' + escapeHtml(t.topic) + '</div>' +
             '<div class="meta">' + escapeHtml(name) + (contact ? ' · ' + escapeHtml(contact) : '') + ' · ' + when + '</div>' +
           '</div>' +
         '</div>' +
-        (t.message ? '<div class="msg">' + escapeHtml(t.message) + '</div>' : '') +
-        resolveBtn +
+        (lastMsg ? '<div class="msg">' + escapeHtml(lastMsg) + '</div>' : '') +
       '</div>'
     );
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
   }
 
   function loadTickets() {
@@ -206,6 +270,9 @@
       })
       .then(function (tickets) {
         showDashboard();
+        ticketsById = {};
+        tickets.forEach(function (t) { ticketsById[t.id] = t; });
+
         var open = tickets.filter(function (t) { return t.status === 'OPEN'; });
         var resolved = tickets.filter(function (t) { return t.status === 'RESOLVED'; });
         document.getElementById('openCount').textContent = open.length;
@@ -216,19 +283,92 @@
           ? resolved.map(ticketHtml).join('')
           : '<div class="empty">Nothing resolved yet.</div>';
 
-        document.querySelectorAll('#openList button[data-id]').forEach(function (btn) {
-          btn.addEventListener('click', function () {
-            var id = btn.getAttribute('data-id');
-            btn.disabled = true;
-            fetch(API + '/admin/support-tickets/' + id + '/resolve', {
-              method: 'PATCH',
-              headers: { Authorization: 'Bearer ' + token },
-            }).then(loadTickets);
-          });
+        document.querySelectorAll('.ticket').forEach(function (el) {
+          el.addEventListener('click', function () { openThread(el.getAttribute('data-id')); });
         });
       })
       .catch(function () {});
   }
+
+  // --- Thread panel ---
+
+  var threadOverlay = document.getElementById('threadOverlay');
+  var threadMessages = document.getElementById('threadMessages');
+  var threadText = document.getElementById('threadText');
+  var threadName = document.getElementById('threadName');
+  var threadContact = document.getElementById('threadContact');
+
+  function openThread(id) {
+    openTicketId = id;
+    var t = ticketsById[id];
+    threadName.textContent = t.user ? [t.user.firstName, t.user.lastName].filter(Boolean).join(' ') : 'Unknown';
+    threadContact.textContent = t.user ? (t.user.email || t.user.phone || '') : '';
+    threadOverlay.style.display = 'flex';
+    loadThread();
+    if (threadPollInterval) clearInterval(threadPollInterval);
+    threadPollInterval = setInterval(loadThread, 4000);
+  }
+
+  function closeThread() {
+    threadOverlay.style.display = 'none';
+    openTicketId = null;
+    if (threadPollInterval) { clearInterval(threadPollInterval); threadPollInterval = null; }
+  }
+  document.getElementById('threadClose').addEventListener('click', closeThread);
+
+  function tbubbleHtml(m) {
+    var time = new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return '<div class="tbubble ' + m.sender + '">' + escapeHtml(m.text) + '<div class="tmeta">' + time + '</div></div>';
+  }
+
+  function loadThread() {
+    if (!openTicketId) return;
+    var token = getToken();
+    fetch(API + '/admin/support-tickets/' + openTicketId + '/messages', { headers: { Authorization: 'Bearer ' + token } })
+      .then(function (r) { return r.json(); })
+      .then(function (messages) {
+        threadMessages.innerHTML = messages.length
+          ? messages.map(tbubbleHtml).join('')
+          : '<div class="empty">No messages yet.</div>';
+        threadMessages.scrollTop = threadMessages.scrollHeight;
+      })
+      .catch(function () {});
+  }
+
+  document.getElementById('threadSend').addEventListener('click', function () {
+    var text = threadText.value.trim();
+    if (!text || !openTicketId) return;
+    var token = getToken();
+    fetch(API + '/admin/support-tickets/' + openTicketId + '/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ text: text }),
+    })
+      .then(function () {
+        threadText.value = '';
+        loadThread();
+      })
+      .catch(function () {});
+  });
+
+  threadText.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('threadSend').click();
+    }
+  });
+
+  document.getElementById('threadResolve').addEventListener('click', function () {
+    if (!openTicketId) return;
+    var token = getToken();
+    fetch(API + '/admin/support-tickets/' + openTicketId + '/resolve', {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + token },
+    }).then(function () {
+      closeThread();
+      loadTickets();
+    });
+  });
 
   if (getToken()) { loadTickets(); } else { showLogin(); }
 </script>

@@ -147,17 +147,44 @@ router.get(
   })
 );
 
-// --- Support tickets (escalations from the in-app FAQ) ---
+// --- Support tickets / Live Support chat ---
 
 router.get(
   "/support-tickets",
   asyncHandler(async (_req, res) => {
     const tickets = await prisma.supportTicket.findMany({
       orderBy: [{ status: "asc" }, { createdAt: "desc" }],
-      include: { user: { select: { firstName: true, lastName: true, email: true, phone: true } } },
+      include: {
+        user: { select: { firstName: true, lastName: true, email: true, phone: true } },
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
       take: 200,
     });
     res.json(tickets);
+  })
+);
+
+router.get(
+  "/support-tickets/:ticketId/messages",
+  asyncHandler(async (req, res) => {
+    const messages = await prisma.chatMessage.findMany({
+      where: { ticketId: req.params.ticketId },
+      orderBy: { createdAt: "asc" },
+    });
+    res.json(messages);
+  })
+);
+
+const replySchema = z.object({ text: z.string().trim().min(1).max(2000) });
+
+router.post(
+  "/support-tickets/:ticketId/reply",
+  asyncHandler(async (req, res) => {
+    const { text } = replySchema.parse(req.body);
+    const message = await prisma.chatMessage.create({
+      data: { ticketId: req.params.ticketId, sender: "ADMIN", text },
+    });
+    res.status(201).json(message);
   })
 );
 

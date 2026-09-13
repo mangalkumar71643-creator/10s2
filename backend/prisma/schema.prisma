@@ -77,6 +77,11 @@ enum SupportTicketStatus {
   RESOLVED
 }
 
+enum ChatSender {
+  USER
+  ADMIN
+}
+
 model User {
   id                   String    @id @default(uuid())
   email                String?   @unique
@@ -260,6 +265,19 @@ model SupportTicket {
   status     SupportTicketStatus @default(OPEN)
   createdAt  DateTime            @default(now())
   resolvedAt DateTime?
+  messages   ChatMessage[]
+}
+
+// One message in a Live Support conversation (see support.routes.ts /
+// admin.routes.ts and public/chat.html + admin-support.html). Always
+// belongs to a SupportTicket, which doubles as the conversation thread.
+model ChatMessage {
+  id        String        @id @default(uuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  sender    ChatSender
+  text      String
+  createdAt DateTime      @default(now())
 }
 
 model Bet {

@@ -134,6 +134,13 @@ export function escalateSupportTicket(topic: string, message?: string) {
   });
 }
 
+/** Mints a short-lived, chat-scoped token for the Live Support web page
+ * (see backend/public/chat.html) — deliberately not the user's full
+ * session token, since this one gets opened in the device browser. */
+export function startChatSession() {
+  return apiFetch<{ chatToken: string }>('/support/chat/session', { method: 'POST' });
+}
+
 export function submitBackendKyc(documentType: string, documentReference: string) {
   return apiFetch('/kyc/submit', {
     method: 'POST',
