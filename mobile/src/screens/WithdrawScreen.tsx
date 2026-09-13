@@ -3,14 +3,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { ApiClientError } from '../api/client';
 import { RootStackParamList } from '../navigation/types';
 import { useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
 import * as walletService from '../services/walletService';
-import { colors, gradients, radius, spacing, typography } from '../theme';
+import { colors, gradients, radius, shadow, spacing, typography } from '../theme';
 
 const CARD_TEXT_COLOR = '#5C3A0E';
 const MIN_WITHDRAW = 100;
@@ -24,7 +24,9 @@ export default function WithdrawScreen() {
     lockedBonus,
     wageringRequired,
     wageringProgress,
-    payoutUpiId,
+    payoutAccountHolderName,
+    payoutAccountNumber,
+    hasPayoutAccount,
     dailyWithdrawalLimit,
     remainingWithdrawalLimit,
     refreshWallet,
@@ -32,9 +34,11 @@ export default function WithdrawScreen() {
   const { backendUser } = useAuth();
   const [amountText, setAmountText] = useState(String(QUICK_AMOUNTS[0]));
   const [busy, setBusy] = useState(false);
-  const [editingUpi, setEditingUpi] = useState(false);
-  const [upiInput, setUpiInput] = useState('');
-  const [savingUpi, setSavingUpi] = useState(false);
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [accountInput, setAccountInput] = useState('');
+  const [ifscInput, setIfscInput] = useState('');
+  const [savingBank, setSavingBank] = useState(false);
 
   const kycApproved = backendUser?.kycStatus === 'APPROVED';
   const maxWithdraw = Math.min(withdrawable, remainingWithdrawalLimit);
@@ -42,20 +46,35 @@ export default function WithdrawScreen() {
   const isValidAmount = amountText.trim().length > 0 && amount >= MIN_WITHDRAW && amount <= maxWithdraw;
   const wageringRemaining = Math.max(0, wageringRequired - wageringProgress);
 
-  async function handleSaveUpi() {
-    if (!upiInput.includes('@')) {
-      Alert.alert('Invalid UPI ID', 'Enter a UPI ID like yourname@bank.');
+  function openBankModal() {
+    setNameInput(payoutAccountHolderName ?? '');
+    setAccountInput(payoutAccountNumber ?? '');
+    setIfscInput('');
+    setBankModalOpen(true);
+  }
+
+  async function handleSaveBankAccount() {
+    if (nameInput.trim().length < 2) {
+      Alert.alert('Enter account holder name', "Enter the account holder's legal name.");
       return;
     }
-    setSavingUpi(true);
+    if (!/^\d{9,18}$/.test(accountInput.trim())) {
+      Alert.alert('Invalid account number', 'Enter a valid bank account number.');
+      return;
+    }
+    if (!/^[A-Za-z]{4}0[A-Za-z0-9]{6}$/.test(ifscInput.trim())) {
+      Alert.alert('Invalid IFSC', 'IFSC requires 11 characters, e.g. HDFC0001234.');
+      return;
+    }
+    setSavingBank(true);
     try {
-      await walletService.setPayoutUpiId(upiInput.trim());
+      await walletService.setPayoutBankAccount(nameInput.trim(), accountInput.trim(), ifscInput.trim());
       await refreshWallet();
-      setEditingUpi(false);
+      setBankModalOpen(false);
     } catch (err) {
-      Alert.alert('Could not save UPI ID', err instanceof ApiClientError ? err.message : 'Please try again.');
+      Alert.alert('Could not save bank account', err instanceof ApiClientError ? err.message : 'Please try again.');
     } finally {
-      setSavingUpi(false);
+      setSavingBank(false);
     }
   }
 
@@ -64,8 +83,8 @@ export default function WithdrawScreen() {
       Alert.alert('Verify your identity', 'Complete KYC verification in Settings before withdrawing.');
       return;
     }
-    if (!payoutUpiId) {
-      Alert.alert('Add a UPI ID', 'Add a UPI ID under Bank Account before withdrawing.');
+    if (!hasPayoutAccount) {
+      openBankModal();
       return;
     }
     if (!isValidAmount) return;
@@ -73,9 +92,11 @@ export default function WithdrawScreen() {
     try {
       await walletService.withdraw(amount);
       await refreshWallet();
-      Alert.alert('Withdrawal requested', `₹${amount.toLocaleString('en-IN')} will be sent to ${payoutUpiId}.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert(
+        'Withdrawal requested',
+        `₹${amount.toLocaleString('en-IN')} will be sent to your bank account ending ${payoutAccountNumber?.slice(-4)}.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     } catch (err) {
       Alert.alert('Withdrawal failed', err instanceof ApiClientError ? err.message : 'Please try again.');
     } finally {
@@ -132,36 +153,14 @@ export default function WithdrawScreen() {
         ) : null}
 
         <Text style={styles.sectionLabel}>Bank Account</Text>
-        {editingUpi ? (
-          <View style={styles.upiEditRow}>
-            <TextInput
-              value={upiInput}
-              onChangeText={setUpiInput}
-              placeholder="yourname@bank"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              style={styles.upiInput}
-            />
-            <Pressable style={styles.upiSaveButton} onPress={handleSaveUpi} disabled={savingUpi}>
-              <Text style={styles.upiSaveButtonText}>{savingUpi ? '...' : 'Save'}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable
-            style={styles.bankRow}
-            onPress={() => {
-              setUpiInput(payoutUpiId ?? '');
-              setEditingUpi(true);
-            }}
-          >
-            <MaterialCommunityIcons
-              name={payoutUpiId ? 'bank-outline' : 'plus-circle'}
-              size={20}
-              color={colors.gold}
-            />
-            <Text style={styles.bankRowText}>{payoutUpiId ?? 'Add UPI ID'}</Text>
-          </Pressable>
-        )}
+        <Pressable style={styles.bankRow} onPress={openBankModal}>
+          <MaterialCommunityIcons name={hasPayoutAccount ? 'bank-outline' : 'plus-circle'} size={20} color={colors.gold} />
+          <Text style={styles.bankRowText}>
+            {hasPayoutAccount
+              ? `${payoutAccountHolderName} · •••• ${payoutAccountNumber?.slice(-4)}`
+              : 'Add Bank'}
+          </Text>
+        </Pressable>
 
         <View style={styles.amountCard}>
           <View style={styles.amountLabelRow}>
@@ -237,8 +236,8 @@ export default function WithdrawScreen() {
       <View style={styles.payBar}>
         <Pressable
           onPress={handleWithdraw}
-          disabled={!isValidAmount || !kycApproved || !payoutUpiId || busy}
-          style={{ opacity: !isValidAmount || !kycApproved || !payoutUpiId || busy ? 0.5 : 1 }}
+          disabled={(!isValidAmount && hasPayoutAccount) || !kycApproved || busy}
+          style={{ opacity: (!isValidAmount && hasPayoutAccount) || !kycApproved || busy ? 0.5 : 1 }}
         >
           <LinearGradient
             colors={gradients.crimsonButton}
@@ -250,6 +249,68 @@ export default function WithdrawScreen() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      <Modal visible={bankModalOpen} transparent animationType="fade" onRequestClose={() => setBankModalOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Bank account</Text>
+              <Pressable onPress={() => setBankModalOpen(false)} hitSlop={10}>
+                <MaterialCommunityIcons name="close" size={22} color={colors.gold} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.modalLabel}>Account Holder Name</Text>
+            <TextInput
+              value={nameInput}
+              onChangeText={setNameInput}
+              placeholder="Enter the Account Holder's Legal Name"
+              placeholderTextColor={colors.textMuted}
+              style={styles.modalInput}
+            />
+
+            <Text style={styles.modalLabel}>Account Number</Text>
+            <TextInput
+              value={accountInput}
+              onChangeText={(t) => setAccountInput(t.replace(/[^0-9]/g, ''))}
+              placeholder="Please Enter Account Number"
+              placeholderTextColor={colors.textMuted}
+              keyboardType="number-pad"
+              style={styles.modalInput}
+            />
+
+            <Text style={styles.modalLabel}>IFSC</Text>
+            <TextInput
+              value={ifscInput}
+              onChangeText={(t) => setIfscInput(t.toUpperCase())}
+              placeholder="IFSC requires 11 characters"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="characters"
+              maxLength={11}
+              style={styles.modalInput}
+            />
+
+            <View style={styles.modalNotice}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color={colors.negative} />
+              <Text style={styles.modalNoticeText}>
+                Credit cards will not be supported for cash withdrawals. Please confirm your bank account
+                information carefully to avoid withdrawal errors.
+              </Text>
+            </View>
+
+            <Pressable onPress={handleSaveBankAccount} disabled={savingBank}>
+              <LinearGradient
+                colors={gradients.crimsonButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.modalSaveButton}
+              >
+                <Text style={styles.modalSaveButtonText}>{savingBank ? 'Saving…' : 'Save & Continue'}</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -304,9 +365,29 @@ const styles = {
     marginBottom: spacing.xl,
   },
   bankRowText: { color: colors.textPrimary, fontWeight: '700' as const, fontSize: typography.sm },
-  upiEditRow: { flexDirection: 'row' as const, gap: spacing.sm, marginBottom: spacing.xl },
-  upiInput: {
-    flex: 1,
+  modalOverlay: { flex: 1, backgroundColor: colors.overlay, alignItems: 'center' as const, justifyContent: 'center' as const, padding: spacing.lg },
+  modalCard: {
+    width: '100%' as const,
+    maxWidth: 420,
+    borderRadius: radius.xl,
+    backgroundColor: colors.backgroundAlt,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    padding: spacing.xl,
+    ...shadow.glow,
+  },
+  modalHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: { color: colors.gold, fontSize: typography.xl, fontWeight: '800' as const },
+  modalLabel: { color: colors.textPrimary, fontWeight: '700' as const, fontSize: typography.sm, marginBottom: spacing.sm },
+  modalInput: {
     backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -314,15 +395,19 @@ const styles = {
     color: colors.textPrimary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
   },
-  upiSaveButton: {
-    backgroundColor: colors.gold,
+  modalNotice: {
+    flexDirection: 'row' as const,
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
-  upiSaveButtonText: { color: colors.background, fontWeight: '800' as const, fontSize: typography.sm },
+  modalNoticeText: { flex: 1, color: colors.textSecondary, fontSize: typography.xs, lineHeight: 16 },
+  modalSaveButton: { borderRadius: radius.lg, paddingVertical: spacing.md, alignItems: 'center' as const },
+  modalSaveButtonText: { color: colors.textPrimary, fontWeight: '800' as const, fontSize: typography.md, letterSpacing: 1 },
   limitsCard: {
     borderRadius: radius.lg,
     borderWidth: 1,

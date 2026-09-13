@@ -6,7 +6,7 @@ import {
   depositToWallet,
   fetchBackendTransactions,
   fetchBackendWallet,
-  setPayoutUpiId as setPayoutUpiIdRequest,
+  setPayoutBankAccount as setPayoutBankAccountRequest,
   withdrawFromWallet,
 } from '../api/backend';
 
@@ -63,7 +63,10 @@ export interface WalletSummary {
   lockedBonus: number;
   wageringRequired: number;
   wageringProgress: number;
-  payoutUpiId: string | null;
+  payoutAccountHolderName: string | null;
+  payoutAccountNumber: string | null;
+  payoutIfsc: string | null;
+  hasPayoutAccount: boolean;
   firstDepositBonusClaimed: boolean;
   dailyWithdrawalLimit: number;
   remainingWithdrawalLimit: number;
@@ -77,7 +80,10 @@ function toSummary(wallet: BackendWallet, transactions: WalletTransaction[]): Wa
     lockedBonus: Number(wallet.lockedBonus),
     wageringRequired: Number(wallet.wageringRequired),
     wageringProgress: Number(wallet.wageringProgress),
-    payoutUpiId: wallet.payoutUpiId,
+    payoutAccountHolderName: wallet.payoutAccountHolderName,
+    payoutAccountNumber: wallet.payoutAccountNumber,
+    payoutIfsc: wallet.payoutIfsc,
+    hasPayoutAccount: wallet.hasPayoutAccount,
     firstDepositBonusClaimed: wallet.firstDepositBonusClaimed,
     dailyWithdrawalLimit: wallet.dailyWithdrawalLimit,
     remainingWithdrawalLimit: wallet.remainingWithdrawalLimit,
@@ -105,6 +111,6 @@ export async function withdraw(amount: number): Promise<number> {
   return Number(wallet.balance);
 }
 
-export async function setPayoutUpiId(upiId: string): Promise<void> {
-  await setPayoutUpiIdRequest(upiId);
+export async function setPayoutBankAccount(accountHolderName: string, accountNumber: string, ifsc: string): Promise<void> {
+  await setPayoutBankAccountRequest(accountHolderName, accountNumber, ifsc);
 }

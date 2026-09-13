@@ -31,7 +31,10 @@ type GameState = {
   lockedBonus: number;
   wageringRequired: number;
   wageringProgress: number;
-  payoutUpiId: string | null;
+  payoutAccountHolderName: string | null;
+  payoutAccountNumber: string | null;
+  payoutIfsc: string | null;
+  hasPayoutAccount: boolean;
   firstDepositBonusClaimed: boolean;
   dailyWithdrawalLimit: number;
   remainingWithdrawalLimit: number;
@@ -64,7 +67,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [lockedBonus, setLockedBonus] = useState(0);
   const [wageringRequired, setWageringRequired] = useState(0);
   const [wageringProgress, setWageringProgress] = useState(0);
-  const [payoutUpiId, setPayoutUpiId] = useState<string | null>(null);
+  const [payoutAccountHolderName, setPayoutAccountHolderName] = useState<string | null>(null);
+  const [payoutAccountNumber, setPayoutAccountNumber] = useState<string | null>(null);
+  const [payoutIfsc, setPayoutIfsc] = useState<string | null>(null);
+  const [hasPayoutAccount, setHasPayoutAccount] = useState(false);
   const [firstDepositBonusClaimed, setFirstDepositBonusClaimed] = useState(false);
   const [dailyWithdrawalLimit, setDailyWithdrawalLimit] = useState(0);
   const [remainingWithdrawalLimit, setRemainingWithdrawalLimit] = useState(0);
@@ -85,7 +91,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     setLockedBonus(wallet.lockedBonus);
     setWageringRequired(wallet.wageringRequired);
     setWageringProgress(wallet.wageringProgress);
-    setPayoutUpiId(wallet.payoutUpiId);
+    setPayoutAccountHolderName(wallet.payoutAccountHolderName);
+    setPayoutAccountNumber(wallet.payoutAccountNumber);
+    setPayoutIfsc(wallet.payoutIfsc);
+    setHasPayoutAccount(wallet.hasPayoutAccount);
     setFirstDepositBonusClaimed(wallet.firstDepositBonusClaimed);
     setDailyWithdrawalLimit(wallet.dailyWithdrawalLimit);
     setRemainingWithdrawalLimit(wallet.remainingWithdrawalLimit);
@@ -144,7 +153,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       setLockedBonus(0);
       setWageringRequired(0);
       setWageringProgress(0);
-      setPayoutUpiId(null);
+      setPayoutAccountHolderName(null);
+      setPayoutAccountNumber(null);
+      setPayoutIfsc(null);
+      setHasPayoutAccount(false);
       setFirstDepositBonusClaimed(false);
       setDailyWithdrawalLimit(0);
       setRemainingWithdrawalLimit(0);
@@ -223,7 +235,10 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     lockedBonus,
     wageringRequired,
     wageringProgress,
-    payoutUpiId,
+    payoutAccountHolderName,
+    payoutAccountNumber,
+    payoutIfsc,
+    hasPayoutAccount,
     firstDepositBonusClaimed,
     dailyWithdrawalLimit,
     remainingWithdrawalLimit,

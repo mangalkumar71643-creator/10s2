@@ -65,7 +65,10 @@ export interface BackendWallet {
   lockedBonus: string;
   wageringRequired: string;
   wageringProgress: string;
-  payoutUpiId: string | null;
+  payoutAccountHolderName: string | null;
+  payoutAccountNumber: string | null;
+  payoutIfsc: string | null;
+  hasPayoutAccount: boolean;
   firstDepositBonusClaimed: boolean;
   withdrawable: number;
   dailyWithdrawalLimit: number;
@@ -109,8 +112,11 @@ export function withdrawFromWallet(amount: number) {
   return apiFetch<BackendWallet>('/wallet/withdraw', { method: 'POST', body: JSON.stringify({ amount }) });
 }
 
-export function setPayoutUpiId(upiId: string) {
-  return apiFetch<BackendWallet>('/wallet/payout-account', { method: 'PUT', body: JSON.stringify({ upiId }) });
+export function setPayoutBankAccount(accountHolderName: string, accountNumber: string, ifsc: string) {
+  return apiFetch<BackendWallet>('/wallet/payout-account', {
+    method: 'PUT',
+    body: JSON.stringify({ accountHolderName, accountNumber, ifsc }),
+  });
 }
 
 export function submitBackendKyc(documentType: string, documentReference: string) {
