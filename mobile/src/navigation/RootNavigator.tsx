@@ -5,9 +5,6 @@ import BottomTabs from './BottomTabs';
 import { AuthStackParamList, RootStackParamList } from './types';
 import BalanceRecordsScreen from '../screens/BalanceRecordsScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
-import DiceGameScreen from '../screens/DiceGameScreen';
-import GameCategoryScreen from '../screens/GameCategoryScreen';
-import GameDetailScreen from '../screens/GameDetailScreen';
 import HelpScreen from '../screens/HelpScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -54,9 +51,6 @@ function MainNavigator() {
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="BalanceRecords" component={BalanceRecordsScreen} />
       <Stack.Screen name="History" component={HistoryScreen} />
-      <Stack.Screen name="GameCategory" component={GameCategoryScreen} />
-      <Stack.Screen name="GameDetail" component={GameDetailScreen} />
-      <Stack.Screen name="DiceGame" component={DiceGameScreen} />
     </Stack.Navigator>
   );
 }

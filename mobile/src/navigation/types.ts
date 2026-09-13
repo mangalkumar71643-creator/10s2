@@ -1,5 +1,4 @@
 import { NavigatorScreenParams } from '@react-navigation/native';
-import { GameCategoryId } from '../data/models';
 
 export type BottomTabParamList = {
   Home: undefined;
@@ -22,7 +21,4 @@ export type RootStackParamList = {
   Notifications: undefined;
   BalanceRecords: undefined;
   History: undefined;
-  GameCategory: { categoryId?: GameCategoryId };
-  GameDetail: { gameId: string };
-  DiceGame: undefined;
 };
