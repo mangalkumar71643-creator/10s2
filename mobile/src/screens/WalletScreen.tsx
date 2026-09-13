@@ -3,15 +3,12 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import AmountInputModal from '../components/AmountInputModal';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
-import { ApiClientError } from '../api/client';
 import { BottomTabParamList, RootStackParamList } from '../navigation/types';
 import { useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
-import * as walletService from '../services/walletService';
 import { colors, gradients, radius, spacing, typography } from '../theme';
 
 const CARD_TEXT_COLOR = '#5C3A0E';
@@ -19,25 +16,10 @@ const CARD_TEXT_COLOR = '#5C3A0E';
 export default function WalletScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { coins, refreshWallet } = useGameState();
+  const { coins } = useGameState();
   const { backendUser } = useAuth();
-  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   const kycApproved = backendUser?.kycStatus === 'APPROVED';
-
-  async function handleWithdraw(amount: number) {
-    setBusy(true);
-    try {
-      await walletService.withdraw(amount);
-      await refreshWallet();
-      setWithdrawModalOpen(false);
-    } catch (err) {
-      Alert.alert('Withdrawal failed', err instanceof ApiClientError ? err.message : 'Please try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <ScreenContainer contentStyle={styles.content}>
@@ -92,7 +74,7 @@ export default function WalletScreen() {
       </View>
 
       <View style={styles.actionRow}>
-        <Pressable style={{ flex: 1 }} onPress={() => setWithdrawModalOpen(true)} disabled={!kycApproved}>
+        <Pressable style={{ flex: 1 }} onPress={() => rootNavigation.navigate('Withdraw')} disabled={!kycApproved}>
           <LinearGradient
             colors={gradients.crimsonButton}
             start={{ x: 0, y: 0 }}
@@ -113,16 +95,6 @@ export default function WalletScreen() {
           </LinearGradient>
         </Pressable>
       </View>
-
-      <AmountInputModal
-        visible={withdrawModalOpen}
-        title="Withdraw"
-        confirmLabel="Withdraw"
-        helperText="Move coins out to your bank/UPI."
-        busy={busy}
-        onConfirm={handleWithdraw}
-        onClose={() => setWithdrawModalOpen(false)}
-      />
     </ScreenContainer>
   );
 }

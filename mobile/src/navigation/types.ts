@@ -22,4 +22,5 @@ export type RootStackParamList = {
   BalanceRecords: undefined;
   History: undefined;
   Deposit: undefined;
+  Withdraw: undefined;
 };

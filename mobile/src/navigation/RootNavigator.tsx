@@ -13,6 +13,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import OtpScreen from '../screens/OtpScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import WithdrawScreen from '../screens/WithdrawScreen';
 import LoadingState from '../components/LoadingState';
 import ScreenContainer from '../components/ScreenContainer';
 import { colors } from '../theme';
@@ -53,6 +54,7 @@ function MainNavigator() {
       <Stack.Screen name="BalanceRecords" component={BalanceRecordsScreen} />
       <Stack.Screen name="History" component={HistoryScreen} />
       <Stack.Screen name="Deposit" component={DepositScreen} />
+      <Stack.Screen name="Withdraw" component={WithdrawScreen} />
     </Stack.Navigator>
   );
 }
