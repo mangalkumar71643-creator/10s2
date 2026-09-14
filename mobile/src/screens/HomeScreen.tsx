@@ -1,7 +1,5 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
 import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
@@ -9,7 +7,7 @@ import { AVATARS } from '../data/avatars';
 import { BottomTabParamList } from '../navigation/types';
 import { useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
-import { colors, gradients, radius, shadow, spacing, typography } from '../theme';
+import { colors, radius, shadow } from '../theme';
 
 const TOP_BAR_HEIGHT = 69;
 
@@ -174,58 +172,11 @@ export default function HomeScreen() {
           ...shadow.glow,
         }}
       >
-        <LinearGradient
-          colors={gradients.balanceCard}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: spacing.lg,
-          }}
-        >
-          <View>
-            <Text style={{ color: colors.gold, fontWeight: '800', fontSize: typography.md, letterSpacing: 1 }}>
-              WIN GO
-            </Text>
-            <Text
-              style={{
-                color: colors.goldLight,
-                fontWeight: '800',
-                fontSize: typography.display,
-                letterSpacing: 0.5,
-                textShadowColor: colors.crimson,
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 8,
-              }}
-            >
-              999X
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 6, marginRight: spacing.md }}>
-            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#2FBE6B' }} />
-            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#9B5DE5', marginTop: 10 }} />
-            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#E14B4B' }} />
-          </View>
-          <LinearGradient
-            colors={gradients.crimsonButton}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              width: winGoTileHeight * 0.62,
-              height: winGoTileHeight * 0.62,
-              borderRadius: radius.md,
-              borderWidth: 1,
-              borderColor: colors.borderStrong,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <MaterialCommunityIcons name="play" size={winGoTileHeight * 0.32} color={colors.textPrimary} />
-          </LinearGradient>
-        </LinearGradient>
+        <Image
+          source={require('../../assets/win-go-banner.jpg')}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
       </Pressable>
     </ScreenContainer>
   );
