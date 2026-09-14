@@ -39,6 +39,15 @@ const REFERENCE_HEIGHT = 2800;
 const PANEL_TOP = 890;
 const PANEL_HEIGHT = 408;
 
+// Measured from a JILI lobby reference screenshot (1280x2800): the gap from
+// the red control-panel graphic's bottom edge to the top of its "Crash" game
+// tile, and that tile's own box (x:18-1200, y:1700-1935 in that same
+// reference frame) — reused here so our tile sits the same distance below
+// our own panel, at the same size, just themed for Win Go instead.
+const WIN_GO_GAP_BELOW_PANEL = 250;
+const WIN_GO_TILE_WIDTH_FRACTION = 0.92;
+const WIN_GO_TILE_ASPECT = 1182 / 235;
+
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
 export default function HomeScreen() {
@@ -49,6 +58,9 @@ export default function HomeScreen() {
   const panelHeight = screenHeight * (PANEL_HEIGHT / REFERENCE_HEIGHT);
   const panelWidth = panelHeight * CONTROL_PANEL_ASPECT;
   const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
+  const winGoTileWidth = screenWidth * WIN_GO_TILE_WIDTH_FRACTION;
+  const winGoTileHeight = winGoTileWidth / WIN_GO_TILE_ASPECT;
+  const winGoTileTop = panelTop + panelHeight + screenHeight * (WIN_GO_GAP_BELOW_PANEL / REFERENCE_HEIGHT);
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -151,28 +163,68 @@ export default function HomeScreen() {
         onPress={() => (navigation as any).navigate('ColorPredict')}
         style={{
           position: 'absolute',
-          top: TOP_BAR_HEIGHT + spacing.md,
-          right: spacing.lg,
+          top: winGoTileTop,
+          left: (screenWidth - winGoTileWidth) / 2,
+          width: winGoTileWidth,
+          height: winGoTileHeight,
+          borderRadius: radius.lg,
+          borderWidth: 2,
+          borderColor: colors.gold,
+          overflow: 'hidden',
+          ...shadow.glow,
         }}
       >
         <LinearGradient
-          colors={gradients.crimsonButton}
+          colors={gradients.balanceCard}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{
+            flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 6,
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.md,
-            borderRadius: radius.pill,
-            borderWidth: 1,
-            borderColor: colors.borderStrong,
-            ...shadow.glow,
+            justifyContent: 'space-between',
+            paddingHorizontal: spacing.lg,
           }}
         >
-          <MaterialCommunityIcons name="circle-multiple-outline" size={16} color={colors.textPrimary} />
-          <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: typography.xs }}>Color Predict</Text>
+          <View>
+            <Text style={{ color: colors.gold, fontWeight: '800', fontSize: typography.md, letterSpacing: 1 }}>
+              WIN GO
+            </Text>
+            <Text
+              style={{
+                color: colors.goldLight,
+                fontWeight: '800',
+                fontSize: typography.display,
+                letterSpacing: 0.5,
+                textShadowColor: colors.crimson,
+                textShadowOffset: { width: 0, height: 0 },
+                textShadowRadius: 8,
+              }}
+            >
+              999X
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6, marginRight: spacing.md }}>
+            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#2FBE6B' }} />
+            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#9B5DE5', marginTop: 10 }} />
+            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: '#E14B4B' }} />
+          </View>
+          <LinearGradient
+            colors={gradients.crimsonButton}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: winGoTileHeight * 0.62,
+              height: winGoTileHeight * 0.62,
+              borderRadius: radius.md,
+              borderWidth: 1,
+              borderColor: colors.borderStrong,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <MaterialCommunityIcons name="play" size={winGoTileHeight * 0.32} color={colors.textPrimary} />
+          </LinearGradient>
         </LinearGradient>
       </Pressable>
     </ScreenContainer>
