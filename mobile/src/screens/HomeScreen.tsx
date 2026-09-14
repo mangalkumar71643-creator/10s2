@@ -58,7 +58,7 @@ export default function HomeScreen() {
   const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
   const winGoTileWidth = screenWidth * WIN_GO_TILE_WIDTH_FRACTION;
   const winGoTileHeight = winGoTileWidth / WIN_GO_TILE_ASPECT;
-  const winGoTileTop = panelTop + panelHeight + screenHeight * (WIN_GO_GAP_BELOW_PANEL / REFERENCE_HEIGHT);
+  const winGoTileTop = panelTop + panelHeight + screenHeight * (WIN_GO_GAP_BELOW_PANEL / REFERENCE_HEIGHT) - 50;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
