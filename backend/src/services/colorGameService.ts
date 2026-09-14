@@ -15,6 +15,13 @@ export const COLOR_GAME_DURATIONS = [30, 60, 180, 300, 600] as const;
  * everyone, including us, until settlement). */
 const LOCK_SECONDS = 5;
 
+/** Platform fee taken off every stake before the win multiplier is applied
+ * (independent of the fixed odds table below) — e.g. a ₹100 bet at 2x pays
+ * ₹100 * 0.98 * 2 = ₹196 on a win, ₹0 on a loss. This guarantees a positive
+ * house edge on every bet type, including Big/Small, which would otherwise
+ * be an exact 50/50 payout with zero edge. */
+const PLATFORM_FEE_RATE = 0.02;
+
 function assertValidDuration(durationSeconds: number) {
   if (!COLOR_GAME_DURATIONS.includes(durationSeconds as (typeof COLOR_GAME_DURATIONS)[number])) {
     throw new ApiError(400, `Invalid duration. Choose one of: ${COLOR_GAME_DURATIONS.join(", ")}`);
@@ -121,7 +128,7 @@ async function settleRound(roundId: string) {
     if (bet.status !== "PENDING") continue;
     const multiplier = payoutMultiplierFor(bet.betType, bet.betValue, resultNumber);
     const won = multiplier > 0;
-    const payout = won ? round2(Number(bet.amount) * multiplier) : 0;
+    const payout = won ? round2(Number(bet.amount) * (1 - PLATFORM_FEE_RATE) * multiplier) : 0;
 
     const ops: Prisma.PrismaPromise<unknown>[] = [
       prisma.colorGameBet.update({
@@ -273,5 +280,6 @@ export function getColorGameConfig() {
     maxStake: env.games.maxStake,
     lockSeconds: LOCK_SECONDS,
     payouts: { number: 9, color: 2, colorMixed: 1.5, violet: 4.5, size: 2 },
+    platformFeePercent: PLATFORM_FEE_RATE * 100,
   };
 }

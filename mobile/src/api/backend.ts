@@ -258,6 +258,7 @@ export interface ColorGameConfig {
   maxStake: number;
   lockSeconds: number;
   payouts: { number: number; color: number; colorMixed: number; violet: number; size: number };
+  platformFeePercent: number;
 }
 
 export function fetchColorGameConfig() {
