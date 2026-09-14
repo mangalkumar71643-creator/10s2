@@ -4,7 +4,6 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import ScreenContainer from '../components/ScreenContainer';
 import { ApiClientError } from '../api/client';
 import {
   ColorGameBetType,
@@ -21,49 +20,54 @@ import {
 } from '../api/backend';
 import { RootStackParamList } from '../navigation/types';
 import { useGameState } from '../state/GameStateContext';
-import { colors, gradients, radius, spacing, typography } from '../theme';
+import { radius, spacing, typography } from '../theme';
 
-// Only the four tracks shown in the reference design — 30s is still a valid
-// backend duration, just not one we surface here.
-const DISPLAY_DURATIONS: ColorGameDuration[] = [60, 180, 300, 600];
-const DURATION_LABELS: Record<ColorGameDuration, string> = {
-  30: 'Win Go 30Sec',
-  60: 'Win Go 1Min',
-  180: 'Win Go 3Min',
-  300: 'Win Go 5Min',
-  600: 'Win Go 10Min',
+// This screen intentionally uses its own light "ticket" palette to match the
+// reference design, rather than the app's global dark theme — Home/Wallet/
+// etc. are unaffected.
+const PALETTE = {
+  headerDark: '#0B3D28',
+  headerLight: '#1C7A50',
+  green: '#1C8A5C',
+  greenDark: '#0F4D34',
+  greenBall: '#2FBE6B',
+  red: '#E24B3F',
+  violet: '#9B59D9',
+  orange: '#E8952E',
+  blue: '#3D7FE0',
+  lightBg: '#F3F5F4',
+  white: '#FFFFFF',
+  textDark: '#123524',
+  textMuted: '#7C9089',
+  border: '#E1E7E4',
 };
 
-const MULTIPLIERS = [1, 2, 5, 10, 20, 50, 100] as const;
-
-// Purely cosmetic per-ball colors so the number grid reads like the
-// reference design — the actual win category (green/red/violet) a number
-// belongs to is unchanged and still decided by colorsForNumber below.
-const NUMBER_BALL_COLORS: Record<number, string> = {
-  0: '#2FBE6B',
-  1: '#3576E0',
-  2: '#F0B93D',
-  3: '#E0473F',
-  4: '#8C4FE0',
-  5: '#1E9E7A',
-  6: '#E38A2E',
-  7: '#31A9D6',
-  8: '#E24F9C',
-  9: '#7A44D6',
+const DURATIONS: ColorGameDuration[] = [30, 60, 180, 300, 600];
+const DURATION_VALUE_LABEL: Record<ColorGameDuration, string> = {
+  30: '30S',
+  60: '1Min',
+  180: '3Min',
+  300: '5Min',
+  600: '10Min',
 };
+
+const MULTIPLIERS = [1, 5, 10, 20, 50, 100] as const;
 
 function colorsForNumber(n: number): Array<'GREEN' | 'RED' | 'VIOLET'> {
   if (n === 0) return ['VIOLET', 'RED'];
   if (n === 5) return ['VIOLET', 'GREEN'];
   return [2, 4, 6, 8].includes(n) ? ['RED'] : ['GREEN'];
 }
-void colorsForNumber; // kept for future use (e.g. explaining mixed numbers)
 
 const CATEGORY_COLOR_HEX: Record<'GREEN' | 'RED' | 'VIOLET', string> = {
-  GREEN: '#2FBE6B',
-  RED: '#E14B4B',
-  VIOLET: '#9B5DE5',
+  GREEN: PALETTE.greenBall,
+  RED: PALETTE.red,
+  VIOLET: PALETTE.violet,
 };
+
+function primaryColorForNumber(n: number): string {
+  return CATEGORY_COLOR_HEX[colorsForNumber(n)[0]];
+}
 
 function formatCountdown(totalSeconds: number): string {
   const clamped = Math.max(0, totalSeconds);
@@ -79,24 +83,20 @@ export default function ColorPredictScreen() {
   const { coins, refreshWallet } = useGameState();
 
   const [config, setConfig] = useState<ColorGameConfig | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<ColorGameDuration>(60);
-  const [roundsByDuration, setRoundsByDuration] = useState<Partial<Record<ColorGameDuration, ColorGameRoundView>>>({});
+  const [duration, setDuration] = useState<ColorGameDuration>(60);
+  const [round, setRound] = useState<ColorGameRoundView | null>(null);
   const [history, setHistory] = useState<ColorGameHistoryEntry[]>([]);
   const [myBets, setMyBets] = useState<ColorGameMyBet[]>([]);
   const [selection, setSelection] = useState<Selection>(null);
   const [multiplier, setMultiplier] = useState<(typeof MULTIPLIERS)[number]>(1);
   const [placing, setPlacing] = useState(false);
 
-  const configRef = useRef(config);
-  configRef.current = config;
+  const roundRef = useRef(round);
+  roundRef.current = round;
 
-  const loadRoundFor = useCallback(async (d: ColorGameDuration) => {
-    try {
-      const view = await fetchColorGameCurrentRound(d);
-      setRoundsByDuration((prev) => ({ ...prev, [d]: view }));
-    } catch {
-      // transient — next tick retries
-    }
+  const loadRound = useCallback(async (d: ColorGameDuration) => {
+    const view = await fetchColorGameCurrentRound(d);
+    setRound(view);
   }, []);
 
   const loadHistory = useCallback(async (d: ColorGameDuration) => {
@@ -118,50 +118,40 @@ export default function ColorPredictScreen() {
   }, []);
 
   useEffect(() => {
-    DISPLAY_DURATIONS.forEach((d) => {
-      loadRoundFor(d);
-    });
-  }, [loadRoundFor]);
-
-  useEffect(() => {
-    loadHistory(selectedDuration);
+    setRound(null);
+    loadRound(duration);
+    loadHistory(duration);
     loadMyBets();
-  }, [selectedDuration, loadHistory, loadMyBets]);
+  }, [duration, loadRound, loadHistory, loadMyBets]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      const expired: ColorGameDuration[] = [];
-      setRoundsByDuration((prev) => {
-        const next: typeof prev = {};
-        for (const d of DISPLAY_DURATIONS) {
-          const r = prev[d];
-          if (!r) continue;
-          const remaining = r.timeRemainingSeconds - 1;
-          if (remaining <= 0) {
-            expired.push(d);
-            next[d] = r;
-          } else {
-            next[d] = { ...r, timeRemainingSeconds: remaining, locked: remaining <= (configRef.current?.lockSeconds ?? 5) };
-          }
-        }
-        return next;
-      });
-      if (expired.length) {
-        expired.forEach((d) => loadRoundFor(d));
-        if (expired.includes(selectedDuration)) {
-          loadHistory(selectedDuration);
-          loadMyBets();
-          refreshWallet().catch(() => {});
-        }
+      const current = roundRef.current;
+      if (!current) return;
+      if (current.timeRemainingSeconds <= 0) {
+        loadRound(duration);
+        loadHistory(duration);
+        loadMyBets();
+        refreshWallet().catch(() => {});
+        return;
       }
+      setRound({
+        ...current,
+        timeRemainingSeconds: current.timeRemainingSeconds - 1,
+        locked: current.timeRemainingSeconds - 1 <= (config?.lockSeconds ?? 5),
+      });
     }, 1000);
     return () => clearInterval(timer);
-  }, [selectedDuration, loadRoundFor, loadHistory, loadMyBets, refreshWallet]);
+  }, [duration, loadRound, loadHistory, loadMyBets, refreshWallet, config]);
 
-  const round = roundsByDuration[selectedDuration] ?? null;
   const locked = round?.locked ?? true;
   const baseUnit = config?.minStake ?? 5;
   const stake = baseUnit * multiplier;
+
+  function pickRandomNumber() {
+    const n = Math.floor(Math.random() * 10);
+    setSelection({ betType: 'NUMBER', betValue: String(n), label: `Number ${n}`, multiplierLabel: `${config?.payouts.number ?? 9}X` });
+  }
 
   async function confirmBet() {
     if (!selection || !round) return;
@@ -175,7 +165,7 @@ export default function ColorPredictScreen() {
     }
     setPlacing(true);
     try {
-      await placeColorGameBet(selectedDuration, selection.betType, selection.betValue, stake);
+      await placeColorGameBet(duration, selection.betType, selection.betValue, stake);
       await Promise.all([refreshWallet(), loadMyBets()]);
       Alert.alert('Bet placed', `₹${stake} on ${selection.label} — good luck!`);
       setSelection(null);
@@ -195,205 +185,187 @@ export default function ColorPredictScreen() {
   }
 
   return (
-    <ScreenContainer scroll={false} contentStyle={{ paddingHorizontal: 0 }}>
-      <View style={styles.topBar}>
-        <View>
-          <Text style={styles.brandTitle}>NOVAPLAY</Text>
-          <Text style={styles.brandTagline}>PLAY  ·  WIN  ·  REPEAT</Text>
-        </View>
-        <View style={styles.topBarIcons}>
-          <Pressable style={styles.topBarIcon} onPress={() => navigation.navigate('Help')}>
-            <MaterialCommunityIcons name="headset" size={24} color={colors.gold} />
-          </Pressable>
-          <Pressable style={styles.topBarIcon} onPress={() => navigation.navigate('Notifications')}>
-            <MaterialCommunityIcons name="bell-outline" size={24} color={colors.gold} />
-            <View style={styles.notificationDot} />
-          </Pressable>
-          <Pressable style={styles.topBarIcon} onPress={() => navigation.navigate('Settings')}>
-            <MaterialCommunityIcons name="menu" size={26} color={colors.gold} />
-          </Pressable>
-        </View>
-      </View>
-
+    <View style={styles.root}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.walletCard}>
-          <View style={styles.walletIconBadge}>
-            <MaterialCommunityIcons name="wallet" size={26} color={colors.positive} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.walletLabel}>Wallet Balance</Text>
-            <View style={styles.walletValueRow}>
-              <Text style={styles.walletValue}>₹{coins.toFixed(2)}</Text>
-              <Pressable onPress={() => refreshWallet().catch(() => {})}>
-                <MaterialCommunityIcons name="refresh" size={17} color={colors.textMuted} />
+        <LinearGradient colors={[PALETTE.headerDark, PALETTE.headerLight]} style={styles.hero}>
+          <View style={styles.heroTopRow}>
+            <Pressable onPress={goHome} style={styles.heroIconButton}>
+              <MaterialCommunityIcons name="chevron-left" size={26} color={PALETTE.white} />
+            </Pressable>
+            <View style={styles.heroTopRight}>
+              <Pressable onPress={() => navigation.navigate('Help')} style={styles.heroIconButton}>
+                <MaterialCommunityIcons name="headset" size={20} color={PALETTE.white} />
+              </Pressable>
+              <Pressable
+                style={styles.heroIconButton}
+                onPress={() =>
+                  Alert.alert(
+                    'Provably fair',
+                    "Every round's result hash is published before betting opens, and the raw seed is revealed after settlement so you can verify it was never changed."
+                  )
+                }
+              >
+                <MaterialCommunityIcons name="shield-check-outline" size={20} color={PALETTE.white} />
               </Pressable>
             </View>
           </View>
-          <View style={{ gap: spacing.sm }}>
-            <Pressable onPress={() => navigation.navigate('Withdraw')} style={[styles.walletActionButton, { backgroundColor: colors.positive }]}>
-              <Text style={[styles.walletActionText, { color: '#08321C' }]}>Withdraw</Text>
-              <MaterialCommunityIcons name="arrow-down-bold" size={15} color="#08321C" />
+
+          <View style={styles.walletCard}>
+            <View style={styles.walletCardTopRow}>
+              <MaterialCommunityIcons name="wallet" size={22} color={PALETTE.green} />
+              <Text style={styles.walletCardTitle}>Wallet balance</Text>
+            </View>
+            <Text style={styles.walletCardAmount}>₹{coins.toFixed(2)}</Text>
+            <View style={styles.walletButtonsRow}>
+              <Pressable style={styles.withdrawButton} onPress={() => navigation.navigate('Withdraw')}>
+                <Text style={styles.withdrawButtonText}>Withdraw</Text>
+              </Pressable>
+              <Pressable style={styles.depositButton} onPress={() => navigation.navigate('Deposit')}>
+                <Text style={styles.depositButtonText}>Deposit</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.durationCard}>
+            {DURATIONS.map((d) => {
+              const isSelected = d === duration;
+              return (
+                <Pressable key={d} onPress={() => setDuration(d)} style={styles.durationTab}>
+                  <View style={[styles.durationIconWrap, isSelected && styles.durationIconWrapSelected]}>
+                    <MaterialCommunityIcons name="clock-outline" size={22} color={isSelected ? PALETTE.white : PALETTE.textMuted} />
+                  </View>
+                  <Text style={[styles.durationLabel, isSelected && styles.durationLabelSelected]}>Win Go</Text>
+                  <Text style={[styles.durationValue, isSelected && styles.durationValueSelected]}>{DURATION_VALUE_LABEL[d]}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.ticketBar}>
+            <Pressable
+              style={styles.howToPlayButton}
+              onPress={() =>
+                Alert.alert('How to play', 'Pick a number, color, or size before the round locks, then confirm your bet below.')
+              }
+            >
+              <MaterialCommunityIcons name="book-open-variant" size={16} color={PALETTE.white} />
+              <Text style={styles.howToPlayText}>How to play</Text>
             </Pressable>
-            <Pressable onPress={() => navigation.navigate('Deposit')} style={[styles.walletActionButton, { backgroundColor: colors.gold }]}>
-              <Text style={[styles.walletActionText, { color: '#3A2405' }]}>Deposit</Text>
-              <MaterialCommunityIcons name="arrow-up-bold" size={15} color="#3A2405" />
-            </Pressable>
+            <View style={styles.ticketDivider} />
+            <View style={styles.ticketRight}>
+              <Text style={styles.ticketLabel}>{locked ? 'Locked' : 'Time remaining'}</Text>
+              <Text style={styles.ticketValue}>{round ? formatCountdown(round.timeRemainingSeconds) : '--:--'}</Text>
+            </View>
+            <View style={[styles.ticketNotch, styles.ticketNotchTop]} />
+            <View style={[styles.ticketNotch, styles.ticketNotchBottom]} />
           </View>
-        </View>
+        </LinearGradient>
 
-        <View style={styles.durationRow}>
-          {DISPLAY_DURATIONS.map((d) => {
-            const isSelected = d === selectedDuration;
-            const r = roundsByDuration[d];
-            return (
-              <Pressable
-                key={d}
-                onPress={() => setSelectedDuration(d)}
-                style={[styles.durationTab, isSelected && styles.durationTabSelected]}
-              >
-                <View style={styles.durationTabTop}>
-                  <MaterialCommunityIcons name="clock-outline" size={12} color={isSelected ? colors.positive : colors.textSecondary} />
-                  <Text style={[styles.durationTabLabel, isSelected && styles.durationTabLabelSelected]}>{DURATION_LABELS[d]}</Text>
-                </View>
-                <Text style={[styles.durationTabTimer, isSelected && styles.durationTabTimerSelected]}>
-                  {r ? formatCountdown(r.timeRemainingSeconds) : '--:--'}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.infoPill}>
-          <Pressable
-            style={styles.infoPillHalf}
-            onPress={() =>
-              Alert.alert(
-                'How to play',
-                "Pick a number, color, or size before the round locks. Each round's result hash is published before betting opens, and the raw seed is revealed after settlement so you can verify it was never changed."
-              )
-            }
-          >
-            <MaterialCommunityIcons name="help-circle-outline" size={18} color={colors.gold} />
-            <Text style={styles.infoPillText}>How to play</Text>
-          </Pressable>
-          <View style={styles.infoPillDivider} />
-          <View style={styles.infoPillHalf}>
-            <Text style={styles.infoPillMuted}>{locked ? 'Locked' : 'Time remaining'}</Text>
-            <Text style={[styles.infoPillTimer, locked && { color: colors.negative }]}>
-              {round ? formatCountdown(round.timeRemainingSeconds) : '--:--'}
-            </Text>
-            <MaterialCommunityIcons name="clock-outline" size={16} color={locked ? colors.negative : colors.positive} />
+        <View style={styles.whiteContent}>
+          <View style={styles.threeRow}>
+            {(['GREEN', 'VIOLET', 'RED'] as const).map((c) => {
+              const mult = c === 'VIOLET' ? config?.payouts.violet ?? 4.5 : config?.payouts.color ?? 2;
+              const isSelected = selection?.betType === 'COLOR' && selection.betValue === c;
+              return (
+                <Pressable
+                  key={c}
+                  style={[styles.categoryButton, { backgroundColor: CATEGORY_COLOR_HEX[c] }, isSelected && styles.selectedOutline]}
+                  onPress={() => setSelection({ betType: 'COLOR', betValue: c, label: c.charAt(0) + c.slice(1).toLowerCase(), multiplierLabel: `${mult}X` })}
+                >
+                  <Text style={styles.categoryButtonText}>{c.charAt(0) + c.slice(1).toLowerCase()}</Text>
+                  <Text style={styles.categoryButtonMult}>{mult}X</Text>
+                </Pressable>
+              );
+            })}
           </View>
-        </View>
 
-        {history.length > 0 ? (
-          <View style={styles.resultsRow}>
-            {history.slice(0, 10).map((h) => (
-              <View key={h.periodNumber} style={[styles.resultDot, { backgroundColor: NUMBER_BALL_COLORS[h.resultNumber] }]}>
-                <Text style={styles.resultDotText}>{h.resultNumber}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        <SectionHeading title="CHOOSE A NUMBER" />
-        <View style={styles.numberGrid}>
-          {Array.from({ length: 10 }, (_, n) => n).map((n) => {
-            const isSelected = selection?.betType === 'NUMBER' && selection.betValue === String(n);
-            return (
-              <Pressable
-                key={n}
-                style={[styles.numberBall, { backgroundColor: NUMBER_BALL_COLORS[n] }, isSelected && styles.selectedOutline]}
-                onPress={() =>
-                  setSelection({ betType: 'NUMBER', betValue: String(n), label: `Number ${n}`, multiplierLabel: `${config?.payouts.number ?? 9}X` })
-                }
-              >
-                <Text style={styles.numberBallText}>{n}</Text>
-                <View style={styles.numberBallBadge}>
-                  <Text style={styles.numberBallBadgeText}>{config?.payouts.number ?? 9}X</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.threeButtonRow}>
-          {(['GREEN', 'VIOLET', 'RED'] as const).map((c) => {
-            const mult = c === 'VIOLET' ? config?.payouts.violet ?? 4.5 : config?.payouts.color ?? 2;
-            const isSelected = selection?.betType === 'COLOR' && selection.betValue === c;
-            return (
-              <Pressable
-                key={c}
-                style={[styles.colorButton, { backgroundColor: CATEGORY_COLOR_HEX[c] }, isSelected && styles.selectedOutline]}
-                onPress={() => setSelection({ betType: 'COLOR', betValue: c, label: c, multiplierLabel: `${mult}X` })}
-              >
-                <View style={styles.colorButtonTop}>
-                  <Text style={styles.colorButtonText}>{c}</Text>
-                  <View style={styles.colorDot} />
-                </View>
-                <Text style={styles.colorButtonMult}>{mult}X</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <SectionHeading title="BIG & SMALL" />
-        <View style={styles.threeButtonRow}>
-          {(['BIG', 'SMALL'] as const).map((s) => {
-            const isSelected = selection?.betType === 'SIZE' && selection.betValue === s;
-            const mult = config?.payouts.size ?? 2;
-            const textColor = s === 'BIG' ? '#08321C' : '#3A2405';
-            return (
-              <Pressable
-                key={s}
-                style={[styles.sizeButton, { backgroundColor: s === 'BIG' ? colors.positive : colors.gold }, isSelected && styles.selectedOutline]}
-                onPress={() => setSelection({ betType: 'SIZE', betValue: s, label: s, multiplierLabel: `${mult}X` })}
-              >
-                <View style={styles.colorButtonTop}>
-                  <Text style={[styles.sizeButtonText, { color: textColor }]}>{s}</Text>
-                  <MaterialCommunityIcons name={s === 'BIG' ? 'arrow-up-bold' : 'arrow-down-bold'} size={16} color={textColor} />
-                </View>
-                <Text style={[styles.colorButtonMult, { color: textColor }]}>{mult}X</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <SectionHeading title="SELECT MULTIPLIER" />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiplierRow}>
-          {MULTIPLIERS.map((m) => {
-            const isSelected = m === multiplier;
-            return (
-              <Pressable key={m} onPress={() => setMultiplier(m)} style={[styles.multiplierChip, isSelected && styles.multiplierChipSelected]}>
-                <Text style={[styles.multiplierChipText, isSelected && styles.multiplierChipTextSelected]}>x{m}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {myBets.length > 0 ? (
-          <>
-            <Text style={styles.myBetsTitle}>My recent bets</Text>
-            <View style={styles.myBetsBlock}>
-              {myBets.slice(0, 8).map((bet) => (
-                <View key={bet.id} style={styles.myBetRow}>
-                  <Text style={styles.myBetLabel} numberOfLines={1}>
-                    {bet.betType === 'NUMBER' ? `Number ${bet.betValue}` : bet.betValue} · ₹{Number(bet.amount)}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.myBetStatus,
-                      bet.status === 'WON' && { color: colors.positive },
-                      bet.status === 'LOST' && { color: colors.negative },
-                    ]}
-                  >
-                    {bet.status === 'PENDING' ? 'Pending' : bet.status === 'WON' ? `+₹${Number(bet.payout)}` : 'Lost'}
-                  </Text>
+          {history.length > 0 ? (
+            <View style={styles.resultsRow}>
+              {history.slice(0, 10).map((h) => (
+                <View key={h.periodNumber} style={[styles.resultDot, { backgroundColor: primaryColorForNumber(h.resultNumber) }]}>
+                  <Text style={styles.resultDotText}>{h.resultNumber}</Text>
                 </View>
               ))}
             </View>
-          </>
-        ) : null}
+          ) : null}
+
+          <View style={styles.numberGrid}>
+            {Array.from({ length: 10 }, (_, n) => n).map((n) => {
+              const isSelected = selection?.betType === 'NUMBER' && selection.betValue === String(n);
+              return (
+                <Pressable
+                  key={n}
+                  style={styles.numberCell}
+                  onPress={() =>
+                    setSelection({ betType: 'NUMBER', betValue: String(n), label: `Number ${n}`, multiplierLabel: `${config?.payouts.number ?? 9}X` })
+                  }
+                >
+                  <View style={[styles.numberBall, { backgroundColor: primaryColorForNumber(n) }, isSelected && styles.selectedOutline]}>
+                    <Text style={styles.numberBallText}>{n}</Text>
+                  </View>
+                  <Text style={styles.numberBallMult}>{config?.payouts.number ?? 9}X</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.multiplierRow}>
+            <Pressable style={styles.randomChip} onPress={pickRandomNumber}>
+              <Text style={styles.randomChipText}>Random</Text>
+            </Pressable>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.multiplierChips}>
+              {MULTIPLIERS.map((m) => {
+                const isSelected = m === multiplier;
+                return (
+                  <Pressable key={m} onPress={() => setMultiplier(m)} style={[styles.multiplierChip, isSelected && styles.multiplierChipSelected]}>
+                    <Text style={[styles.multiplierChipText, isSelected && styles.multiplierChipTextSelected]}>X{m}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <View style={styles.bigSmallBar}>
+            {(['BIG', 'SMALL'] as const).map((s) => {
+              const isSelected = selection?.betType === 'SIZE' && selection.betValue === s;
+              const mult = config?.payouts.size ?? 2;
+              return (
+                <Pressable
+                  key={s}
+                  style={[styles.bigSmallHalf, { backgroundColor: s === 'BIG' ? PALETTE.orange : PALETTE.blue }, isSelected && styles.selectedOutline]}
+                  onPress={() => setSelection({ betType: 'SIZE', betValue: s, label: s.charAt(0) + s.slice(1).toLowerCase(), multiplierLabel: `${mult}X` })}
+                >
+                  <Text style={styles.bigSmallText}>{s.charAt(0) + s.slice(1).toLowerCase()}</Text>
+                  <Text style={styles.bigSmallText}>{mult}X</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {myBets.length > 0 ? (
+            <>
+              <Text style={styles.myBetsTitle}>My recent bets</Text>
+              <View style={styles.myBetsBlock}>
+                {myBets.slice(0, 8).map((bet) => (
+                  <View key={bet.id} style={styles.myBetRow}>
+                    <Text style={styles.myBetLabel} numberOfLines={1}>
+                      {bet.betType === 'NUMBER' ? `Number ${bet.betValue}` : bet.betValue} · ₹{Number(bet.amount)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.myBetStatus,
+                        bet.status === 'WON' && { color: PALETTE.green },
+                        bet.status === 'LOST' && { color: PALETTE.red },
+                      ]}
+                    >
+                      {bet.status === 'PENDING' ? 'Pending' : bet.status === 'WON' ? `+₹${Number(bet.payout)}` : 'Lost'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          ) : null}
+        </View>
       </ScrollView>
 
       {selection ? (
@@ -404,207 +376,185 @@ export default function ColorPredictScreen() {
             </Text>
           </View>
           <Pressable onPress={() => setSelection(null)} style={styles.confirmCancel}>
-            <MaterialCommunityIcons name="close" size={18} color={colors.textMuted} />
+            <MaterialCommunityIcons name="close" size={18} color={PALETTE.textMuted} />
           </Pressable>
-          <Pressable onPress={confirmBet} disabled={placing || locked}>
-            <LinearGradient
-              colors={gradients.crimsonButton}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.confirmButton, { opacity: placing || locked ? 0.5 : 1 }]}
-            >
-              <Text style={styles.confirmButtonText}>{placing ? 'Placing…' : 'Place Bet'}</Text>
-            </LinearGradient>
+          <Pressable onPress={confirmBet} disabled={placing || locked} style={[styles.confirmButton, { opacity: placing || locked ? 0.5 : 1 }]}>
+            <Text style={styles.confirmButtonText}>{placing ? 'Placing…' : 'Place Bet'}</Text>
           </Pressable>
         </View>
       ) : null}
 
       <View style={styles.bottomNav}>
         <Pressable style={styles.bottomNavItem} onPress={goHome}>
-          <MaterialCommunityIcons name="home" size={22} color={colors.positive} />
-          <Text style={[styles.bottomNavLabel, { color: colors.positive }]}>Home</Text>
+          <MaterialCommunityIcons name="home" size={22} color={PALETTE.green} />
+          <Text style={[styles.bottomNavLabel, { color: PALETTE.green }]}>Home</Text>
         </Pressable>
         <Pressable
           style={styles.bottomNavItem}
           onPress={() => Alert.alert('My Bets', 'See "My recent bets" further up this screen for your latest wagers.')}
         >
-          <MaterialCommunityIcons name="file-document-outline" size={22} color={colors.gold} />
+          <MaterialCommunityIcons name="file-document-outline" size={22} color={PALETTE.textMuted} />
           <Text style={styles.bottomNavLabel}>My Bets</Text>
         </Pressable>
         <Pressable style={styles.bottomNavItem} onPress={() => navigation.navigate('History')}>
-          <MaterialCommunityIcons name="clock-time-four-outline" size={22} color={colors.gold} />
+          <MaterialCommunityIcons name="clock-time-four-outline" size={22} color={PALETTE.textMuted} />
           <Text style={styles.bottomNavLabel}>History</Text>
         </Pressable>
         <Pressable style={styles.bottomNavItem} onPress={() => navigation.navigate('Profile')}>
-          <MaterialCommunityIcons name="account-outline" size={22} color={colors.gold} />
+          <MaterialCommunityIcons name="account-outline" size={22} color={PALETTE.textMuted} />
           <Text style={styles.bottomNavLabel}>Profile</Text>
         </Pressable>
       </View>
-    </ScreenContainer>
-  );
-}
-
-function SectionHeading({ title }: { title: string }) {
-  return (
-    <View style={styles.sectionHeadingWrap}>
-      <View style={styles.sectionHeadingRow}>
-        <Text style={styles.sectionHeadingDiamond}>◆</Text>
-        <Text style={styles.sectionHeadingText}>{title}</Text>
-        <Text style={styles.sectionHeadingDiamond}>◆</Text>
-      </View>
-      <View style={styles.sectionHeadingLine} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  root: { flex: 1, backgroundColor: PALETTE.lightBg },
+  scrollContent: { paddingBottom: 220 },
+  hero: {
+    paddingTop: spacing.xxl,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xl,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
   },
-  brandTitle: { color: colors.gold, fontSize: typography.xxl, fontWeight: '900', letterSpacing: 1 },
-  brandTagline: { color: colors.goldDark, fontSize: 10, fontWeight: '700', letterSpacing: 2, marginTop: 2 },
-  topBarIcons: { flexDirection: 'row', gap: spacing.md, alignItems: 'center', marginTop: 4 },
-  topBarIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  notificationDot: {
-    position: 'absolute',
-    top: 1,
-    right: 3,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.positive,
-    borderWidth: 1,
-    borderColor: colors.background,
-  },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: 220 },
+  heroTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  heroTopRight: { flexDirection: 'row', gap: spacing.sm },
+  heroIconButton: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   walletCard: {
-    flexDirection: 'row',
+    backgroundColor: PALETTE.white,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
     alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    padding: spacing.lg,
     marginBottom: spacing.lg,
   },
-  walletIconBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.md,
+  walletCardTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  walletCardTitle: { color: PALETTE.textDark, fontSize: typography.lg, fontWeight: '700' },
+  walletCardAmount: { color: PALETTE.green, fontSize: typography.xxl, fontWeight: '800', marginBottom: spacing.lg },
+  walletButtonsRow: { flexDirection: 'row', gap: spacing.md, width: '100%' },
+  withdrawButton: {
+    flex: 1,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: PALETTE.green,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(62,207,142,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(62,207,142,0.4)',
   },
-  walletLabel: { color: colors.textSecondary, fontSize: typography.sm, fontWeight: '600', marginBottom: 4 },
-  walletValueRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  walletValue: { color: colors.positive, fontSize: typography.xl, fontWeight: '800' },
-  walletActionButton: {
+  withdrawButtonText: { color: PALETTE.green, fontWeight: '800', fontSize: typography.md },
+  depositButton: {
+    flex: 1,
+    borderRadius: radius.pill,
+    backgroundColor: PALETTE.greenDark,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  depositButtonText: { color: PALETTE.white, fontWeight: '800', fontSize: typography.md },
+  durationCard: {
+    flexDirection: 'row',
+    backgroundColor: PALETTE.white,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  durationTab: { flex: 1, alignItems: 'center', gap: 4 },
+  durationIconWrap: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  durationIconWrapSelected: { backgroundColor: PALETTE.green },
+  durationLabel: { color: PALETTE.textMuted, fontSize: 10, fontWeight: '700' },
+  durationLabelSelected: { color: PALETTE.green },
+  durationValue: { color: PALETTE.textMuted, fontSize: typography.xs, fontWeight: '800' },
+  durationValueSelected: { color: PALETTE.green },
+  ticketBar: {
+    flexDirection: 'row',
+    backgroundColor: PALETTE.greenDark,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+  },
+  howToPlayButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    minWidth: 108,
+    paddingVertical: spacing.lg,
   },
-  walletActionText: { fontWeight: '800', fontSize: typography.sm },
-  durationRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  durationTab: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    gap: 4,
-  },
-  durationTabSelected: { backgroundColor: 'rgba(62,207,142,0.12)', borderColor: colors.positive },
-  durationTabTop: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  durationTabLabel: { color: colors.textSecondary, fontSize: 10, fontWeight: '700' },
-  durationTabLabelSelected: { color: colors.positive },
-  durationTabTimer: { color: colors.textMuted, fontSize: typography.sm, fontWeight: '800', marginTop: 2 },
-  durationTabTimerSelected: { color: colors.positive },
-  infoPill: {
-    flexDirection: 'row',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.lg,
-    overflow: 'hidden',
-  },
-  infoPillHalf: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: spacing.md },
-  infoPillDivider: { width: 1, backgroundColor: colors.border },
-  infoPillText: { color: colors.gold, fontWeight: '700', fontSize: typography.sm },
-  infoPillMuted: { color: colors.textMuted, fontSize: typography.xs, marginRight: 4 },
-  infoPillTimer: { color: colors.positive, fontWeight: '800', fontSize: typography.lg, marginRight: 4 },
-  resultsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, flexWrap: 'wrap' },
-  resultDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  resultDotText: { color: '#FFFFFF', fontWeight: '800', fontSize: typography.xs },
-  sectionHeadingWrap: { marginBottom: spacing.md, marginTop: spacing.sm },
-  sectionHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, marginBottom: 6 },
-  sectionHeadingDiamond: { color: colors.gold, fontSize: typography.sm },
-  sectionHeadingText: { color: colors.gold, fontWeight: '800', fontSize: typography.sm, letterSpacing: 1 },
-  sectionHeadingLine: { height: 1, backgroundColor: colors.border, width: '70%', alignSelf: 'center' },
-  numberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'space-between', marginBottom: spacing.xl },
-  numberBall: {
-    width: '18%',
-    aspectRatio: 1,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'transparent',
-    marginBottom: spacing.md,
-  },
-  numberBallText: { color: '#FFFFFF', fontWeight: '800', fontSize: typography.lg },
-  numberBallBadge: {
+  howToPlayText: { color: PALETTE.white, fontWeight: '700', fontSize: typography.sm },
+  ticketDivider: { width: 1.5, borderLeftWidth: 1.5, borderLeftColor: 'rgba(255,255,255,0.5)', borderStyle: 'dashed' },
+  ticketRight: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.lg },
+  ticketLabel: { color: 'rgba(255,255,255,0.75)', fontSize: typography.xs, marginBottom: 2 },
+  ticketValue: { color: PALETTE.white, fontWeight: '800', fontSize: typography.lg },
+  ticketNotch: {
     position: 'absolute',
-    bottom: -6,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: radius.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
+    left: '50%',
+    marginLeft: -9,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: PALETTE.headerLight,
   },
-  numberBallBadgeText: { color: '#FFFFFF', fontWeight: '800', fontSize: 9 },
-  selectedOutline: { borderWidth: 3, borderColor: colors.gold },
-  threeButtonRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
-  colorButton: { flex: 1, borderRadius: radius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center' },
-  colorButtonTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  colorButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: typography.sm, letterSpacing: 0.5 },
-  colorDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.85)' },
-  colorButtonMult: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: typography.xs, marginTop: 4 },
-  sizeButton: { flex: 1, borderRadius: radius.lg, paddingVertical: spacing.lg, alignItems: 'center', justifyContent: 'center' },
-  sizeButtonText: { fontWeight: '800', fontSize: typography.md },
-  multiplierRow: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs, paddingRight: spacing.lg, marginBottom: spacing.xl },
+  ticketNotchTop: { top: -9 },
+  ticketNotchBottom: { bottom: -9 },
+  whiteContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
+  threeRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  categoryButton: {
+    flex: 1,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  categoryButtonText: { color: PALETTE.white, fontWeight: '700', fontSize: typography.sm },
+  categoryButtonMult: { color: PALETTE.white, fontWeight: '800', fontSize: typography.sm },
+  resultsRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg, flexWrap: 'wrap' },
+  resultDot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  resultDotText: { color: PALETTE.white, fontWeight: '800', fontSize: 11 },
+  numberGrid: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: spacing.lg },
+  numberCell: { width: '20%', alignItems: 'center', marginBottom: spacing.md },
+  numberBall: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'transparent' },
+  numberBallText: { color: PALETTE.white, fontWeight: '800', fontSize: typography.lg },
+  numberBallMult: { color: PALETTE.textMuted, fontSize: 11, fontWeight: '700', marginTop: 4 },
+  selectedOutline: { borderWidth: 3, borderColor: PALETTE.greenDark },
+  multiplierRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+  randomChip: {
+    borderWidth: 1.5,
+    borderColor: PALETTE.green,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  randomChipText: { color: PALETTE.green, fontWeight: '800', fontSize: typography.sm },
+  multiplierChips: { flexDirection: 'row', gap: spacing.sm },
   multiplierChip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
+    borderColor: PALETTE.border,
+    backgroundColor: PALETTE.white,
   },
-  multiplierChipSelected: { borderColor: colors.positive, backgroundColor: 'rgba(62,207,142,0.15)' },
-  multiplierChipText: { color: colors.textSecondary, fontWeight: '700', fontSize: typography.sm },
-  multiplierChipTextSelected: { color: colors.positive },
-  myBetsTitle: { color: colors.textPrimary, fontSize: typography.md, fontWeight: '800', marginBottom: spacing.md, marginTop: spacing.sm },
+  multiplierChipSelected: { backgroundColor: PALETTE.greenDark, borderColor: PALETTE.greenDark },
+  multiplierChipText: { color: PALETTE.textDark, fontWeight: '700', fontSize: typography.sm },
+  multiplierChipTextSelected: { color: PALETTE.white },
+  bigSmallBar: { flexDirection: 'row', borderRadius: radius.md, overflow: 'hidden', marginBottom: spacing.lg },
+  bigSmallHalf: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  bigSmallText: { color: PALETTE.white, fontWeight: '800', fontSize: typography.md },
+  myBetsTitle: { color: PALETTE.textDark, fontSize: typography.md, fontWeight: '800', marginBottom: spacing.md },
   myBetsBlock: {
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: PALETTE.border,
+    backgroundColor: PALETTE.white,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     marginBottom: spacing.lg,
@@ -615,10 +565,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: PALETTE.border,
   },
-  myBetLabel: { color: colors.textSecondary, fontSize: typography.sm, flex: 1, marginRight: spacing.md },
-  myBetStatus: { color: colors.textMuted, fontWeight: '800', fontSize: typography.sm },
+  myBetLabel: { color: PALETTE.textDark, fontSize: typography.sm, flex: 1, marginRight: spacing.md },
+  myBetStatus: { color: PALETTE.textMuted, fontWeight: '800', fontSize: typography.sm },
   confirmBar: {
     position: 'absolute',
     left: 0,
@@ -629,14 +579,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: PALETTE.white,
     borderTopWidth: 1,
-    borderTopColor: colors.borderStrong,
+    borderTopColor: PALETTE.border,
   },
-  confirmLabel: { color: colors.textPrimary, fontSize: typography.sm, fontWeight: '700' },
+  confirmLabel: { color: PALETTE.textDark, fontSize: typography.sm, fontWeight: '700' },
   confirmCancel: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  confirmButton: { borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, alignItems: 'center' },
-  confirmButtonText: { color: colors.textPrimary, fontWeight: '800', fontSize: typography.sm },
+  confirmButton: { borderRadius: radius.lg, backgroundColor: PALETTE.greenDark, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, alignItems: 'center' },
+  confirmButtonText: { color: PALETTE.white, fontWeight: '800', fontSize: typography.sm },
   bottomNav: {
     position: 'absolute',
     left: 0,
@@ -644,10 +594,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 64,
     flexDirection: 'row',
-    backgroundColor: colors.surface,
+    backgroundColor: PALETTE.white,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: PALETTE.border,
   },
   bottomNavItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  bottomNavLabel: { color: colors.gold, fontSize: 10, fontWeight: '700', marginTop: 2 },
+  bottomNavLabel: { color: PALETTE.textMuted, fontSize: 10, fontWeight: '700', marginTop: 2 },
 });
