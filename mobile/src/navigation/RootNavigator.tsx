@@ -4,6 +4,7 @@ import React from 'react';
 import BottomTabs from './BottomTabs';
 import { AuthStackParamList, RootStackParamList } from './types';
 import BalanceRecordsScreen from '../screens/BalanceRecordsScreen';
+import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -55,6 +56,7 @@ function MainNavigator() {
       <Stack.Screen name="History" component={HistoryScreen} />
       <Stack.Screen name="Deposit" component={DepositScreen} />
       <Stack.Screen name="Withdraw" component={WithdrawScreen} />
+      <Stack.Screen name="ColorPredict" component={ColorPredictScreen} />
     </Stack.Navigator>
   );
 }

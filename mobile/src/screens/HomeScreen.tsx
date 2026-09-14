@@ -1,5 +1,7 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
 import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
@@ -7,6 +9,7 @@ import { AVATARS } from '../data/avatars';
 import { BottomTabParamList } from '../navigation/types';
 import { useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
+import { colors, gradients, radius, shadow, spacing, typography } from '../theme';
 
 const TOP_BAR_HEIGHT = 69;
 
@@ -144,6 +147,34 @@ export default function HomeScreen() {
         }}
         resizeMode="contain"
       />
+      <Pressable
+        onPress={() => (navigation as any).navigate('ColorPredict')}
+        style={{
+          position: 'absolute',
+          top: TOP_BAR_HEIGHT + spacing.md,
+          right: spacing.lg,
+        }}
+      >
+        <LinearGradient
+          colors={gradients.crimsonButton}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.md,
+            borderRadius: radius.pill,
+            borderWidth: 1,
+            borderColor: colors.borderStrong,
+            ...shadow.glow,
+          }}
+        >
+          <MaterialCommunityIcons name="circle-multiple-outline" size={16} color={colors.textPrimary} />
+          <Text style={{ color: colors.textPrimary, fontWeight: '800', fontSize: typography.xs }}>Color Predict</Text>
+        </LinearGradient>
+      </Pressable>
     </ScreenContainer>
   );
 }
