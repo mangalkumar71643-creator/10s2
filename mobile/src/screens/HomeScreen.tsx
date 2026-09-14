@@ -3,7 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
-import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { AVATARS } from '../data/avatars';
 import { BottomTabParamList } from '../navigation/types';
@@ -39,6 +39,9 @@ const REFERENCE_HEIGHT = 2800;
 const PANEL_TOP = 890;
 const PANEL_HEIGHT = 408;
 
+const LOTTERY_BANNER_ASPECT = 2135 / 736;
+const LOTTERY_BANNER_GAP_BELOW_PANEL = 100;
+
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
 export default function HomeScreen() {
@@ -49,6 +52,9 @@ export default function HomeScreen() {
   const panelHeight = screenHeight * (PANEL_HEIGHT / REFERENCE_HEIGHT);
   const panelWidth = panelHeight * CONTROL_PANEL_ASPECT;
   const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
+  const lotteryBannerWidth = panelWidth;
+  const lotteryBannerHeight = lotteryBannerWidth / LOTTERY_BANNER_ASPECT;
+  const lotteryBannerTop = panelTop + panelHeight + LOTTERY_BANNER_GAP_BELOW_PANEL;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -147,6 +153,22 @@ export default function HomeScreen() {
         }}
         resizeMode="contain"
       />
+      <Pressable
+        onPress={() => Alert.alert('Lottery Win Go', 'Coming soon!')}
+        style={{
+          position: 'absolute',
+          top: lotteryBannerTop,
+          left: (screenWidth - lotteryBannerWidth) / 2,
+          width: lotteryBannerWidth,
+          height: lotteryBannerHeight,
+        }}
+      >
+        <Image
+          source={require('../../assets/lottery-win-go-banner.jpg')}
+          style={{ width: '100%', height: '100%', borderRadius: radius.lg }}
+          resizeMode="cover"
+        />
+      </Pressable>
       <Pressable
         onPress={() => (navigation as any).navigate('ColorPredict')}
         style={{
