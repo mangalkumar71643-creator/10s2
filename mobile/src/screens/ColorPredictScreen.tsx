@@ -189,6 +189,11 @@ const SMALL_BOX: Box = { left: 341, top: BIGSMALL_Y, width: 278, height: BIGSMAL
 const HISTORY_TAB_Y = 40;
 const HISTORY_TAB_H = 165;
 const GAME_TAB_BOX: Box = { left: 48, top: HISTORY_TAB_Y, width: 472, height: HISTORY_TAB_H };
+// The unselected artwork's target box is widened on both sides: the
+// baked green tab's edges anti-alias from x:45-47 (left) and x:518-522
+// (right), so stopping exactly at the nominal 48-520 bounds left thin
+// green slivers showing on both sides.
+const GAME_TAB_UNSELECTED_TARGET: Box = { left: 43, top: HISTORY_TAB_Y, width: 481, height: HISTORY_TAB_H };
 const CHART_TAB_BOX: Box = { left: 564, top: HISTORY_TAB_Y, width: 472, height: HISTORY_TAB_H };
 const MY_TAB_BOX: Box = { left: 1076, top: HISTORY_TAB_Y, width: 472, height: HISTORY_TAB_H };
 const TAB_UNSELECTED_BG = 'rgb(231,231,231)';
@@ -646,17 +651,18 @@ export default function ColorPredictScreen() {
           />
 
           {/* "Game history" is baked in as permanently selected (green) —
-              redraw its label in the plain unselected style when "My
-              history" is picked instead, rather than blanking the tab. */}
+              swap in the real unselected-style artwork when "My history"
+              is picked instead, rather than blanking or redrawing the tab. */}
           {historyTab !== 'game' ? (
-            <View
-              pointerEvents="none"
-              style={[
-                boxStyle(GAME_TAB_BOX, scaleBottom),
-                { backgroundColor: TAB_UNSELECTED_BG, borderRadius: 14 * scaleBottom, alignItems: 'center', justifyContent: 'center' },
-              ]}
-            >
-              <Text style={{ color: '#3A4744', fontSize: 30 * scaleBottom, fontWeight: '400' }}>Game history</Text>
+            <View pointerEvents="none" style={boxStyle(GAME_TAB_UNSELECTED_TARGET, scaleBottom)}>
+              <Image
+                source={require('../../assets/wingo-history-game-unselected.jpg')}
+                resizeMode="stretch"
+                style={[
+                  boxStyle({ left: 0, top: 0, width: GAME_TAB_UNSELECTED_TARGET.width, height: GAME_TAB_UNSELECTED_TARGET.height }, scaleBottom),
+                  styles.selectedPillImage,
+                ]}
+              />
             </View>
           ) : null}
           <Pressable style={boxStyle(GAME_TAB_BOX, scaleBottom)} onPress={() => setHistoryTab('game')} />
