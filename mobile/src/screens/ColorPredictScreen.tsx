@@ -370,12 +370,24 @@ export default function ColorPredictScreen() {
           <Pressable style={boxStyle(WITHDRAW_BOX, scaleTop)} onPress={() => navigation.navigate('Withdraw')} />
           <Pressable style={boxStyle(DEPOSIT_BOX, scaleTop)} onPress={() => navigation.navigate('Deposit')} />
 
-          {/* Duration tabs */}
+          {/* Duration tabs — the "1Min" tab is baked into the image as
+              permanently selected (green), so when a different duration is
+              chosen we patch that box back to plain and redraw its icon and
+              labels in the same muted style the other unselected tabs use
+              (a flat color patch alone would erase the icon/text, not just
+              the green tint). */}
           {durationTabIndex !== 0 ? (
             <View
               pointerEvents="none"
-              style={[boxStyle(DEFAULT_DURATION_TAB_HIGHLIGHT, scaleTop), { backgroundColor: TAB_CARD_BG, borderRadius: 16 * scaleTop }]}
-            />
+              style={[
+                boxStyle(DEFAULT_DURATION_TAB_HIGHLIGHT, scaleTop),
+                { backgroundColor: TAB_CARD_BG, borderRadius: 16 * scaleTop, alignItems: 'center', justifyContent: 'center' },
+              ]}
+            >
+              <MaterialCommunityIcons name="clock-outline" size={26 * scaleTop} color="#9AA6A1" />
+              <Text style={{ color: '#9AA6A1', fontSize: 11 * scaleTop, fontWeight: '700', marginTop: 4 * scaleTop }}>Win Go</Text>
+              <Text style={{ color: '#3A4744', fontSize: 13 * scaleTop, fontWeight: '800' }}>1Min</Text>
+            </View>
           ) : null}
           {DURATION_ORDER.map((d, i) => {
             const left = DURATION_TAB_X[i];
@@ -477,11 +489,19 @@ export default function ColorPredictScreen() {
 
           {/* Random + multiplier */}
           <Pressable style={boxStyle(RANDOM_BOX, scaleTop)} onPress={pickRandomNumber} />
+          {/* Same deal as the duration tab above — "X1" is baked in as
+              permanently selected, so redraw its label when a different
+              multiplier is chosen instead of just blanking it out. */}
           {multiplierIndex !== 0 ? (
             <View
               pointerEvents="none"
-              style={[boxStyle(DEFAULT_MULTIPLIER_HIGHLIGHT, scaleTop), { backgroundColor: CHIP_BG, borderRadius: 14 * scaleTop }]}
-            />
+              style={[
+                boxStyle(DEFAULT_MULTIPLIER_HIGHLIGHT, scaleTop),
+                { backgroundColor: CHIP_BG, borderRadius: 14 * scaleTop, alignItems: 'center', justifyContent: 'center' },
+              ]}
+            >
+              <Text style={{ color: '#123524', fontSize: 15 * scaleTop, fontWeight: '700' }}>X1</Text>
+            </View>
           ) : null}
           {MULTIPLIER_VALUES.map((m, i) => {
             const left = MULTIPLIER_X[i];
@@ -529,8 +549,19 @@ export default function ColorPredictScreen() {
             resizeMode="cover"
           />
 
+          {/* "Game history" is baked in as permanently selected (green) —
+              redraw its label in the plain unselected style when "My
+              history" is picked instead, rather than blanking the tab. */}
           {historyTab !== 'game' ? (
-            <View pointerEvents="none" style={[boxStyle(GAME_TAB_BOX, scaleBottom), { backgroundColor: TAB_UNSELECTED_BG, borderRadius: 14 * scaleBottom }]} />
+            <View
+              pointerEvents="none"
+              style={[
+                boxStyle(GAME_TAB_BOX, scaleBottom),
+                { backgroundColor: TAB_UNSELECTED_BG, borderRadius: 14 * scaleBottom, alignItems: 'center', justifyContent: 'center' },
+              ]}
+            >
+              <Text style={{ color: '#3A4744', fontSize: 30 * scaleBottom, fontWeight: '400' }}>Game history</Text>
+            </View>
           ) : null}
           <Pressable style={boxStyle(GAME_TAB_BOX, scaleBottom)} onPress={() => setHistoryTab('game')} />
           <Pressable
