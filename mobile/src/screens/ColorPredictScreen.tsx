@@ -112,6 +112,21 @@ const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 13
 // Same treatment, same 134x172 size, for the "3Min" tab's selected pill.
 const TAB_3MIN_PILL_BOX: Box = { left: DURATION_TAB_X[2] + 4, top: 536, width: 134, height: 172 };
 
+// Same again for the (already correctly labeled) "5Min" and "10Min" tabs.
+const TAB_5MIN_PILL_BOX: Box = { left: DURATION_TAB_X[3] + 4, top: 536, width: 134, height: 172 };
+const TAB_10MIN_PILL_BOX: Box = { left: DURATION_TAB_X[4] + 4, top: 536, width: 134, height: 172 };
+
+// Per-duration real selected-pill artwork, indexed by DURATION_ORDER
+// position; a tab without a supplied asset yet falls back to tinting its
+// own baked (mislabeled, for index 2) unselected artwork green instead.
+const SELECTED_PILL_ASSETS: Array<{ source: ReturnType<typeof require>; box: Box } | null> = [
+  null,
+  { source: require('../../assets/wingo-tab-30s-green.jpg'), box: TAB_30S_PILL_BOX },
+  { source: require('../../assets/wingo-tab-3min-green.jpg'), box: TAB_3MIN_PILL_BOX },
+  { source: require('../../assets/wingo-tab-5min-green.jpg'), box: TAB_5MIN_PILL_BOX },
+  { source: require('../../assets/wingo-tab-10min-green.jpg'), box: TAB_10MIN_PILL_BOX },
+];
+
 // The base image's third duration tab (backend 180s = 3 minutes) is baked
 // in reading "5Min", duplicating the fourth tab's real 300s/5Min label.
 // Swapping in a whole replacement icon made that tab visibly bigger than
@@ -466,30 +481,24 @@ export default function ColorPredictScreen() {
               />
             );
           })}
-          {durationTabIndex === 1 ? (
-            <View pointerEvents="none" style={boxStyle(TAB_30S_PILL_BOX, scaleTop)}>
-              <Image
-                source={require('../../assets/wingo-tab-30s-green.jpg')}
-                resizeMode="stretch"
-                style={[
-                  boxStyle({ left: 0, top: 0, width: TAB_30S_PILL_BOX.width, height: TAB_30S_PILL_BOX.height }, scaleTop),
-                  styles.selectedPillImage,
-                ]}
-              />
-            </View>
-          ) : durationTabIndex === 2 ? (
-            <View pointerEvents="none" style={boxStyle(TAB_3MIN_PILL_BOX, scaleTop)}>
-              <Image
-                source={require('../../assets/wingo-tab-3min-green.jpg')}
-                resizeMode="stretch"
-                style={[
-                  boxStyle({ left: 0, top: 0, width: TAB_3MIN_PILL_BOX.width, height: TAB_3MIN_PILL_BOX.height }, scaleTop),
-                  styles.selectedPillImage,
-                ]}
-              />
-            </View>
-          ) : durationTabIndex !== 0 ? (
-            <View pointerEvents="none" style={[boxStyle(selectedPillBox(durationTabIndex), scaleTop), styles.selectedTabHighlight]} />
+          {durationTabIndex !== 0 ? (
+            SELECTED_PILL_ASSETS[durationTabIndex] ? (
+              <View pointerEvents="none" style={boxStyle(SELECTED_PILL_ASSETS[durationTabIndex]!.box, scaleTop)}>
+                <Image
+                  source={SELECTED_PILL_ASSETS[durationTabIndex]!.source}
+                  resizeMode="stretch"
+                  style={[
+                    boxStyle(
+                      { left: 0, top: 0, width: SELECTED_PILL_ASSETS[durationTabIndex]!.box.width, height: SELECTED_PILL_ASSETS[durationTabIndex]!.box.height },
+                      scaleTop
+                    ),
+                    styles.selectedPillImage,
+                  ]}
+                />
+              </View>
+            ) : (
+              <View pointerEvents="none" style={[boxStyle(selectedPillBox(durationTabIndex), scaleTop), styles.selectedTabHighlight]} />
+            )
           ) : null}
           {durationTabIndex !== 2 ? (
             <>
