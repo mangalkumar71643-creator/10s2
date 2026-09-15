@@ -107,7 +107,7 @@ function selectedPillBox(i: number): Box {
 
 // Per user request, the 30S selected pill is sized 126x160 (8px taller
 // than the generic 126x152 pill above) rather than matching it exactly.
-const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 132, height: 170 };
+const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 134, height: 172 };
 
 function tab1IconImageStyle(scale: number) {
   const refScale = TAB1_ICON_TARGET.width / TAB1_ICON_CROP.width;
