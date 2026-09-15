@@ -141,10 +141,13 @@ function primaryColorHexForNumber(n: number): string {
   return CATEGORY_HEX[colorsForNumber(n)[0]];
 }
 
-function categoryLabelForNumber(n: number): string {
-  return colorsForNumber(n)
-    .map((c) => c.charAt(0) + c.slice(1).toLowerCase())
-    .join('/');
+// Dot order for the "Color" column: violet always drawn last (the plain
+// green/red dot leads for the mixed 0 and 5 rows) — matches how the
+// reference table lays these out.
+function colorDotsForNumber(n: number): Array<'GREEN' | 'RED' | 'VIOLET'> {
+  const cs = colorsForNumber(n);
+  if (cs.length === 1) return cs;
+  return cs[0] === 'VIOLET' ? [cs[1], cs[0]] : cs;
 }
 
 function formatCountdown(totalSeconds: number): string {
@@ -285,6 +288,7 @@ export default function ColorPredictScreen() {
         period: bet.round.periodNumber,
         number: bet.round.resultNumber,
         size: bet.round.resultSize,
+        dots: null as Array<'GREEN' | 'RED' | 'VIOLET'> | null,
         rightLabel:
           bet.status === 'PENDING' ? 'Pending' : bet.status === 'WON' ? `+₹${Number(bet.payout)}` : 'Lost',
         rightColor: bet.status === 'WON' ? '#1C8A5C' : bet.status === 'LOST' ? '#E24B3F' : '#7C9089',
@@ -295,8 +299,9 @@ export default function ColorPredictScreen() {
       period: h.periodNumber,
       number: h.resultNumber as number | null,
       size: h.resultSize as 'BIG' | 'SMALL' | null,
-      rightLabel: h.resultNumber != null ? categoryLabelForNumber(h.resultNumber) : '-',
-      rightColor: h.resultNumber != null ? primaryColorHexForNumber(h.resultNumber) : '#7C9089',
+      dots: h.resultNumber != null ? colorDotsForNumber(h.resultNumber) : null,
+      rightLabel: undefined as string | undefined,
+      rightColor: undefined as string | undefined,
     }));
   }, [historyTab, history, myBets]);
 
@@ -528,21 +533,49 @@ export default function ColorPredictScreen() {
                 >
                   {row.period.slice(-8)}
                 </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    {
-                      left: (TABLE_COL_CENTER.number - 60) * scaleBottom,
-                      width: 120 * scaleBottom,
-                      top: rowCenter * scaleBottom - 16 * scaleBottom,
-                      fontSize: 28 * scaleBottom,
-                      fontWeight: '800',
-                      color: row.number != null ? primaryColorHexForNumber(row.number) : '#7C9089',
-                    },
-                  ]}
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: (TABLE_COL_CENTER.number - 60) * scaleBottom,
+                    width: 120 * scaleBottom,
+                    top: rowCenter * scaleBottom - 20 * scaleBottom,
+                    height: 40 * scaleBottom,
+                  }}
                 >
-                  {row.number ?? '-'}
-                </Text>
+                  {row.number == null ? (
+                    <Text style={[styles.numberCellText, { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: '#7C9089' }]}>-</Text>
+                  ) : colorsForNumber(row.number).length === 1 ? (
+                    <Text
+                      style={[styles.numberCellText, { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: primaryColorHexForNumber(row.number) }]}
+                    >
+                      {row.number}
+                    </Text>
+                  ) : (
+                    // Mixed number (0 or 5): draw the digit twice at the exact
+                    // same position, clip the top copy to its left half — the
+                    // same split-color digit the reference table uses.
+                    <>
+                      <Text
+                        style={[
+                          styles.numberCellText,
+                          { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: CATEGORY_HEX[colorsForNumber(row.number)[1]] },
+                        ]}
+                      >
+                        {row.number}
+                      </Text>
+                      <View style={{ position: 'absolute', left: 0, top: 0, width: 60 * scaleBottom, height: '100%', overflow: 'hidden' }}>
+                        <Text
+                          style={[
+                            styles.numberCellText,
+                            { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: CATEGORY_HEX[colorsForNumber(row.number)[0]] },
+                          ]}
+                        >
+                          {row.number}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
                 <Text
                   style={[
                     styles.tableCell,
@@ -551,21 +584,49 @@ export default function ColorPredictScreen() {
                 >
                   {row.size ?? '-'}
                 </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    {
+                {row.dots ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: 6 * scaleBottom,
                       left: (TABLE_COL_CENTER.color - 90) * scaleBottom,
                       width: 180 * scaleBottom,
-                      top: rowCenter * scaleBottom - 16 * scaleBottom,
-                      fontSize: 22 * scaleBottom,
-                      fontWeight: '700',
-                      color: row.rightColor,
-                    },
-                  ]}
-                >
-                  {row.rightLabel}
-                </Text>
+                      top: rowCenter * scaleBottom - 10 * scaleBottom,
+                      height: 20 * scaleBottom,
+                    }}
+                  >
+                    {row.dots.map((c, di) => (
+                      <View
+                        key={di}
+                        style={{
+                          width: 18 * scaleBottom,
+                          height: 18 * scaleBottom,
+                          borderRadius: 9 * scaleBottom,
+                          backgroundColor: CATEGORY_HEX[c],
+                        }}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <Text
+                    style={[
+                      styles.tableCell,
+                      {
+                        left: (TABLE_COL_CENTER.color - 90) * scaleBottom,
+                        width: 180 * scaleBottom,
+                        top: rowCenter * scaleBottom - 16 * scaleBottom,
+                        fontSize: 22 * scaleBottom,
+                        fontWeight: '700',
+                        color: row.rightColor,
+                      },
+                    ]}
+                  >
+                    {row.rightLabel}
+                  </Text>
+                )}
               </React.Fragment>
             );
           })}
@@ -647,6 +708,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     color: '#123524',
     textAlign: 'center',
+  },
+  numberCellText: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    textAlign: 'center',
+    fontWeight: '800',
   },
   confirmBar: {
     flexDirection: 'row',
