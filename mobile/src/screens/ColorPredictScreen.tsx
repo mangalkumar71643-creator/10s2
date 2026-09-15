@@ -109,6 +109,9 @@ function selectedPillBox(i: number): Box {
 // than the generic 126x152 pill above) rather than matching it exactly.
 const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 134, height: 172 };
 
+// Same treatment, same 134x172 size, for the "3Min" tab's selected pill.
+const TAB_3MIN_PILL_BOX: Box = { left: DURATION_TAB_X[2] + 4, top: 536, width: 134, height: 172 };
+
 // The base image's third duration tab (backend 180s = 3 minutes) is baked
 // in reading "5Min", duplicating the fourth tab's real 300s/5Min label.
 // Swapping in a whole replacement icon made that tab visibly bigger than
@@ -474,13 +477,28 @@ export default function ColorPredictScreen() {
                 ]}
               />
             </View>
+          ) : durationTabIndex === 2 ? (
+            <View pointerEvents="none" style={boxStyle(TAB_3MIN_PILL_BOX, scaleTop)}>
+              <Image
+                source={require('../../assets/wingo-tab-3min-green.jpg')}
+                resizeMode="stretch"
+                style={[
+                  boxStyle({ left: 0, top: 0, width: TAB_3MIN_PILL_BOX.width, height: TAB_3MIN_PILL_BOX.height }, scaleTop),
+                  styles.selectedPillImage,
+                ]}
+              />
+            </View>
           ) : durationTabIndex !== 0 ? (
             <View pointerEvents="none" style={[boxStyle(selectedPillBox(durationTabIndex), scaleTop), styles.selectedTabHighlight]} />
           ) : null}
-          <View pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), { backgroundColor: '#ffffff' }]} />
-          <Text pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), styles.tab3DigitText, { fontSize: scaleTop * 20 }]}>
-            3
-          </Text>
+          {durationTabIndex !== 2 ? (
+            <>
+              <View pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), { backgroundColor: '#ffffff' }]} />
+              <Text pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), styles.tab3DigitText, { fontSize: scaleTop * 20 }]}>
+                3
+              </Text>
+            </>
+          ) : null}
 
           {/* Ticket bar */}
           <Pressable
