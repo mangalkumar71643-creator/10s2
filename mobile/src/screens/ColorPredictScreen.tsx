@@ -71,7 +71,30 @@ const DURATION_ORDER: ColorGameDuration[] = [60, 30, 180, 300, 600];
 const DURATION_TAB_X = [20, 149, 278, 407, 536, 665];
 const DURATION_TAB_Y = 535;
 const DURATION_TAB_H = 165;
-const DEFAULT_DURATION_TAB_HIGHLIGHT: Box = { left: 24, top: 536, width: 126, height: 152 };
+
+// Unselected "1Min" tab artwork: the source photo (222x293) has a white
+// margin and a faint border line around its actual icon+text content, which
+// showed up as a visible seam/edge when the whole photo was stretched into
+// the tab slot. Instead we paint the tab's whole column white (matching the
+// real card background, sampled as pure rgb(255,255,255) under the other
+// unselected tabs) and draw only the tightly-cropped icon+text content on
+// top, scaled/positioned to match the neighboring tabs' real icon and text
+// placement exactly (measured off the "30S" tab, one column to the right).
+const TAB1_ICON_SRC_W = 222;
+const TAB1_ICON_SRC_H = 293;
+const TAB1_ICON_CROP: Box = { left: 35, top: 25, width: 152, height: 232 };
+const TAB1_ICON_TARGET: Box = { left: 44, top: 558, width: 85, height: 130 };
+
+function tab1IconImageStyle(scale: number) {
+  const refScale = TAB1_ICON_TARGET.width / TAB1_ICON_CROP.width;
+  return {
+    position: 'absolute' as const,
+    left: -TAB1_ICON_CROP.left * refScale * scale,
+    top: -TAB1_ICON_CROP.top * refScale * scale,
+    width: TAB1_ICON_SRC_W * refScale * scale,
+    height: TAB1_ICON_SRC_H * refScale * scale,
+  };
+}
 
 // Ticket bar (How to play / Time remaining).
 const HOWTOPLAY_BOX: Box = { left: 18, top: 733, width: 326, height: 204 };
@@ -374,11 +397,24 @@ export default function ColorPredictScreen() {
               chosen, swap it for the real unselected-style artwork instead
               of trying to redraw it. */}
           {durationTabIndex !== 0 ? (
-            <Image
-              source={require('../../assets/wingo-tab-1min-white.jpg')}
-              resizeMode="stretch"
-              style={boxStyle(DEFAULT_DURATION_TAB_HIGHLIGHT, scaleTop)}
-            />
+            <>
+              <View
+                pointerEvents="none"
+                style={[
+                  boxStyle(
+                    { left: DURATION_TAB_X[0], top: DURATION_TAB_Y, width: DURATION_TAB_X[1] - DURATION_TAB_X[0], height: DURATION_TAB_H },
+                    scaleTop
+                  ),
+                  { backgroundColor: '#ffffff', borderTopLeftRadius: 14, borderTopRightRadius: 14 },
+                ]}
+              />
+              <View pointerEvents="none" style={[boxStyle(TAB1_ICON_TARGET, scaleTop), styles.tab1IconClip]}>
+                <Image
+                  source={require('../../assets/wingo-tab-1min-white.jpg')}
+                  style={tab1IconImageStyle(scaleTop)}
+                />
+              </View>
+            </>
           ) : null}
           {DURATION_ORDER.map((d, i) => {
             const left = DURATION_TAB_X[i];
@@ -739,6 +775,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#FFFFFF',
     fontWeight: '800',
+  },
+  tab1IconClip: {
+    overflow: 'hidden',
   },
   selectedTabHighlight: {
     borderWidth: 3,
