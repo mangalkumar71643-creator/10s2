@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useGameState } from '../state/GameStateContext';
@@ -12,8 +13,17 @@ const IMAGE_ASPECT = 688 / 1504;
 // label) — measured directly off the screenshot.
 const BALANCE_CENTER_Y = 250;
 
+// Bounding box (in that same 688x1504 reference image) of the "Grok"
+// watermark in the bottom-right corner, sampled directly off the
+// screenshot — covered with a patch matching its own background there.
+const WATERMARK_LEFT = 620;
+const WATERMARK_TOP = 1465;
+const WATERMARK_BG_TOP = 'rgb(248,247,253)';
+const WATERMARK_BG_BOTTOM = 'rgb(253,253,255)';
+
 // Just the reference image, plus the real wallet balance overlaid above the
-// "Wallet balance" label — no other buttons/logic added yet.
+// "Wallet balance" label and the Grok watermark patched over — no other
+// buttons/logic added yet.
 export default function ColorPredictScreen() {
   const { width } = useWindowDimensions();
   const { coins } = useGameState();
@@ -32,6 +42,10 @@ export default function ColorPredictScreen() {
         >
           ₹{coins.toFixed(2)}
         </Text>
+        <LinearGradient
+          colors={[WATERMARK_BG_TOP, WATERMARK_BG_BOTTOM]}
+          style={{ position: 'absolute', left: scale * WATERMARK_LEFT, top: scale * WATERMARK_TOP, right: 0, bottom: 0 }}
+        />
       </View>
     </ScrollView>
   );
