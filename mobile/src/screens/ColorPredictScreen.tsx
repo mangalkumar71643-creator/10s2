@@ -109,35 +109,6 @@ function selectedPillBox(i: number): Box {
 // than the generic 126x152 pill above) rather than matching it exactly.
 const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 134, height: 172 };
 
-// Unselected "3Min" tab (index 2): the base image bakes this tab's label
-// as "5Min", which is wrong (backend duration 180s = 3 minutes — the next
-// tab over is the real 300s/5Min). Same white-swap technique as tab1:
-// patch the wrong content over with matching white, then draw the tightly
-// cropped real icon+text on top — sized/centered into a 134x172 box per
-// user request, matching the 30S pill's footprint since this source photo's
-// own proportions (152x233 content) are narrower than that box.
-const TAB3MIN_ICON_SRC_W = 210;
-const TAB3MIN_ICON_SRC_H = 292;
-const TAB3MIN_ICON_CROP: Box = { left: 27, top: 33, width: 152, height: 233 };
-const TAB3MIN_TARGET: Box = { left: DURATION_TAB_X[2] + 4, top: 536, width: 134, height: 172 };
-const TAB3MIN_PATCH_RIGHT = DURATION_TAB_X[3] + 11;
-const TAB3MIN_PATCH_BOTTOM = 708;
-
-function tab3MinIconImageStyle(scale: number) {
-  const fitScale = Math.min(TAB3MIN_TARGET.width / TAB3MIN_ICON_CROP.width, TAB3MIN_TARGET.height / TAB3MIN_ICON_CROP.height);
-  const renderedW = TAB3MIN_ICON_CROP.width * fitScale;
-  const renderedH = TAB3MIN_ICON_CROP.height * fitScale;
-  const offsetX = (TAB3MIN_TARGET.width - renderedW) / 2;
-  const offsetY = (TAB3MIN_TARGET.height - renderedH) / 2;
-  return {
-    position: 'absolute' as const,
-    left: (offsetX - TAB3MIN_ICON_CROP.left * fitScale) * scale,
-    top: (offsetY - TAB3MIN_ICON_CROP.top * fitScale) * scale,
-    width: TAB3MIN_ICON_SRC_W * fitScale * scale,
-    height: TAB3MIN_ICON_SRC_H * fitScale * scale,
-  };
-}
-
 function tab1IconImageStyle(scale: number) {
   const refScale = TAB1_ICON_TARGET.width / TAB1_ICON_CROP.width;
   return {
@@ -465,26 +436,6 @@ export default function ColorPredictScreen() {
                 <Image
                   source={require('../../assets/wingo-tab-1min-white.jpg')}
                   style={tab1IconImageStyle(scaleTop)}
-                />
-              </View>
-            </>
-          ) : null}
-          {durationTabIndex !== 2 ? (
-            <>
-              <View
-                pointerEvents="none"
-                style={[
-                  boxStyle(
-                    { left: DURATION_TAB_X[2], top: DURATION_TAB_Y, width: TAB3MIN_PATCH_RIGHT - DURATION_TAB_X[2], height: TAB3MIN_PATCH_BOTTOM - DURATION_TAB_Y },
-                    scaleTop
-                  ),
-                  { backgroundColor: '#ffffff' },
-                ]}
-              />
-              <View pointerEvents="none" style={[boxStyle(TAB3MIN_TARGET, scaleTop), styles.tab1IconClip]}>
-                <Image
-                  source={require('../../assets/wingo-tab-3min-white.jpg')}
-                  style={tab3MinIconImageStyle(scaleTop)}
                 />
               </View>
             </>
