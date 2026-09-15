@@ -105,6 +105,10 @@ function selectedPillBox(i: number): Box {
   return { left: DURATION_TAB_X[i] + 4, top: 536, width: 126, height: 152 };
 }
 
+// Per user request, the 30S selected pill is sized 126x160 (8px taller
+// than the generic 126x152 pill above) rather than matching it exactly.
+const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 126, height: 160 };
+
 function tab1IconImageStyle(scale: number) {
   const refScale = TAB1_ICON_TARGET.width / TAB1_ICON_CROP.width;
   return {
@@ -448,12 +452,12 @@ export default function ColorPredictScreen() {
             );
           })}
           {durationTabIndex === 1 ? (
-            <View pointerEvents="none" style={boxStyle(selectedPillBox(1), scaleTop)}>
+            <View pointerEvents="none" style={boxStyle(TAB_30S_PILL_BOX, scaleTop)}>
               <Image
                 source={require('../../assets/wingo-tab-30s-green.jpg')}
                 resizeMode="stretch"
                 style={[
-                  boxStyle({ left: 0, top: 0, width: selectedPillBox(1).width, height: selectedPillBox(1).height }, scaleTop),
+                  boxStyle({ left: 0, top: 0, width: TAB_30S_PILL_BOX.width, height: TAB_30S_PILL_BOX.height }, scaleTop),
                   styles.selectedPillImage,
                 ]}
               />
