@@ -658,10 +658,7 @@ export default function ColorPredictScreen() {
               <Image
                 source={require('../../assets/wingo-history-game-unselected.jpg')}
                 resizeMode="stretch"
-                style={[
-                  boxStyle({ left: 0, top: 0, width: GAME_TAB_UNSELECTED_TARGET.width, height: GAME_TAB_UNSELECTED_TARGET.height }, scaleBottom),
-                  styles.selectedPillImage,
-                ]}
+                style={boxStyle({ left: 0, top: 0, width: GAME_TAB_UNSELECTED_TARGET.width, height: GAME_TAB_UNSELECTED_TARGET.height }, scaleBottom)}
               />
             </View>
           ) : null}
