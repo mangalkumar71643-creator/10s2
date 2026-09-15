@@ -120,6 +120,17 @@ const TABLE_ROWS_PER_PAGE = 9;
 const TABLE_ROW_HEIGHT = (TABLE_ROW_BOTTOM - TABLE_ROW_TOP) / TABLE_ROWS_PER_PAGE;
 const TABLE_COL_CENTER = { period: 227, number: 535, bigSmall: 770, color: 1030 };
 
+// Font sizes below are in the same 1595-wide reference-pixel space as every
+// other measurement on this image, so `* scaleBottom` grows them with the
+// image instead of shrinking them to a fraction of a real dp (that was the
+// earlier bug — sizes like "28" were being treated as already-final dp
+// values and then multiplied by a ~0.25 scale factor on top).
+const PERIOD_FONT = 56;
+const NUMBER_FONT = 120;
+const BIGSMALL_FONT = 68;
+const DOT_DIAMETER = 56;
+const NUMBER_CELL_WIDTH = 170;
+
 const PAGE_LEFT_BOX: Box = { left: 310, top: 2295, width: 140, height: 135 };
 const PAGE_RIGHT_BOX: Box = { left: 760, top: 2295, width: 140, height: 135 };
 
@@ -523,12 +534,18 @@ export default function ColorPredictScreen() {
           {pageRows.map((row, i) => {
             const rowTop = TABLE_ROW_TOP + i * TABLE_ROW_HEIGHT;
             const rowCenter = rowTop + TABLE_ROW_HEIGHT / 2;
+            const numberCellHeight = NUMBER_FONT * 1.3;
             return (
               <React.Fragment key={row.key}>
                 <Text
                   style={[
                     styles.tableCell,
-                    { left: 0, width: TABLE_COL_CENTER.number - 40, top: rowCenter * scaleBottom - 16 * scaleBottom, fontSize: 26 * scaleBottom },
+                    {
+                      left: 0,
+                      width: (TABLE_COL_CENTER.number - 60) * scaleBottom,
+                      top: (rowCenter - PERIOD_FONT * 0.6) * scaleBottom,
+                      fontSize: PERIOD_FONT * scaleBottom,
+                    },
                   ]}
                 >
                   {row.period.slice(-8)}
@@ -536,17 +553,22 @@ export default function ColorPredictScreen() {
                 <View
                   style={{
                     position: 'absolute',
-                    left: (TABLE_COL_CENTER.number - 60) * scaleBottom,
-                    width: 120 * scaleBottom,
-                    top: rowCenter * scaleBottom - 20 * scaleBottom,
-                    height: 40 * scaleBottom,
+                    left: (TABLE_COL_CENTER.number - NUMBER_CELL_WIDTH / 2) * scaleBottom,
+                    width: NUMBER_CELL_WIDTH * scaleBottom,
+                    top: (rowCenter - numberCellHeight / 2) * scaleBottom,
+                    height: numberCellHeight * scaleBottom,
                   }}
                 >
                   {row.number == null ? (
-                    <Text style={[styles.numberCellText, { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: '#7C9089' }]}>-</Text>
+                    <Text style={[styles.numberCellText, { width: NUMBER_CELL_WIDTH * scaleBottom, fontSize: NUMBER_FONT * scaleBottom, color: '#7C9089' }]}>
+                      -
+                    </Text>
                   ) : colorsForNumber(row.number).length === 1 ? (
                     <Text
-                      style={[styles.numberCellText, { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: primaryColorHexForNumber(row.number) }]}
+                      style={[
+                        styles.numberCellText,
+                        { width: NUMBER_CELL_WIDTH * scaleBottom, fontSize: NUMBER_FONT * scaleBottom, color: primaryColorHexForNumber(row.number) },
+                      ]}
                     >
                       {row.number}
                     </Text>
@@ -558,16 +580,16 @@ export default function ColorPredictScreen() {
                       <Text
                         style={[
                           styles.numberCellText,
-                          { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: CATEGORY_HEX[colorsForNumber(row.number)[1]] },
+                          { width: NUMBER_CELL_WIDTH * scaleBottom, fontSize: NUMBER_FONT * scaleBottom, color: CATEGORY_HEX[colorsForNumber(row.number)[1]] },
                         ]}
                       >
                         {row.number}
                       </Text>
-                      <View style={{ position: 'absolute', left: 0, top: 0, width: 60 * scaleBottom, height: '100%', overflow: 'hidden' }}>
+                      <View style={{ position: 'absolute', left: 0, top: 0, width: (NUMBER_CELL_WIDTH / 2) * scaleBottom, height: '100%', overflow: 'hidden' }}>
                         <Text
                           style={[
                             styles.numberCellText,
-                            { width: 120 * scaleBottom, fontSize: 28 * scaleBottom, color: CATEGORY_HEX[colorsForNumber(row.number)[0]] },
+                            { width: NUMBER_CELL_WIDTH * scaleBottom, fontSize: NUMBER_FONT * scaleBottom, color: CATEGORY_HEX[colorsForNumber(row.number)[0]] },
                           ]}
                         >
                           {row.number}
@@ -579,7 +601,13 @@ export default function ColorPredictScreen() {
                 <Text
                   style={[
                     styles.tableCell,
-                    { left: (TABLE_COL_CENTER.bigSmall - 70) * scaleBottom, width: 140 * scaleBottom, top: rowCenter * scaleBottom - 16 * scaleBottom, fontSize: 24 * scaleBottom },
+                    {
+                      left: (TABLE_COL_CENTER.bigSmall - 115) * scaleBottom,
+                      width: 230 * scaleBottom,
+                      top: (rowCenter - BIGSMALL_FONT * 0.6) * scaleBottom,
+                      fontSize: BIGSMALL_FONT * scaleBottom,
+                      fontWeight: '700',
+                    },
                   ]}
                 >
                   {row.size ?? '-'}
@@ -591,20 +619,20 @@ export default function ColorPredictScreen() {
                       flexDirection: 'row',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      gap: 6 * scaleBottom,
+                      gap: 10 * scaleBottom,
                       left: (TABLE_COL_CENTER.color - 90) * scaleBottom,
                       width: 180 * scaleBottom,
-                      top: rowCenter * scaleBottom - 10 * scaleBottom,
-                      height: 20 * scaleBottom,
+                      top: (rowCenter - DOT_DIAMETER / 2) * scaleBottom,
+                      height: DOT_DIAMETER * scaleBottom,
                     }}
                   >
                     {row.dots.map((c, di) => (
                       <View
                         key={di}
                         style={{
-                          width: 18 * scaleBottom,
-                          height: 18 * scaleBottom,
-                          borderRadius: 9 * scaleBottom,
+                          width: DOT_DIAMETER * scaleBottom,
+                          height: DOT_DIAMETER * scaleBottom,
+                          borderRadius: (DOT_DIAMETER * scaleBottom) / 2,
                           backgroundColor: CATEGORY_HEX[c],
                         }}
                       />
@@ -615,10 +643,10 @@ export default function ColorPredictScreen() {
                     style={[
                       styles.tableCell,
                       {
-                        left: (TABLE_COL_CENTER.color - 90) * scaleBottom,
-                        width: 180 * scaleBottom,
-                        top: rowCenter * scaleBottom - 16 * scaleBottom,
-                        fontSize: 22 * scaleBottom,
+                        left: (TABLE_COL_CENTER.color - 100) * scaleBottom,
+                        width: 200 * scaleBottom,
+                        top: (rowCenter - BIGSMALL_FONT * 0.5) * scaleBottom,
+                        fontSize: BIGSMALL_FONT * 0.8 * scaleBottom,
                         fontWeight: '700',
                         color: row.rightColor,
                       },
