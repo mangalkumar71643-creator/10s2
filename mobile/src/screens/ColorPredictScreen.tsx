@@ -114,8 +114,12 @@ const CHART_TAB_BOX: Box = { left: 425, top: HISTORY_TAB_Y, width: 360, height: 
 const MY_TAB_BOX: Box = { left: 815, top: HISTORY_TAB_Y, width: 360, height: HISTORY_TAB_H };
 const TAB_UNSELECTED_BG = 'rgb(231,231,231)';
 
-const TABLE_ROW_TOP = 330;
-const TABLE_ROW_BOTTOM = 1955;
+// Measured directly off the divider lines in the image — the header (with
+// "Period/Number/Big Small/Color") is much taller than it first looked,
+// ending around y=443, not ~330; using the wrong top pushed every row up
+// into the one above it (row 1 into the header itself).
+const TABLE_ROW_TOP = 443;
+const TABLE_ROW_BOTTOM = 1980;
 const TABLE_ROWS_PER_PAGE = 9;
 const TABLE_ROW_HEIGHT = (TABLE_ROW_BOTTOM - TABLE_ROW_TOP) / TABLE_ROWS_PER_PAGE;
 const TABLE_COL_CENTER = { period: 227, number: 535, bigSmall: 770, color: 1030 };
@@ -599,11 +603,12 @@ export default function ColorPredictScreen() {
                   )}
                 </View>
                 <Text
+                  numberOfLines={1}
                   style={[
                     styles.tableCell,
                     {
-                      left: (TABLE_COL_CENTER.bigSmall - 115) * scaleBottom,
-                      width: 230 * scaleBottom,
+                      left: (TABLE_COL_CENTER.bigSmall - 150) * scaleBottom,
+                      width: 300 * scaleBottom,
                       top: (rowCenter - BIGSMALL_FONT * 0.6) * scaleBottom,
                       fontSize: BIGSMALL_FONT * scaleBottom,
                       fontWeight: '700',
