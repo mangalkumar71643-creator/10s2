@@ -448,7 +448,10 @@ export default function ColorPredictScreen() {
               <Image
                 source={require('../../assets/wingo-tab-30s-green.jpg')}
                 resizeMode="stretch"
-                style={[StyleSheet.absoluteFill, styles.selectedPillImage]}
+                style={[
+                  boxStyle({ left: 0, top: 0, width: selectedPillBox(1).width, height: selectedPillBox(1).height }, scaleTop),
+                  styles.selectedPillImage,
+                ]}
               />
             </View>
           ) : durationTabIndex !== 0 ? (
