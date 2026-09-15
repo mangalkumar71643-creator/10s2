@@ -122,7 +122,11 @@ const TABLE_ROW_TOP = 443;
 const TABLE_ROW_BOTTOM = 1980;
 const TABLE_ROWS_PER_PAGE = 9;
 const TABLE_ROW_HEIGHT = (TABLE_ROW_BOTTOM - TABLE_ROW_TOP) / TABLE_ROWS_PER_PAGE;
-const TABLE_COL_CENTER = { period: 227, number: 535, bigSmall: 770, color: 1030 };
+// Header text cluster centers, detected directly from the white "Period /
+// Number / Big Small / Color" pixels — the earlier values were measured
+// wrong (too far left), which is why every column drifted from its own
+// header.
+const TABLE_COL_CENTER = { period: 297, number: 704, bigSmall: 1015, color: 1360 };
 
 // Font sizes below are in the same 1595-wide reference-pixel space as every
 // other measurement on this image, so `* scaleBottom` grows them with the
@@ -133,7 +137,7 @@ const PERIOD_FONT = 56;
 const NUMBER_FONT = 120;
 const BIGSMALL_FONT = 68;
 const DOT_DIAMETER = 56;
-const NUMBER_CELL_WIDTH = 170;
+const NUMBER_CELL_WIDTH = 220;
 
 const PAGE_LEFT_BOX: Box = { left: 310, top: 2295, width: 140, height: 135 };
 const PAGE_RIGHT_BOX: Box = { left: 760, top: 2295, width: 140, height: 135 };
@@ -545,8 +549,8 @@ export default function ColorPredictScreen() {
                   style={[
                     styles.tableCell,
                     {
-                      left: 0,
-                      width: (TABLE_COL_CENTER.number - 60) * scaleBottom,
+                      left: (TABLE_COL_CENTER.period - 190) * scaleBottom,
+                      width: 380 * scaleBottom,
                       top: (rowCenter - PERIOD_FONT * 0.6) * scaleBottom,
                       fontSize: PERIOD_FONT * scaleBottom,
                     },
@@ -607,8 +611,8 @@ export default function ColorPredictScreen() {
                   style={[
                     styles.tableCell,
                     {
-                      left: (TABLE_COL_CENTER.bigSmall - 150) * scaleBottom,
-                      width: 300 * scaleBottom,
+                      left: (TABLE_COL_CENTER.bigSmall - 140) * scaleBottom,
+                      width: 280 * scaleBottom,
                       top: (rowCenter - BIGSMALL_FONT * 0.6) * scaleBottom,
                       fontSize: BIGSMALL_FONT * scaleBottom,
                       fontWeight: '700',
@@ -625,8 +629,8 @@ export default function ColorPredictScreen() {
                       justifyContent: 'center',
                       alignItems: 'center',
                       gap: 10 * scaleBottom,
-                      left: (TABLE_COL_CENTER.color - 90) * scaleBottom,
-                      width: 180 * scaleBottom,
+                      left: (TABLE_COL_CENTER.color - 110) * scaleBottom,
+                      width: 220 * scaleBottom,
                       top: (rowCenter - DOT_DIAMETER / 2) * scaleBottom,
                       height: DOT_DIAMETER * scaleBottom,
                     }}
@@ -648,8 +652,8 @@ export default function ColorPredictScreen() {
                     style={[
                       styles.tableCell,
                       {
-                        left: (TABLE_COL_CENTER.color - 100) * scaleBottom,
-                        width: 200 * scaleBottom,
+                        left: (TABLE_COL_CENTER.color - 110) * scaleBottom,
+                        width: 220 * scaleBottom,
                         top: (rowCenter - BIGSMALL_FONT * 0.5) * scaleBottom,
                         fontSize: BIGSMALL_FONT * 0.8 * scaleBottom,
                         fontWeight: '700',
