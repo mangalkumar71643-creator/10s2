@@ -109,6 +109,14 @@ function selectedPillBox(i: number): Box {
 // than the generic 126x152 pill above) rather than matching it exactly.
 const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 134, height: 172 };
 
+// The base image's third duration tab (backend 180s = 3 minutes) is baked
+// in reading "5Min", duplicating the fourth tab's real 300s/5Min label.
+// Swapping in a whole replacement icon made that tab visibly bigger than
+// its neighbors, so instead just patch over the "5" digit itself (measured
+// tight to that glyph, x:322-330 y:674-688) with matching white and draw
+// a "3" in its place — everything else (icon, "Win Go", "Min") is untouched.
+const TAB3_DIGIT_PATCH: Box = { left: 320, top: 672, width: 13, height: 18 };
+
 function tab1IconImageStyle(scale: number) {
   const refScale = TAB1_ICON_TARGET.width / TAB1_ICON_CROP.width;
   return {
@@ -465,6 +473,10 @@ export default function ColorPredictScreen() {
           ) : durationTabIndex !== 0 ? (
             <View pointerEvents="none" style={[boxStyle(selectedPillBox(durationTabIndex), scaleTop), styles.selectedTabHighlight]} />
           ) : null}
+          <View pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), { backgroundColor: '#ffffff' }]} />
+          <Text pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), styles.tab3DigitText, { fontSize: scaleTop * 15 }]}>
+            3
+          </Text>
 
           {/* Ticket bar */}
           <Pressable
@@ -804,6 +816,12 @@ const styles = StyleSheet.create({
   },
   tab1IconClip: {
     overflow: 'hidden',
+  },
+  tab3DigitText: {
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    color: '#8a8a8a',
+    fontWeight: '400',
   },
   selectedPillImage: {
     borderRadius: 14,
