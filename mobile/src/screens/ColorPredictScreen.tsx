@@ -72,7 +72,6 @@ const DURATION_TAB_X = [20, 149, 278, 407, 536, 665];
 const DURATION_TAB_Y = 535;
 const DURATION_TAB_H = 165;
 const DEFAULT_DURATION_TAB_HIGHLIGHT: Box = { left: 24, top: 536, width: 126, height: 152 };
-const TAB_CARD_BG = 'rgb(252,252,252)';
 
 // Ticket bar (How to play / Time remaining).
 const HOWTOPLAY_BOX: Box = { left: 18, top: 733, width: 326, height: 204 };
@@ -371,23 +370,15 @@ export default function ColorPredictScreen() {
           <Pressable style={boxStyle(DEPOSIT_BOX, scaleTop)} onPress={() => navigation.navigate('Deposit')} />
 
           {/* Duration tabs — the "1Min" tab is baked into the image as
-              permanently selected (green), so when a different duration is
-              chosen we patch that box back to plain and redraw its icon and
-              labels in the same muted style the other unselected tabs use
-              (a flat color patch alone would erase the icon/text, not just
-              the green tint). */}
+              permanently selected (green). When a different duration is
+              chosen, swap it for the real unselected-style artwork instead
+              of trying to redraw it. */}
           {durationTabIndex !== 0 ? (
-            <View
-              pointerEvents="none"
-              style={[
-                boxStyle(DEFAULT_DURATION_TAB_HIGHLIGHT, scaleTop),
-                { backgroundColor: TAB_CARD_BG, borderRadius: 16 * scaleTop, alignItems: 'center', justifyContent: 'center' },
-              ]}
-            >
-              <MaterialCommunityIcons name="clock-outline" size={26 * scaleTop} color="#9AA6A1" />
-              <Text style={{ color: '#9AA6A1', fontSize: 11 * scaleTop, fontWeight: '700', marginTop: 4 * scaleTop }}>Win Go</Text>
-              <Text style={{ color: '#3A4744', fontSize: 13 * scaleTop, fontWeight: '800' }}>1Min</Text>
-            </View>
+            <Image
+              source={require('../../assets/wingo-tab-1min-white.jpg')}
+              resizeMode="stretch"
+              style={boxStyle(DEFAULT_DURATION_TAB_HIGHLIGHT, scaleTop)}
+            />
           ) : null}
           {DURATION_ORDER.map((d, i) => {
             const left = DURATION_TAB_X[i];
