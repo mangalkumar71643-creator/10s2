@@ -107,11 +107,14 @@ const SMALL_BOX: Box = { left: 341, top: BIGSMALL_Y, width: 278, height: BIGSMAL
 
 // ---- BOTTOM image hotspots (1595x2636, already cropped) ----------------
 
-const HISTORY_TAB_Y = 20;
-const HISTORY_TAB_H = 140;
-const GAME_TAB_BOX: Box = { left: 18, top: HISTORY_TAB_Y, width: 380, height: HISTORY_TAB_H };
-const CHART_TAB_BOX: Box = { left: 425, top: HISTORY_TAB_Y, width: 360, height: HISTORY_TAB_H };
-const MY_TAB_BOX: Box = { left: 815, top: HISTORY_TAB_Y, width: 360, height: HISTORY_TAB_H };
+// Re-measured from the actual button color edges (previous values were
+// guessed too narrow/too far left, so the "My history" highlight was
+// landing on top of "Chart" instead).
+const HISTORY_TAB_Y = 40;
+const HISTORY_TAB_H = 165;
+const GAME_TAB_BOX: Box = { left: 48, top: HISTORY_TAB_Y, width: 472, height: HISTORY_TAB_H };
+const CHART_TAB_BOX: Box = { left: 564, top: HISTORY_TAB_Y, width: 472, height: HISTORY_TAB_H };
+const MY_TAB_BOX: Box = { left: 1076, top: HISTORY_TAB_Y, width: 472, height: HISTORY_TAB_H };
 const TAB_UNSELECTED_BG = 'rgb(231,231,231)';
 
 // Measured directly off the divider lines in the image — the header (with
@@ -139,8 +142,9 @@ const BIGSMALL_FONT = 68;
 const DOT_DIAMETER = 56;
 const NUMBER_CELL_WIDTH = 220;
 
-const PAGE_LEFT_BOX: Box = { left: 310, top: 2295, width: 140, height: 135 };
-const PAGE_RIGHT_BOX: Box = { left: 760, top: 2295, width: 140, height: 135 };
+// Also re-measured from the actual arrow button color edges.
+const PAGE_LEFT_BOX: Box = { left: 415, top: 2290, width: 170, height: 165 };
+const PAGE_RIGHT_BOX: Box = { left: 1010, top: 2290, width: 170, height: 165 };
 
 // ---- Game logic helpers (unchanged rules) -------------------------------
 
