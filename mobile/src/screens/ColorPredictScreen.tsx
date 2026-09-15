@@ -98,7 +98,11 @@ const TAB1_ICON_TARGET: Box = { left: 44, top: 558, width: 85, height: 130 };
 // pill — matched so a real per-duration asset (like the 30S one below)
 // lines up exactly with that native artwork when swapped in.
 function selectedPillBox(i: number): Box {
-  return { left: DURATION_TAB_X[i] + 4, top: 536, width: DURATION_TAB_X[i + 1] - DURATION_TAB_X[i] - 8, height: 152 };
+  // Width/height match tab1's own baked-in selected pill exactly (measured
+  // as 126x152, asymmetrically inset — 4px on the left, ~flush on the
+  // right) rather than a symmetric "column width minus a margin" guess,
+  // which came out ~5px narrower and visibly smaller than the real pill.
+  return { left: DURATION_TAB_X[i] + 4, top: 536, width: 126, height: 152 };
 }
 
 function tab1IconImageStyle(scale: number) {
