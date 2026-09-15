@@ -1,65 +1,602 @@
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ApiClientError } from '../api/client';
+import {
+  ColorGameBetType,
+  ColorGameConfig,
+  ColorGameDuration,
+  ColorGameHistoryEntry,
+  ColorGameMyBet,
+  ColorGameRoundView,
+  fetchColorGameConfig,
+  fetchColorGameCurrentRound,
+  fetchColorGameHistory,
+  fetchColorGameMyBets,
+  placeColorGameBet,
+} from '../api/backend';
+import { RootStackParamList } from '../navigation/types';
 import { useGameState } from '../state/GameStateContext';
 
-// Reference screenshot's own pixel size — used to scale it (and the overlaid
-// balance text below) to full device width while keeping proportions.
-const IMAGE_REF_WIDTH = 688;
-const IMAGE_ASPECT = 688 / 1504;
+// ---- Reference images & shared geometry helpers -----------------------
+//
+// Both screenshots are used as-is (per earlier request); every interactive
+// element below is an invisible hotspot positioned over it, measured
+// directly off the image pixels (see the crops used to derive these numbers
+// during development). Coordinates are in each image's own pixel space —
+// a `scale` factor (deviceWidth / referenceWidth) converts them at render
+// time so hit targets and overlays track the image at any screen size.
 
-// Vertical center, in that same 688-wide reference image, of the blank gap
-// above the "Wallet balance" label (between the card's top edge and that
-// label) — measured directly off the screenshot.
+const TOP_REF_WIDTH = 688;
+const TOP_ASPECT = 688 / 1504;
+const BOTTOM_ASPECT = 1595 / 2636;
+
+type Box = { left: number; top: number; width: number; height: number };
+
+function boxStyle(box: Box, scale: number) {
+  return {
+    position: 'absolute' as const,
+    left: box.left * scale,
+    top: box.top * scale,
+    width: box.width * scale,
+    height: box.height * scale,
+  };
+}
+
+// ---- TOP image hotspots (688x1504) -------------------------------------
+
+const BACK_BOX: Box = { left: 8, top: 68, width: 65, height: 68 };
+const HEADSET_BOX: Box = { left: 528, top: 68, width: 74, height: 68 };
+const FAIRNESS_BOX: Box = { left: 598, top: 68, width: 74, height: 68 };
+const WITHDRAW_BOX: Box = { left: 78, top: 383, width: 244, height: 74 };
+const DEPOSIT_BOX: Box = { left: 358, top: 383, width: 254, height: 74 };
+
+// Reference balance overlay position (above the "Wallet balance" label).
 const BALANCE_CENTER_Y = 250;
 
-// Bounding box (in that same 688x1504 reference image) of the "Grok"
-// watermark in the bottom-right corner, sampled directly off the
-// screenshot — covered with a patch matching its own background there.
+// Grok watermark patch (bottom-right of the top image).
 const WATERMARK_LEFT = 620;
 const WATERMARK_TOP = 1465;
 const WATERMARK_BG_TOP = 'rgb(248,247,253)';
 const WATERMARK_BG_BOTTOM = 'rgb(253,253,255)';
 
-// The "bottom half" reference image (Game history / Chart / My history +
-// results table) was cropped to remove its own copy of the Big/Small bar —
-// the top image above already ends with that bar, so this picks up right
-// after it with no duplicate.
-const BOTTOM_IMAGE_ASPECT = 1595 / 2636;
+// Duration tabs: 5 equal columns: "1Min"(default selected, backend 60s),
+// "30S"(30s), "5Min"(mislabeled in the mockup, actually backend 180s/3min),
+// "5Min"(300s/5min), "10Min"(600s) — all 5 backend durations stay reachable
+// even though two tab labels read the same.
+const DURATION_ORDER: ColorGameDuration[] = [60, 30, 180, 300, 600];
+const DURATION_TAB_X = [20, 149, 278, 407, 536, 665];
+const DURATION_TAB_Y = 535;
+const DURATION_TAB_H = 165;
+const DEFAULT_DURATION_TAB_HIGHLIGHT: Box = { left: 24, top: 536, width: 126, height: 152 };
+const TAB_CARD_BG = 'rgb(252,252,252)';
 
-// Just the two reference images stacked into one continuous screen, plus
-// the real wallet balance overlaid above the "Wallet balance" label and the
-// Grok watermark patched over — no other buttons/logic added yet.
+// Ticket bar (How to play / Time remaining).
+const HOWTOPLAY_BOX: Box = { left: 18, top: 733, width: 326, height: 204 };
+const COUNTDOWN_BOX: Box = { left: 342, top: 800, width: 323, height: 60 };
+
+// Green / Violet / Red category buttons.
+const GREEN_BOX: Box = { left: 28, top: 983, width: 200, height: 64 };
+const VIOLET_BOX: Box = { left: 238, top: 983, width: 204, height: 64 };
+const RED_BOX: Box = { left: 452, top: 983, width: 200, height: 64 };
+
+// Number grid: 5 columns x 2 rows.
+const NUMBER_COL_X = [52, 168, 282, 397, 512, 627];
+const NUMBER_ROW_Y = [1085, 1215, 1345];
+const NUMBER_COL_CENTER = [110, 225, 340, 455, 570];
+const NUMBER_ROW_BALL_CENTER_Y = [1137, 1265];
+const NUMBER_BALL_DIAMETER = 88;
+
+// Random + multiplier chips.
+const RANDOM_BOX: Box = { left: 18, top: 1346, width: 168, height: 72 };
+const MULTIPLIER_X = [184, 272, 337, 416, 494, 569, 660];
+const MULTIPLIER_VALUES = [1, 5, 10, 20, 50, 100] as const;
+const MULTIPLIER_Y = 1346;
+const MULTIPLIER_H = 72;
+const DEFAULT_MULTIPLIER_HIGHLIGHT: Box = { left: 188, top: 1346, width: 70, height: 72 };
+const CHIP_BG = 'rgb(240,240,240)';
+
+// Big / Small split bar.
+const BIGSMALL_Y = 1435;
+const BIGSMALL_H = 69;
+const BIG_BOX: Box = { left: 62, top: BIGSMALL_Y, width: 279, height: BIGSMALL_H };
+const SMALL_BOX: Box = { left: 341, top: BIGSMALL_Y, width: 278, height: BIGSMALL_H };
+
+// ---- BOTTOM image hotspots (1595x2636, already cropped) ----------------
+
+const HISTORY_TAB_Y = 20;
+const HISTORY_TAB_H = 140;
+const GAME_TAB_BOX: Box = { left: 18, top: HISTORY_TAB_Y, width: 380, height: HISTORY_TAB_H };
+const CHART_TAB_BOX: Box = { left: 425, top: HISTORY_TAB_Y, width: 360, height: HISTORY_TAB_H };
+const MY_TAB_BOX: Box = { left: 815, top: HISTORY_TAB_Y, width: 360, height: HISTORY_TAB_H };
+const TAB_UNSELECTED_BG = 'rgb(231,231,231)';
+
+const TABLE_ROW_TOP = 330;
+const TABLE_ROW_BOTTOM = 1955;
+const TABLE_ROWS_PER_PAGE = 9;
+const TABLE_ROW_HEIGHT = (TABLE_ROW_BOTTOM - TABLE_ROW_TOP) / TABLE_ROWS_PER_PAGE;
+const TABLE_COL_CENTER = { period: 227, number: 535, bigSmall: 770, color: 1030 };
+
+const PAGE_LEFT_BOX: Box = { left: 310, top: 2295, width: 140, height: 135 };
+const PAGE_RIGHT_BOX: Box = { left: 760, top: 2295, width: 140, height: 135 };
+
+// ---- Game logic helpers (unchanged rules) -------------------------------
+
+function colorsForNumber(n: number): Array<'GREEN' | 'RED' | 'VIOLET'> {
+  if (n === 0) return ['VIOLET', 'RED'];
+  if (n === 5) return ['VIOLET', 'GREEN'];
+  return [2, 4, 6, 8].includes(n) ? ['RED'] : ['GREEN'];
+}
+
+const CATEGORY_HEX: Record<'GREEN' | 'RED' | 'VIOLET', string> = {
+  GREEN: '#2FBE6B',
+  RED: '#E24B3F',
+  VIOLET: '#9B59D9',
+};
+
+function primaryColorHexForNumber(n: number): string {
+  return CATEGORY_HEX[colorsForNumber(n)[0]];
+}
+
+function categoryLabelForNumber(n: number): string {
+  return colorsForNumber(n)
+    .map((c) => c.charAt(0) + c.slice(1).toLowerCase())
+    .join('/');
+}
+
+function formatCountdown(totalSeconds: number): string {
+  const clamped = Math.max(0, totalSeconds);
+  const m = Math.floor(clamped / 60);
+  const s = clamped % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+type Selection = { betType: ColorGameBetType; betValue: string; label: string; multiplierLabel: string } | null;
+type HistoryTab = 'game' | 'my';
+
 export default function ColorPredictScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { width } = useWindowDimensions();
-  const { coins } = useGameState();
-  const scale = width / IMAGE_REF_WIDTH;
-  const imageHeight = width / IMAGE_ASPECT;
-  const bottomImageHeight = width / BOTTOM_IMAGE_ASPECT;
+  const { coins, refreshWallet } = useGameState();
+
+  const scaleTop = width / TOP_REF_WIDTH;
+  const topImageHeight = width / TOP_ASPECT;
+  const bottomImageHeight = width / BOTTOM_ASPECT;
+
+  const [config, setConfig] = useState<ColorGameConfig | null>(null);
+  const [duration, setDuration] = useState<ColorGameDuration>(60);
+  const [round, setRound] = useState<ColorGameRoundView | null>(null);
+  const [history, setHistory] = useState<ColorGameHistoryEntry[]>([]);
+  const [myBets, setMyBets] = useState<ColorGameMyBet[]>([]);
+  const [selection, setSelection] = useState<Selection>(null);
+  const [multiplier, setMultiplier] = useState<(typeof MULTIPLIER_VALUES)[number]>(1);
+  const [placing, setPlacing] = useState(false);
+  const [historyTab, setHistoryTab] = useState<HistoryTab>('game');
+  const [page, setPage] = useState(0);
+
+  const roundRef = useRef(round);
+  roundRef.current = round;
+
+  const loadRound = useCallback(async (d: ColorGameDuration) => {
+    const view = await fetchColorGameCurrentRound(d);
+    setRound(view);
+  }, []);
+
+  const loadHistory = useCallback(async (d: ColorGameDuration) => {
+    const rows = await fetchColorGameHistory(d);
+    setHistory(rows);
+  }, []);
+
+  const loadMyBets = useCallback(async () => {
+    try {
+      const rows = await fetchColorGameMyBets();
+      setMyBets(rows);
+    } catch {
+      // not logged in / transient — leave previous list as-is
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchColorGameConfig().then(setConfig).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setRound(null);
+    setPage(0);
+    loadRound(duration);
+    loadHistory(duration);
+    loadMyBets();
+  }, [duration, loadRound, loadHistory, loadMyBets]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [historyTab]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const current = roundRef.current;
+      if (!current) return;
+      if (current.timeRemainingSeconds <= 0) {
+        loadRound(duration);
+        loadHistory(duration);
+        loadMyBets();
+        refreshWallet().catch(() => {});
+        return;
+      }
+      setRound({
+        ...current,
+        timeRemainingSeconds: current.timeRemainingSeconds - 1,
+        locked: current.timeRemainingSeconds - 1 <= (config?.lockSeconds ?? 5),
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [duration, loadRound, loadHistory, loadMyBets, refreshWallet, config]);
+
+  const locked = round?.locked ?? true;
+  const baseUnit = config?.minStake ?? 5;
+  const stake = baseUnit * multiplier;
+
+  function pickRandomNumber() {
+    const n = Math.floor(Math.random() * 10);
+    setSelection({ betType: 'NUMBER', betValue: String(n), label: `Number ${n}`, multiplierLabel: `${config?.payouts.number ?? 9}X` });
+  }
+
+  async function confirmBet() {
+    if (!selection || !round) return;
+    if (config && (stake < config.minStake || stake > config.maxStake)) {
+      Alert.alert('Invalid stake', `Stake must be between ₹${config.minStake} and ₹${config.maxStake}.`);
+      return;
+    }
+    if (round.locked) {
+      Alert.alert('Betting closed', 'This round is locked — wait for the next one.');
+      return;
+    }
+    setPlacing(true);
+    try {
+      await placeColorGameBet(duration, selection.betType, selection.betValue, stake);
+      await Promise.all([refreshWallet(), loadMyBets()]);
+      Alert.alert('Bet placed', `₹${stake} on ${selection.label} — good luck!`);
+      setSelection(null);
+    } catch (err) {
+      Alert.alert('Bet failed', err instanceof ApiClientError ? err.message : 'Please try again.');
+    } finally {
+      setPlacing(false);
+    }
+  }
+
+  function goHome() {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('MainTabs', { screen: 'Home' });
+    }
+  }
+
+  const durationTabIndex = DURATION_ORDER.indexOf(duration);
+  const multiplierIndex = MULTIPLIER_VALUES.indexOf(multiplier);
+
+  const rows = useMemo(() => {
+    if (historyTab === 'my') {
+      return myBets.map((bet) => ({
+        key: bet.id,
+        period: bet.round.periodNumber,
+        number: bet.round.resultNumber,
+        size: bet.round.resultSize,
+        rightLabel:
+          bet.status === 'PENDING' ? 'Pending' : bet.status === 'WON' ? `+₹${Number(bet.payout)}` : 'Lost',
+        rightColor: bet.status === 'WON' ? '#1C8A5C' : bet.status === 'LOST' ? '#E24B3F' : '#7C9089',
+      }));
+    }
+    return history.map((h) => ({
+      key: h.periodNumber,
+      period: h.periodNumber,
+      number: h.resultNumber as number | null,
+      size: h.resultSize as 'BIG' | 'SMALL' | null,
+      rightLabel: h.resultNumber != null ? categoryLabelForNumber(h.resultNumber) : '-',
+      rightColor: h.resultNumber != null ? primaryColorHexForNumber(h.resultNumber) : '#7C9089',
+    }));
+  }, [historyTab, history, myBets]);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / TABLE_ROWS_PER_PAGE));
+  const pageRows = rows.slice(page * TABLE_ROWS_PER_PAGE, page * TABLE_ROWS_PER_PAGE + TABLE_ROWS_PER_PAGE);
+
+  const scaleBottom = width / 1595;
 
   return (
-    <ScrollView style={styles.root} showsVerticalScrollIndicator={false}>
-      <View style={{ width, height: imageHeight }}>
-        <Image source={require('../../assets/win-go-screen.jpg')} style={{ width, height: imageHeight }} resizeMode="cover" />
-        <Text
-          style={[
-            styles.balanceText,
-            { top: scale * BALANCE_CENTER_Y - scale * 17, fontSize: scale * 30 },
-          ]}
-        >
-          ₹{coins.toFixed(2)}
-        </Text>
-        <LinearGradient
-          colors={[WATERMARK_BG_TOP, WATERMARK_BG_BOTTOM]}
-          style={{ position: 'absolute', left: scale * WATERMARK_LEFT, top: scale * WATERMARK_TOP, right: 0, bottom: 0 }}
-        />
-      </View>
-      <Image
-        source={require('../../assets/win-go-screen-bottom.jpg')}
-        style={{ width, height: bottomImageHeight }}
-        resizeMode="cover"
-      />
-    </ScrollView>
+    <View style={styles.root}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        {/* ---------------- TOP IMAGE ---------------- */}
+        <View style={{ width, height: topImageHeight }}>
+          <Image source={require('../../assets/win-go-screen.jpg')} style={{ width, height: topImageHeight }} resizeMode="cover" />
+
+          {/* Balance overlay */}
+          <Text
+            style={[styles.balanceText, { top: scaleTop * BALANCE_CENTER_Y - scaleTop * 17, fontSize: scaleTop * 30 }]}
+          >
+            ₹{coins.toFixed(2)}
+          </Text>
+
+          {/* Watermark patch */}
+          <LinearGradient
+            colors={[WATERMARK_BG_TOP, WATERMARK_BG_BOTTOM]}
+            style={{ position: 'absolute', left: scaleTop * WATERMARK_LEFT, top: scaleTop * WATERMARK_TOP, right: 0, bottom: 0 }}
+          />
+
+          {/* Header */}
+          <Pressable style={boxStyle(BACK_BOX, scaleTop)} onPress={goHome} />
+          <Pressable style={boxStyle(HEADSET_BOX, scaleTop)} onPress={() => navigation.navigate('Help')} />
+          <Pressable
+            style={boxStyle(FAIRNESS_BOX, scaleTop)}
+            onPress={() =>
+              Alert.alert(
+                'Provably fair',
+                "Every round's result hash is published before betting opens, and the raw seed is revealed after settlement so you can verify it was never changed."
+              )
+            }
+          />
+
+          {/* Wallet actions */}
+          <Pressable style={boxStyle(WITHDRAW_BOX, scaleTop)} onPress={() => navigation.navigate('Withdraw')} />
+          <Pressable style={boxStyle(DEPOSIT_BOX, scaleTop)} onPress={() => navigation.navigate('Deposit')} />
+
+          {/* Duration tabs */}
+          {durationTabIndex !== 0 ? (
+            <View
+              pointerEvents="none"
+              style={[boxStyle(DEFAULT_DURATION_TAB_HIGHLIGHT, scaleTop), { backgroundColor: TAB_CARD_BG, borderRadius: 16 * scaleTop }]}
+            />
+          ) : null}
+          {DURATION_ORDER.map((d, i) => {
+            const left = DURATION_TAB_X[i];
+            const w = DURATION_TAB_X[i + 1] - left;
+            return (
+              <Pressable
+                key={d + '-' + i}
+                style={boxStyle({ left, top: DURATION_TAB_Y, width: w, height: DURATION_TAB_H }, scaleTop)}
+                onPress={() => setDuration(d)}
+              />
+            );
+          })}
+          {durationTabIndex !== 0 ? (
+            <View
+              pointerEvents="none"
+              style={[
+                boxStyle(
+                  { left: DURATION_TAB_X[durationTabIndex] + 4, top: 536, width: DURATION_TAB_X[durationTabIndex + 1] - DURATION_TAB_X[durationTabIndex] - 8, height: 152 },
+                  scaleTop
+                ),
+                styles.selectedTabHighlight,
+              ]}
+            />
+          ) : null}
+
+          {/* Ticket bar */}
+          <Pressable
+            style={boxStyle(HOWTOPLAY_BOX, scaleTop)}
+            onPress={() =>
+              Alert.alert('How to play', 'Pick a number, color, or size before the round locks, then confirm your bet below.')
+            }
+          />
+          <Text style={[boxStyle(COUNTDOWN_BOX, scaleTop), styles.countdownText, { fontSize: scaleTop * 28 }]}>
+            {locked ? 'Locked' : round ? formatCountdown(round.timeRemainingSeconds) : '--:--'}
+          </Text>
+
+          {/* Category buttons */}
+          <Pressable
+            style={boxStyle(GREEN_BOX, scaleTop)}
+            onPress={() => setSelection({ betType: 'COLOR', betValue: 'GREEN', label: 'Green', multiplierLabel: `${config?.payouts.color ?? 2}X` })}
+          />
+          <Pressable
+            style={boxStyle(VIOLET_BOX, scaleTop)}
+            onPress={() => setSelection({ betType: 'COLOR', betValue: 'VIOLET', label: 'Violet', multiplierLabel: `${config?.payouts.violet ?? 4.5}X` })}
+          />
+          <Pressable
+            style={boxStyle(RED_BOX, scaleTop)}
+            onPress={() => setSelection({ betType: 'COLOR', betValue: 'RED', label: 'Red', multiplierLabel: `${config?.payouts.color ?? 2}X` })}
+          />
+          {selection?.betType === 'COLOR' ? (
+            <View
+              pointerEvents="none"
+              style={[
+                boxStyle(selection.betValue === 'GREEN' ? GREEN_BOX : selection.betValue === 'VIOLET' ? VIOLET_BOX : RED_BOX, scaleTop),
+                styles.selectionOutlineRect,
+              ]}
+            />
+          ) : null}
+
+          {/* Number grid */}
+          {[0, 1].map((row) =>
+            Array.from({ length: 5 }, (_, col) => {
+              const n = row * 5 + col;
+              const left = NUMBER_COL_X[col];
+              const w = NUMBER_COL_X[col + 1] - left;
+              const top = NUMBER_ROW_Y[row];
+              const h = NUMBER_ROW_Y[row + 1] - top;
+              return (
+                <Pressable
+                  key={n}
+                  style={boxStyle({ left, top, width: w, height: h }, scaleTop)}
+                  onPress={() =>
+                    setSelection({ betType: 'NUMBER', betValue: String(n), label: `Number ${n}`, multiplierLabel: `${config?.payouts.number ?? 9}X` })
+                  }
+                />
+              );
+            })
+          )}
+          {selection?.betType === 'NUMBER'
+            ? (() => {
+                const n = Number(selection.betValue);
+                const row = n >= 5 ? 1 : 0;
+                const col = n % 5;
+                const cx = NUMBER_COL_CENTER[col];
+                const cy = NUMBER_ROW_BALL_CENTER_Y[row];
+                const d = NUMBER_BALL_DIAMETER;
+                return (
+                  <View
+                    pointerEvents="none"
+                    style={[
+                      boxStyle({ left: cx - d / 2, top: cy - d / 2, width: d, height: d }, scaleTop),
+                      styles.selectionOutlineCircle,
+                      { borderRadius: (d * scaleTop) / 2 },
+                    ]}
+                  />
+                );
+              })()
+            : null}
+
+          {/* Random + multiplier */}
+          <Pressable style={boxStyle(RANDOM_BOX, scaleTop)} onPress={pickRandomNumber} />
+          {multiplierIndex !== 0 ? (
+            <View
+              pointerEvents="none"
+              style={[boxStyle(DEFAULT_MULTIPLIER_HIGHLIGHT, scaleTop), { backgroundColor: CHIP_BG, borderRadius: 14 * scaleTop }]}
+            />
+          ) : null}
+          {MULTIPLIER_VALUES.map((m, i) => {
+            const left = MULTIPLIER_X[i];
+            const w = MULTIPLIER_X[i + 1] - left;
+            return (
+              <Pressable
+                key={m}
+                style={boxStyle({ left, top: MULTIPLIER_Y, width: w, height: MULTIPLIER_H }, scaleTop)}
+                onPress={() => setMultiplier(m)}
+              />
+            );
+          })}
+          {multiplierIndex !== 0 ? (
+            <View
+              pointerEvents="none"
+              style={[
+                boxStyle({ left: MULTIPLIER_X[multiplierIndex] + 4, top: MULTIPLIER_Y, width: MULTIPLIER_X[multiplierIndex + 1] - MULTIPLIER_X[multiplierIndex] - 8, height: MULTIPLIER_H }, scaleTop),
+                styles.selectedChipHighlight,
+              ]}
+            />
+          ) : null}
+
+          {/* Big / Small */}
+          <Pressable
+            style={boxStyle(BIG_BOX, scaleTop)}
+            onPress={() => setSelection({ betType: 'SIZE', betValue: 'BIG', label: 'Big', multiplierLabel: `${config?.payouts.size ?? 2}X` })}
+          />
+          <Pressable
+            style={boxStyle(SMALL_BOX, scaleTop)}
+            onPress={() => setSelection({ betType: 'SIZE', betValue: 'SMALL', label: 'Small', multiplierLabel: `${config?.payouts.size ?? 2}X` })}
+          />
+          {selection?.betType === 'SIZE' ? (
+            <View
+              pointerEvents="none"
+              style={[boxStyle(selection.betValue === 'BIG' ? BIG_BOX : SMALL_BOX, scaleTop), styles.selectionOutlineRect]}
+            />
+          ) : null}
+        </View>
+
+        {/* ---------------- BOTTOM IMAGE ---------------- */}
+        <View style={{ width, height: bottomImageHeight }}>
+          <Image
+            source={require('../../assets/win-go-screen-bottom.jpg')}
+            style={{ width, height: bottomImageHeight }}
+            resizeMode="cover"
+          />
+
+          {historyTab !== 'game' ? (
+            <View pointerEvents="none" style={[boxStyle(GAME_TAB_BOX, scaleBottom), { backgroundColor: TAB_UNSELECTED_BG, borderRadius: 14 * scaleBottom }]} />
+          ) : null}
+          <Pressable style={boxStyle(GAME_TAB_BOX, scaleBottom)} onPress={() => setHistoryTab('game')} />
+          <Pressable
+            style={boxStyle(CHART_TAB_BOX, scaleBottom)}
+            onPress={() => Alert.alert('Chart', 'Chart view is coming soon.')}
+          />
+          <Pressable style={boxStyle(MY_TAB_BOX, scaleBottom)} onPress={() => setHistoryTab('my')} />
+          {historyTab === 'my' ? (
+            <View pointerEvents="none" style={[boxStyle(MY_TAB_BOX, scaleBottom), styles.selectedHistoryTabHighlight]} />
+          ) : null}
+
+          {/* Table rows */}
+          {pageRows.map((row, i) => {
+            const rowTop = TABLE_ROW_TOP + i * TABLE_ROW_HEIGHT;
+            const rowCenter = rowTop + TABLE_ROW_HEIGHT / 2;
+            return (
+              <React.Fragment key={row.key}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { left: 0, width: TABLE_COL_CENTER.number - 40, top: rowCenter * scaleBottom - 16 * scaleBottom, fontSize: 26 * scaleBottom },
+                  ]}
+                >
+                  {row.period.slice(-8)}
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    {
+                      left: (TABLE_COL_CENTER.number - 60) * scaleBottom,
+                      width: 120 * scaleBottom,
+                      top: rowCenter * scaleBottom - 16 * scaleBottom,
+                      fontSize: 28 * scaleBottom,
+                      fontWeight: '800',
+                      color: row.number != null ? primaryColorHexForNumber(row.number) : '#7C9089',
+                    },
+                  ]}
+                >
+                  {row.number ?? '-'}
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    { left: (TABLE_COL_CENTER.bigSmall - 70) * scaleBottom, width: 140 * scaleBottom, top: rowCenter * scaleBottom - 16 * scaleBottom, fontSize: 24 * scaleBottom },
+                  ]}
+                >
+                  {row.size ?? '-'}
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    {
+                      left: (TABLE_COL_CENTER.color - 90) * scaleBottom,
+                      width: 180 * scaleBottom,
+                      top: rowCenter * scaleBottom - 16 * scaleBottom,
+                      fontSize: 22 * scaleBottom,
+                      fontWeight: '700',
+                      color: row.rightColor,
+                    },
+                  ]}
+                >
+                  {row.rightLabel}
+                </Text>
+              </React.Fragment>
+            );
+          })}
+
+          <Pressable
+            style={boxStyle(PAGE_LEFT_BOX, scaleBottom)}
+            onPress={() => setPage((p) => Math.max(0, p - 1))}
+          />
+          <Pressable
+            style={boxStyle(PAGE_RIGHT_BOX, scaleBottom)}
+            onPress={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+          />
+        </View>
+      </ScrollView>
+
+      {selection ? (
+        <View style={styles.confirmBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.confirmLabel} numberOfLines={1}>
+              {selection.label} ({selection.multiplierLabel}) · x{multiplier} = ₹{stake}
+            </Text>
+          </View>
+          <Pressable onPress={() => setSelection(null)} style={styles.confirmCancel}>
+            <MaterialCommunityIcons name="close" size={18} color="#7C9089" />
+          </Pressable>
+          <Pressable onPress={confirmBet} disabled={placing || locked} style={[styles.confirmButton, { opacity: placing || locked ? 0.5 : 1 }]}>
+            <Text style={styles.confirmButtonText}>{placing ? 'Placing…' : 'Place Bet'}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -73,4 +610,56 @@ const styles = StyleSheet.create({
     color: '#1C8A5C',
     fontWeight: '800',
   },
+  countdownText: {
+    position: 'absolute',
+    textAlign: 'center',
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  selectedTabHighlight: {
+    borderWidth: 3,
+    borderColor: '#1C8A5C',
+    borderRadius: 14,
+    backgroundColor: 'rgba(28,138,92,0.12)',
+  },
+  selectedChipHighlight: {
+    borderWidth: 3,
+    borderColor: '#1C8A5C',
+    borderRadius: 12,
+    backgroundColor: 'rgba(28,138,92,0.12)',
+  },
+  selectionOutlineRect: {
+    borderWidth: 4,
+    borderColor: '#F0B93D',
+    borderRadius: 14,
+  },
+  selectionOutlineCircle: {
+    borderWidth: 4,
+    borderColor: '#F0B93D',
+  },
+  selectedHistoryTabHighlight: {
+    borderWidth: 3,
+    borderColor: '#1C8A5C',
+    borderRadius: 14,
+    backgroundColor: 'rgba(28,138,92,0.12)',
+  },
+  tableCell: {
+    position: 'absolute',
+    color: '#123524',
+    textAlign: 'center',
+  },
+  confirmBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E1E7E4',
+  },
+  confirmLabel: { color: '#123524', fontSize: 13, fontWeight: '700' },
+  confirmCancel: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  confirmButton: { borderRadius: 14, backgroundColor: '#0F4D34', paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' },
+  confirmButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
 });
