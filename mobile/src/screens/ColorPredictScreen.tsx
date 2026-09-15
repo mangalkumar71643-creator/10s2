@@ -113,9 +113,13 @@ const TAB_30S_PILL_BOX: Box = { left: DURATION_TAB_X[1] + 4, top: 536, width: 13
 // in reading "5Min", duplicating the fourth tab's real 300s/5Min label.
 // Swapping in a whole replacement icon made that tab visibly bigger than
 // its neighbors, so instead just patch over the "5" digit itself (measured
-// tight to that glyph, x:322-330 y:674-688) with matching white and draw
-// a "3" in its place — everything else (icon, "Win Go", "Min") is untouched.
-const TAB3_DIGIT_PATCH: Box = { left: 320, top: 672, width: 13, height: 18 };
+// tight to that glyph, x:322-330 y:674-688, safely inside the blank gap
+// before "Min" starts at x:332 and below "Win Go"'s baseline at y:661)
+// with matching white and draw a "3" in its place — everything else
+// (icon, "Win Go", "Min") is untouched. The patch is sized generously
+// around the glyph rather than tight to it, since the drawn "3" needs
+// real room to render at the reference glyph's actual ~15px ink height.
+const TAB3_DIGIT_PATCH: Box = { left: 317, top: 669, width: 14, height: 24 };
 
 function tab1IconImageStyle(scale: number) {
   const refScale = TAB1_ICON_TARGET.width / TAB1_ICON_CROP.width;
@@ -474,7 +478,7 @@ export default function ColorPredictScreen() {
             <View pointerEvents="none" style={[boxStyle(selectedPillBox(durationTabIndex), scaleTop), styles.selectedTabHighlight]} />
           ) : null}
           <View pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), { backgroundColor: '#ffffff' }]} />
-          <Text pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), styles.tab3DigitText, { fontSize: scaleTop * 15 }]}>
+          <Text pointerEvents="none" style={[boxStyle(TAB3_DIGIT_PATCH, scaleTop), styles.tab3DigitText, { fontSize: scaleTop * 20 }]}>
             3
           </Text>
 
