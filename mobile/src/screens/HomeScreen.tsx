@@ -63,7 +63,7 @@ export default function HomeScreen() {
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
   return (
-    <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.png')}>
+    <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.jpg')}>
       <View
         style={{
           position: 'absolute',
