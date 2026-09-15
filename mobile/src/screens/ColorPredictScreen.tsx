@@ -8,12 +8,12 @@ const IMAGE_REF_WIDTH = 688;
 const IMAGE_ASPECT = 688 / 1504;
 
 // Vertical center, in that same 688-wide reference image, of the blank gap
-// between the "Wallet balance" label and the Withdraw/Deposit buttons —
-// measured directly off the screenshot.
-const BALANCE_CENTER_Y = 367;
+// above the "Wallet balance" label (between the card's top edge and that
+// label) — measured directly off the screenshot.
+const BALANCE_CENTER_Y = 250;
 
-// Just the reference image, plus the real wallet balance overlaid into the
-// blank space it left for it — no other buttons/logic added yet.
+// Just the reference image, plus the real wallet balance overlaid above the
+// "Wallet balance" label — no other buttons/logic added yet.
 export default function ColorPredictScreen() {
   const { width } = useWindowDimensions();
   const { coins } = useGameState();
