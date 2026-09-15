@@ -72,6 +72,14 @@ const DURATION_TAB_X = [20, 149, 278, 407, 536, 665];
 const DURATION_TAB_Y = 535;
 const DURATION_TAB_H = 165;
 
+// The tab1 "unselect" white patch (below) needs to reach slightly past the
+// column's nominal boundary (149) and bottom (700): the source photo still
+// has a few px of green anti-aliasing on the right and a faint shadow
+// tint at the bottom before it's genuinely flat white there. 160 stays
+// well clear of the neighboring "30S" tab's icon, which starts at 175.
+const TAB1_PATCH_RIGHT = 160;
+const TAB1_PATCH_BOTTOM = 708;
+
 // Unselected "1Min" tab artwork: the source photo (222x293) has a white
 // margin and a faint border line around its actual icon+text content, which
 // showed up as a visible seam/edge when the whole photo was stretched into
@@ -402,10 +410,10 @@ export default function ColorPredictScreen() {
                 pointerEvents="none"
                 style={[
                   boxStyle(
-                    { left: DURATION_TAB_X[0], top: DURATION_TAB_Y, width: DURATION_TAB_X[1] - DURATION_TAB_X[0], height: DURATION_TAB_H },
+                    { left: DURATION_TAB_X[0], top: DURATION_TAB_Y, width: TAB1_PATCH_RIGHT - DURATION_TAB_X[0], height: TAB1_PATCH_BOTTOM - DURATION_TAB_Y },
                     scaleTop
                   ),
-                  { backgroundColor: '#ffffff', borderTopLeftRadius: 14, borderTopRightRadius: 14 },
+                  { backgroundColor: '#ffffff', borderTopLeftRadius: 14 },
                 ]}
               />
               <View pointerEvents="none" style={[boxStyle(TAB1_ICON_TARGET, scaleTop), styles.tab1IconClip]}>
