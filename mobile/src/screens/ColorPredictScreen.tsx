@@ -21,14 +21,21 @@ const WATERMARK_TOP = 1465;
 const WATERMARK_BG_TOP = 'rgb(248,247,253)';
 const WATERMARK_BG_BOTTOM = 'rgb(253,253,255)';
 
-// Just the reference image, plus the real wallet balance overlaid above the
-// "Wallet balance" label and the Grok watermark patched over — no other
-// buttons/logic added yet.
+// The "bottom half" reference image (Game history / Chart / My history +
+// results table) was cropped to remove its own copy of the Big/Small bar —
+// the top image above already ends with that bar, so this picks up right
+// after it with no duplicate.
+const BOTTOM_IMAGE_ASPECT = 1595 / 2636;
+
+// Just the two reference images stacked into one continuous screen, plus
+// the real wallet balance overlaid above the "Wallet balance" label and the
+// Grok watermark patched over — no other buttons/logic added yet.
 export default function ColorPredictScreen() {
   const { width } = useWindowDimensions();
   const { coins } = useGameState();
   const scale = width / IMAGE_REF_WIDTH;
   const imageHeight = width / IMAGE_ASPECT;
+  const bottomImageHeight = width / BOTTOM_IMAGE_ASPECT;
 
   return (
     <ScrollView style={styles.root} showsVerticalScrollIndicator={false}>
@@ -47,6 +54,11 @@ export default function ColorPredictScreen() {
           style={{ position: 'absolute', left: scale * WATERMARK_LEFT, top: scale * WATERMARK_TOP, right: 0, bottom: 0 }}
         />
       </View>
+      <Image
+        source={require('../../assets/win-go-screen-bottom.jpg')}
+        style={{ width, height: bottomImageHeight }}
+        resizeMode="cover"
+      />
     </ScrollView>
   );
 }
