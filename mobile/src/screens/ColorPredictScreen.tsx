@@ -93,6 +93,14 @@ const TAB1_ICON_SRC_H = 293;
 const TAB1_ICON_CROP: Box = { left: 35, top: 25, width: 152, height: 232 };
 const TAB1_ICON_TARGET: Box = { left: 44, top: 558, width: 85, height: 130 };
 
+// The selected-tab green pill sits inset by 4px on each side within its
+// column, spanning the same rows (536-688) as tab1's own baked-in selected
+// pill — matched so a real per-duration asset (like the 30S one below)
+// lines up exactly with that native artwork when swapped in.
+function selectedPillBox(i: number): Box {
+  return { left: DURATION_TAB_X[i] + 4, top: 536, width: DURATION_TAB_X[i + 1] - DURATION_TAB_X[i] - 8, height: 152 };
+}
+
 function tab1IconImageStyle(scale: number) {
   const refScale = TAB1_ICON_TARGET.width / TAB1_ICON_CROP.width;
   return {
@@ -435,17 +443,16 @@ export default function ColorPredictScreen() {
               />
             );
           })}
-          {durationTabIndex !== 0 ? (
-            <View
-              pointerEvents="none"
-              style={[
-                boxStyle(
-                  { left: DURATION_TAB_X[durationTabIndex] + 4, top: 536, width: DURATION_TAB_X[durationTabIndex + 1] - DURATION_TAB_X[durationTabIndex] - 8, height: 152 },
-                  scaleTop
-                ),
-                styles.selectedTabHighlight,
-              ]}
-            />
+          {durationTabIndex === 1 ? (
+            <View pointerEvents="none" style={boxStyle(selectedPillBox(1), scaleTop)}>
+              <Image
+                source={require('../../assets/wingo-tab-30s-green.jpg')}
+                resizeMode="stretch"
+                style={[StyleSheet.absoluteFill, styles.selectedPillImage]}
+              />
+            </View>
+          ) : durationTabIndex !== 0 ? (
+            <View pointerEvents="none" style={[boxStyle(selectedPillBox(durationTabIndex), scaleTop), styles.selectedTabHighlight]} />
           ) : null}
 
           {/* Ticket bar */}
@@ -786,6 +793,9 @@ const styles = StyleSheet.create({
   },
   tab1IconClip: {
     overflow: 'hidden',
+  },
+  selectedPillImage: {
+    borderRadius: 14,
   },
   selectedTabHighlight: {
     borderWidth: 3,
