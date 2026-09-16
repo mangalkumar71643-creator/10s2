@@ -289,14 +289,9 @@ const BADGE_SMALL_COLOR = '#4A90D9';
 // image instead of shrinking them to a fraction of a real dp (that was the
 // earlier bug — sizes like "28" were being treated as already-final dp
 // values and then multiplied by a ~0.25 scale factor on top).
-const PERIOD_FONT = 56;
-
 // periodNumber is exactly 12 chars: YYMMDD + 6-digit daily round number
-// (e.g. "260916000001"). The date part repeats across every visible row on
-// a given day, so only the day-of-month + round number is worth showing.
-function formatPeriodDisplay(period: string): string {
-  return `${period.slice(-8, -6)}-${period.slice(-6)}`;
-}
+// (e.g. "260916000001") — shown in full, unmodified, per spec.
+const PERIOD_FONT = 38;
 const NUMBER_FONT = 120;
 const BIGSMALL_FONT = 68;
 const DOT_DIAMETER = 56;
@@ -818,7 +813,7 @@ export default function ColorPredictScreen() {
                     },
                   ]}
                 >
-                  {formatPeriodDisplay(row.period)}
+                  {row.period}
                 </Text>
                 <View
                   style={{
@@ -954,10 +949,10 @@ export default function ColorPredictScreen() {
                     <Text
                       style={[
                         styles.tableCell,
-                        { left: CHART_PERIOD_BOX.left * scaleBottom, width: CHART_PERIOD_BOX.width * scaleBottom, top: (rowCenter - 24) * scaleBottom, fontSize: 38 * scaleBottom },
+                        { left: CHART_PERIOD_BOX.left * scaleBottom, width: CHART_PERIOD_BOX.width * scaleBottom, top: (rowCenter - 16) * scaleBottom, fontSize: 26 * scaleBottom },
                       ]}
                     >
-                      {formatPeriodDisplay(row.period)}
+                      {row.period}
                     </Text>
                     {Array.from({ length: 10 }, (_, digit) => {
                       const hit = row.number === digit;
