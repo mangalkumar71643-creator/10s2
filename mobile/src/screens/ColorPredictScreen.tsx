@@ -61,7 +61,7 @@ const BALANCE_CENTER_Y = 250;
 // together (same resync used for countdown recovery). Sized relative to
 // its own emoji glyph per user request: button footprint is 1.5x the
 // emoji's own font size.
-const REFRESH_EMOJI_SIZE = 100;
+const REFRESH_EMOJI_SIZE = 50;
 const REFRESH_BUTTON_SIZE = REFRESH_EMOJI_SIZE * 1.5;
 const REFRESH_GAP = 12;
 
