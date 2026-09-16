@@ -37,15 +37,17 @@ const PANEL_TOP = 890;
 const PANEL_HEIGHT = 408;
 
 // Measured from a JILI lobby reference screenshot (1280x2800): the gap from
-// the red control-panel graphic's bottom edge to the top of its "Crash" game
-// tile — reused here so our tile sits the same distance below our own panel.
-const WIN_GO_GAP_BELOW_PANEL = 250;
-// Per user request: fixed 150x150 size, not scaled off screen width like
-// the rest of this screen's elements. The icon's transparent PNG is
-// letterboxed (resizeMode="contain") inside this square so its real
-// non-square card shape isn't cropped or stretched.
-const WIN_GO_TILE_WIDTH = 150;
-const WIN_GO_TILE_HEIGHT = 150;
+// the red control-panel graphic's bottom edge to the top of its game-icon
+// row — reused here so our row sits the same distance below our own panel.
+const GAME_GRID_GAP_BELOW_PANEL = 250;
+
+// Fixed-size grid for game icons below the control panel, left-aligned so
+// more icons can be added in a row/wrap layout later — each one just needs
+// its own {row, col} using GAME_ICON_SIZE/GAME_GRID_GAP/GAME_GRID_LEFT below.
+const GAME_ICON_SIZE = 150;
+const GAME_GRID_LEFT = 24;
+const GAME_GRID_GAP = 16;
+const GAME_GRID_CELL = GAME_ICON_SIZE + GAME_GRID_GAP;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
@@ -57,9 +59,11 @@ export default function HomeScreen() {
   const panelHeight = screenHeight * (PANEL_HEIGHT / REFERENCE_HEIGHT);
   const panelWidth = panelHeight * CONTROL_PANEL_ASPECT;
   const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
-  const winGoTileWidth = WIN_GO_TILE_WIDTH;
-  const winGoTileHeight = WIN_GO_TILE_HEIGHT;
-  const winGoTileTop = panelTop + panelHeight + screenHeight * (WIN_GO_GAP_BELOW_PANEL / REFERENCE_HEIGHT) - 50;
+  const gameGridTop = panelTop + panelHeight + screenHeight * (GAME_GRID_GAP_BELOW_PANEL / REFERENCE_HEIGHT) - 50;
+  // Win Go is grid cell {row: 0, col: 0}; a later icon at, say, {row: 0, col: 1}
+  // would sit at left: GAME_GRID_LEFT + 1 * GAME_GRID_CELL, same top.
+  const winGoTileTop = gameGridTop;
+  const winGoTileLeft = GAME_GRID_LEFT;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -163,9 +167,9 @@ export default function HomeScreen() {
         style={{
           position: 'absolute',
           top: winGoTileTop,
-          left: (screenWidth - winGoTileWidth) / 2,
-          width: winGoTileWidth,
-          height: winGoTileHeight,
+          left: winGoTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
           overflow: 'hidden',
         }}
       >
