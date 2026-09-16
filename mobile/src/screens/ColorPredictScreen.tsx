@@ -153,6 +153,14 @@ function tab1IconImageStyle(scale: number) {
 // Ticket bar (How to play / Time remaining).
 const HOWTOPLAY_BOX: Box = { left: 18, top: 733, width: 326, height: 204 };
 const COUNTDOWN_BOX: Box = { left: 342, top: 800, width: 323, height: 60 };
+// Decorative bookmark card under "Time remaining" / the countdown value,
+// centered under COUNTDOWN_BOX, sized 100x120 per user request.
+const TICKET_BOOKMARK_BOX: Box = {
+  left: COUNTDOWN_BOX.left + COUNTDOWN_BOX.width / 2 - 50,
+  top: 860,
+  width: 100,
+  height: 120,
+};
 
 // Green / Violet / Red category buttons.
 const GREEN_BOX: Box = { left: 28, top: 983, width: 200, height: 64 };
@@ -560,6 +568,10 @@ export default function ColorPredictScreen() {
           <Text style={[boxStyle(COUNTDOWN_BOX, scaleTop), styles.countdownText, { fontSize: scaleTop * 28 }]}>
             {locked ? 'Locked' : round ? formatCountdown(round.timeRemainingSeconds) : '--:--'}
           </Text>
+          <Image
+            source={require('../../assets/wingo-ticket-bookmark.jpg')}
+            style={boxStyle(TICKET_BOOKMARK_BOX, scaleTop)}
+          />
 
           {/* Category buttons */}
           <Pressable
