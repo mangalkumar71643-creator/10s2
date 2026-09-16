@@ -39,12 +39,13 @@ const PANEL_HEIGHT = 408;
 
 // Measured from a JILI lobby reference screenshot (1280x2800): the gap from
 // the red control-panel graphic's bottom edge to the top of its "Crash" game
-// tile, and that tile's own box (x:18-1200, y:1700-1935 in that same
-// reference frame) — reused here so our tile sits the same distance below
-// our own panel, at the same size, just themed for Win Go instead.
+// tile — reused here so our tile sits the same distance below our own panel.
 const WIN_GO_GAP_BELOW_PANEL = 250;
-const WIN_GO_TILE_WIDTH_FRACTION = 0.92;
-const WIN_GO_TILE_ASPECT = 1182 / 235;
+// Per user request: a fixed 200x350 portrait card (the old wide banner
+// "didn't look right"), not scaled off screen width like the rest of this
+// screen's elements.
+const WIN_GO_TILE_WIDTH = 200;
+const WIN_GO_TILE_HEIGHT = 350;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
@@ -56,8 +57,8 @@ export default function HomeScreen() {
   const panelHeight = screenHeight * (PANEL_HEIGHT / REFERENCE_HEIGHT);
   const panelWidth = panelHeight * CONTROL_PANEL_ASPECT;
   const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
-  const winGoTileWidth = screenWidth * WIN_GO_TILE_WIDTH_FRACTION;
-  const winGoTileHeight = winGoTileWidth / WIN_GO_TILE_ASPECT;
+  const winGoTileWidth = WIN_GO_TILE_WIDTH;
+  const winGoTileHeight = WIN_GO_TILE_HEIGHT;
   const winGoTileTop = panelTop + panelHeight + screenHeight * (WIN_GO_GAP_BELOW_PANEL / REFERENCE_HEIGHT) - 50;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -173,7 +174,7 @@ export default function HomeScreen() {
         }}
       >
         <Image
-          source={require('../../assets/win-go-banner.jpg')}
+          source={require('../../assets/lottery-wingo-tile.jpg')}
           style={{ width: '100%', height: '100%' }}
           resizeMode="cover"
         />
