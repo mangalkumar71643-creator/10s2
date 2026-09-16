@@ -1021,23 +1021,44 @@ export default function ColorPredictScreen() {
                       />
                     ))}
                   </View>
-                ) : (
-                  <Text
-                    style={[
-                      styles.tableCell,
-                      {
-                        left: (TABLE_COL_CENTER.color - 110) * scaleBottom,
-                        width: 220 * scaleBottom,
-                        top: (rowCenter - BIGSMALL_FONT * 0.5) * scaleBottom,
-                        fontSize: BIGSMALL_FONT * 0.8 * scaleBottom,
-                        fontWeight: '700',
-                        color: row.rightColor,
-                      },
-                    ]}
-                  >
-                    {row.rightLabel}
-                  </Text>
-                )}
+                ) : row.bet ? (
+                  // My history: no baked column for "what did I buy", so
+                  // stack it above the existing win/lose line in the same
+                  // "Color" cell rather than adding a whole new column.
+                  <>
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.tableCell,
+                        {
+                          left: (TABLE_COL_CENTER.color - 110) * scaleBottom,
+                          width: 220 * scaleBottom,
+                          top: (rowCenter - 46) * scaleBottom,
+                          fontSize: 32 * scaleBottom,
+                          fontWeight: '700',
+                          color: betColorFor(row.bet),
+                        },
+                      ]}
+                    >
+                      {betLabelFor(row.bet)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        {
+                          left: (TABLE_COL_CENTER.color - 110) * scaleBottom,
+                          width: 220 * scaleBottom,
+                          top: (rowCenter + 8) * scaleBottom,
+                          fontSize: BIGSMALL_FONT * 0.55 * scaleBottom,
+                          fontWeight: '700',
+                          color: row.rightColor,
+                        },
+                      ]}
+                    >
+                      {row.rightLabel}
+                    </Text>
+                  </>
+                ) : null}
               </React.Fragment>
             );
           })}
