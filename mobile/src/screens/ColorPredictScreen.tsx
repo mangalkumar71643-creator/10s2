@@ -165,6 +165,22 @@ const RECENT_BALL_TOP = 848;
 const RECENT_BALL_LEFT = HOWTOPLAY_BOX.left + 10;
 const DURATION_LABEL: Record<ColorGameDuration, string> = { 60: '1Min', 30: '30S', 180: '3Min', 300: '5Min', 600: '10Min' };
 
+// The recent-results balls use the exact same artwork as the main number
+// grid below (cropped straight from it), not redrawn flat circles — so
+// they match pixel-for-pixel instead of just approximating the colors.
+const BALL_IMAGES = [
+  require('../../assets/balls/wingo-ball-0.png'),
+  require('../../assets/balls/wingo-ball-1.png'),
+  require('../../assets/balls/wingo-ball-2.png'),
+  require('../../assets/balls/wingo-ball-3.png'),
+  require('../../assets/balls/wingo-ball-4.png'),
+  require('../../assets/balls/wingo-ball-5.png'),
+  require('../../assets/balls/wingo-ball-6.png'),
+  require('../../assets/balls/wingo-ball-7.png'),
+  require('../../assets/balls/wingo-ball-8.png'),
+  require('../../assets/balls/wingo-ball-9.png'),
+];
+
 // Green / Violet / Red category buttons.
 const GREEN_BOX: Box = { left: 28, top: 983, width: 200, height: 64 };
 const VIOLET_BOX: Box = { left: 238, top: 983, width: 204, height: 64 };
@@ -576,25 +592,10 @@ export default function ColorPredictScreen() {
             WinGo {DURATION_LABEL[duration]}
           </Text>
           {recentResults.map((n, i) => {
+            if (n == null) return null;
             const left = RECENT_BALL_LEFT + i * (RECENT_BALL_DIAMETER + RECENT_BALL_GAP);
             const box: Box = { left, top: RECENT_BALL_TOP, width: RECENT_BALL_DIAMETER, height: RECENT_BALL_DIAMETER };
-            return (
-              <View
-                key={i}
-                pointerEvents="none"
-                style={[
-                  boxStyle(box, scaleTop),
-                  {
-                    borderRadius: (RECENT_BALL_DIAMETER * scaleTop) / 2,
-                    backgroundColor: n == null ? '#D8DEDB' : primaryColorHexForNumber(n),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  },
-                ]}
-              >
-                {n != null ? <Text style={{ fontSize: scaleTop * 24, fontWeight: '700', color: '#FFFFFF' }}>{n}</Text> : null}
-              </View>
-            );
+            return <Image key={i} source={BALL_IMAGES[n]} resizeMode="stretch" style={boxStyle(box, scaleTop)} />;
           })}
 
           {/* Category buttons */}
