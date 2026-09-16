@@ -18,7 +18,7 @@ export const env = {
   smsProviderMode: (process.env.SMS_PROVIDER_MODE ?? "mock") as "mock" | "live",
 
   games: {
-    minStake: Number(process.env.GAME_MIN_STAKE ?? 5),
+    minStake: Number(process.env.GAME_MIN_STAKE ?? 1),
     maxStake: Number(process.env.GAME_MAX_STAKE ?? 500),
     // Return-to-player: long-run share of total stakes paid back as winnings.
     rtp: Number(process.env.GAME_RTP ?? 0.92),
