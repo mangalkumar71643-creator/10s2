@@ -197,9 +197,6 @@ const RED_BOX: Box = { left: 452, top: 983, width: 200, height: 64 };
 // Number grid: 5 columns x 2 rows.
 const NUMBER_COL_X = [52, 168, 282, 397, 512, 627];
 const NUMBER_ROW_Y = [1085, 1215, 1345];
-const NUMBER_COL_CENTER = [110, 225, 340, 455, 570];
-const NUMBER_ROW_BALL_CENTER_Y = [1137, 1265];
-const NUMBER_BALL_DIAMETER = 88;
 
 // Random + multiplier chips.
 const RANDOM_BOX: Box = { left: 18, top: 1346, width: 168, height: 72 };
@@ -699,16 +696,6 @@ export default function ColorPredictScreen() {
             style={boxStyle(RED_BOX, scaleTop)}
             onPress={() => setSelection({ betType: 'COLOR', betValue: 'RED', label: 'Red', multiplierLabel: `${config?.payouts.color ?? 2}X` })}
           />
-          {selection?.betType === 'COLOR' ? (
-            <View
-              pointerEvents="none"
-              style={[
-                boxStyle(selection.betValue === 'GREEN' ? GREEN_BOX : selection.betValue === 'VIOLET' ? VIOLET_BOX : RED_BOX, scaleTop),
-                styles.selectionOutlineRect,
-              ]}
-            />
-          ) : null}
-
           {/* Number grid */}
           {[0, 1].map((row) =>
             Array.from({ length: 5 }, (_, col) => {
@@ -728,27 +715,6 @@ export default function ColorPredictScreen() {
               );
             })
           )}
-          {selection?.betType === 'NUMBER'
-            ? (() => {
-                const n = Number(selection.betValue);
-                const row = n >= 5 ? 1 : 0;
-                const col = n % 5;
-                const cx = NUMBER_COL_CENTER[col];
-                const cy = NUMBER_ROW_BALL_CENTER_Y[row];
-                const d = NUMBER_BALL_DIAMETER;
-                return (
-                  <View
-                    pointerEvents="none"
-                    style={[
-                      boxStyle({ left: cx - d / 2, top: cy - d / 2, width: d, height: d }, scaleTop),
-                      styles.selectionOutlineCircle,
-                      { borderRadius: (d * scaleTop) / 2 },
-                    ]}
-                  />
-                );
-              })()
-            : null}
-
           {/* Random + multiplier */}
           <Pressable style={boxStyle(RANDOM_BOX, scaleTop)} onPress={pickRandomNumber} />
           {/* Same deal as the duration tab above — "X1" is baked in as
@@ -795,13 +761,6 @@ export default function ColorPredictScreen() {
             style={boxStyle(SMALL_BOX, scaleTop)}
             onPress={() => setSelection({ betType: 'SIZE', betValue: 'SMALL', label: 'Small', multiplierLabel: `${config?.payouts.size ?? 2}X` })}
           />
-          {selection?.betType === 'SIZE' ? (
-            <View
-              pointerEvents="none"
-              style={[boxStyle(selection.betValue === 'BIG' ? BIG_BOX : SMALL_BOX, scaleTop), styles.selectionOutlineRect]}
-            />
-          ) : null}
-
           {/* Betting locked in the closing seconds — gray out and block
               taps on the whole betting area, with a big countdown. */}
           {locked && round ? (
@@ -1174,15 +1133,6 @@ const styles = StyleSheet.create({
     borderColor: '#1C8A5C',
     borderRadius: 12,
     backgroundColor: 'rgba(28,138,92,0.12)',
-  },
-  selectionOutlineRect: {
-    borderWidth: 4,
-    borderColor: '#F0B93D',
-    borderRadius: 14,
-  },
-  selectionOutlineCircle: {
-    borderWidth: 4,
-    borderColor: '#F0B93D',
   },
   lockOverlay: {
     position: 'absolute',
