@@ -3,7 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, AppState, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { ApiClientError } from '../api/client';
 import {
   ColorGameBetType,
@@ -387,8 +387,12 @@ export default function ColorPredictScreen() {
   useEffect(() => {
     setRound(null);
     setPage(0);
-    loadRound(duration);
-    loadHistory(duration);
+    // Swallow failures here too — leaving `round` at null after a
+    // transient error would otherwise freeze the screen on "--:--"
+    // forever, since the countdown interval below only ever resyncs
+    // once it already has a round to compare against.
+    loadRound(duration).catch(() => {});
+    loadHistory(duration).catch(() => {});
     loadMyBets();
   }, [duration, loadRound, loadHistory, loadMyBets]);
 
@@ -396,25 +400,66 @@ export default function ColorPredictScreen() {
     setPage(0);
   }, [historyTab]);
 
+  // Refetches the round/history/bets after a round ends. Guarded by a
+  // ref (not state) so a slow or failing call can't pile up duplicate
+  // requests every tick, and a caught error just lets the next tick try
+  // again instead of leaving the UI frozen on a failed fetch forever.
+  const resyncingRef = useRef(false);
+  const resync = useCallback(async () => {
+    if (resyncingRef.current) return;
+    resyncingRef.current = true;
+    try {
+      await Promise.all([loadRound(duration), loadHistory(duration), loadMyBets()]);
+      refreshWallet().catch(() => {});
+    } catch {
+      // transient network error — the next tick (or the app-foreground
+      // resync below) will retry; nothing to show the user for this.
+    } finally {
+      resyncingRef.current = false;
+    }
+  }, [duration, loadRound, loadHistory, loadMyBets, refreshWallet]);
+
   useEffect(() => {
+    // Derive the countdown from the round's absolute endTime every tick,
+    // rather than decrementing a local counter — a decrementing counter
+    // drifts from the server (and can freeze entirely) whenever the JS
+    // timer is throttled or paused, e.g. the app backgrounding or the
+    // screen locking during those last few "Locked" seconds. Recomputing
+    // from endTime is self-correcting: it always reflects real elapsed
+    // wall-clock time, however late this tick actually ran.
     const timer = setInterval(() => {
       const current = roundRef.current;
-      if (!current) return;
-      if (current.timeRemainingSeconds <= 0) {
-        loadRound(duration);
-        loadHistory(duration);
-        loadMyBets();
-        refreshWallet().catch(() => {});
+      if (!current) {
+        // No round loaded yet — either still fetching, or the initial
+        // load failed. Keep retrying every tick instead of sitting on
+        // "--:--" forever.
+        resync();
+        return;
+      }
+      const remaining = Math.max(0, Math.round((new Date(current.endTime).getTime() - Date.now()) / 1000));
+      if (remaining <= 0) {
+        resync();
         return;
       }
       setRound({
         ...current,
-        timeRemainingSeconds: current.timeRemainingSeconds - 1,
-        locked: current.timeRemainingSeconds - 1 <= (config?.lockSeconds ?? 5),
+        timeRemainingSeconds: remaining,
+        locked: remaining <= (config?.lockSeconds ?? 5),
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [duration, loadRound, loadHistory, loadMyBets, refreshWallet, config]);
+  }, [config, resync]);
+
+  useEffect(() => {
+    // Coming back from the background is exactly when the countdown is
+    // most likely to look stuck (JS timers don't run while backgrounded) —
+    // force an immediate resync so it snaps back to the real state at once
+    // instead of waiting for the next 1s tick to notice.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') resync();
+    });
+    return () => sub.remove();
+  }, [resync]);
 
   const locked = round?.locked ?? true;
   const baseUnit = config?.minStake ?? 5;
