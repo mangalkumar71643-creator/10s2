@@ -57,6 +57,14 @@ const DEPOSIT_BOX: Box = { left: 358, top: 383, width: 254, height: 74 };
 // Reference balance overlay position (above the "Wallet balance" label).
 const BALANCE_CENTER_Y = 250;
 
+// Refresh button next to the balance — reloads round/history/bets/wallet
+// together (same resync used for countdown recovery). Sized relative to
+// its own emoji glyph per user request: button footprint is 1.5x the
+// emoji's own font size.
+const REFRESH_EMOJI_SIZE = 100;
+const REFRESH_BUTTON_SIZE = REFRESH_EMOJI_SIZE * 1.5;
+const REFRESH_GAP = 12;
+
 // Grok watermark patch (bottom-right of the top image).
 const WATERMARK_LEFT = 620;
 const WATERMARK_TOP = 1465;
@@ -544,12 +552,33 @@ export default function ColorPredictScreen() {
         <View style={{ width, height: topImageHeight }}>
           <Image source={require('../../assets/win-go-screen.jpg')} style={{ width, height: topImageHeight }} resizeMode="cover" />
 
-          {/* Balance overlay */}
-          <Text
-            style={[styles.balanceText, { top: scaleTop * BALANCE_CENTER_Y - scaleTop * 17, fontSize: scaleTop * 30 }]}
+          {/* Balance overlay + refresh button */}
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: scaleTop * BALANCE_CENTER_Y - scaleTop * 17,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            ₹{coins.toFixed(2)}
-          </Text>
+            <Text style={[styles.balanceText, { fontSize: scaleTop * 30 }]}>₹{coins.toFixed(2)}</Text>
+            <Pressable
+              onPress={resync}
+              hitSlop={8}
+              style={{
+                width: scaleTop * REFRESH_BUTTON_SIZE,
+                height: scaleTop * REFRESH_BUTTON_SIZE,
+                marginLeft: scaleTop * REFRESH_GAP,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: scaleTop * REFRESH_EMOJI_SIZE }}>🔄</Text>
+            </Pressable>
+          </View>
 
           {/* Watermark patch */}
           <LinearGradient
@@ -1108,10 +1137,6 @@ export default function ColorPredictScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#000000' },
   balanceText: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
     color: '#1C8A5C',
     fontWeight: '800',
   },
