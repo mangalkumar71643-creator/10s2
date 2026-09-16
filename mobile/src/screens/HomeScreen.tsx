@@ -41,14 +41,12 @@ const PANEL_HEIGHT = 408;
 // the red control-panel graphic's bottom edge to the top of its "Crash" game
 // tile — reused here so our tile sits the same distance below our own panel.
 const WIN_GO_GAP_BELOW_PANEL = 250;
-// Per user request: fixed size, not scaled off screen width like the rest
-// of this screen's elements. The icon's own transparent PNG already has
-// its real (non-square) card shape baked in, so the tile keeps that same
-// aspect ratio (300x366) at a 150-wide footprint instead of forcing a
-// square crop.
+// Per user request: fixed 150x150 size, not scaled off screen width like
+// the rest of this screen's elements. The icon's transparent PNG is
+// letterboxed (resizeMode="contain") inside this square so its real
+// non-square card shape isn't cropped or stretched.
 const WIN_GO_TILE_WIDTH = 150;
-const WIN_GO_ICON_ASPECT = 300 / 366;
-const WIN_GO_TILE_HEIGHT = WIN_GO_TILE_WIDTH / WIN_GO_ICON_ASPECT;
+const WIN_GO_TILE_HEIGHT = 150;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
