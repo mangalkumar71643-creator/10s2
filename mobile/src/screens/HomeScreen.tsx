@@ -41,10 +41,14 @@ const PANEL_HEIGHT = 408;
 // the red control-panel graphic's bottom edge to the top of its "Crash" game
 // tile — reused here so our tile sits the same distance below our own panel.
 const WIN_GO_GAP_BELOW_PANEL = 250;
-// Per user request: a fixed 150x150 square icon, not scaled off screen
-// width like the rest of this screen's elements.
+// Per user request: fixed size, not scaled off screen width like the rest
+// of this screen's elements. The icon's own transparent PNG already has
+// its real (non-square) card shape baked in, so the tile keeps that same
+// aspect ratio (300x366) at a 150-wide footprint instead of forcing a
+// square crop.
 const WIN_GO_TILE_WIDTH = 150;
-const WIN_GO_TILE_HEIGHT = 150;
+const WIN_GO_ICON_ASPECT = 300 / 366;
+const WIN_GO_TILE_HEIGHT = WIN_GO_TILE_WIDTH / WIN_GO_ICON_ASPECT;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
@@ -173,9 +177,9 @@ export default function HomeScreen() {
         }}
       >
         <Image
-          source={require('../../assets/wingo-home-icon.jpg')}
+          source={require('../../assets/wingo-home-icon.png')}
           style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
+          resizeMode="contain"
         />
       </Pressable>
     </ScreenContainer>
