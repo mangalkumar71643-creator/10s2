@@ -24,4 +24,5 @@ export type RootStackParamList = {
   Deposit: undefined;
   Withdraw: undefined;
   ColorPredict: undefined;
+  Aviator: undefined;
 };

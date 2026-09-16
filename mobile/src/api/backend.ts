@@ -328,3 +328,94 @@ export interface ColorGameMyBet extends ColorGameBetResult {
 export function fetchColorGameMyBets() {
   return apiFetch<ColorGameMyBet[]>('/color-game/my-bets');
 }
+
+// ---- Aviator --------------------------------------------------------------
+
+export interface AviatorConfig {
+  minStake: number;
+  maxStake: number;
+  bettingDurationSeconds: number;
+  resultPauseSeconds: number;
+  growthRate: number;
+  houseEdgePercent: number;
+  minAutoCashout: number;
+}
+
+export function fetchAviatorConfig() {
+  return apiFetch<AviatorConfig>('/aviator/config');
+}
+
+export type AviatorPhase = 'BETTING' | 'FLYING' | 'CRASHED';
+
+export interface AviatorRoundView {
+  periodNumber: string;
+  bettingStartTime: string;
+  flyStartTime: string;
+  // Both null until the round actually crashes — derived from the secret
+  // crash point, so the backend withholds them until then (see
+  // aviatorService.ts's getCurrentRoundView).
+  crashTime: string | null;
+  endTime: string | null;
+  serverSeedHash: string;
+  phase: AviatorPhase;
+  multiplier: number;
+  crashMultiplier: number | null;
+}
+
+export function fetchAviatorCurrentRound() {
+  return apiFetch<AviatorRoundView>('/aviator/current');
+}
+
+export interface AviatorHistoryEntry {
+  periodNumber: string;
+  bettingStartTime: string;
+  crashMultiplier: number;
+  serverSeed: string;
+  serverSeedHash: string;
+}
+
+export function fetchAviatorHistory() {
+  return apiFetch<AviatorHistoryEntry[]>('/aviator/history');
+}
+
+export interface AviatorBetResult {
+  id: string;
+  roundId: string;
+  userId: string;
+  amount: string;
+  autoCashoutAt: string | null;
+  cashoutMultiplier: string | null;
+  status: 'PENDING' | 'WON' | 'LOST';
+  payout: string;
+  createdAt: string;
+}
+
+export function placeAviatorBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<AviatorBetResult>('/aviator/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+export function cashOutAviatorBet(betId: string) {
+  return apiFetch<{ multiplier: number; payout: number }>('/aviator/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+export function fetchAviatorMyCurrentBet() {
+  return apiFetch<AviatorBetResult | null>('/aviator/my-current-bet');
+}
+
+export interface AviatorMyBet extends AviatorBetResult {
+  round: {
+    periodNumber: string;
+    crashMultiplier: string;
+    settled: boolean;
+  };
+}
+
+export function fetchAviatorMyBets() {
+  return apiFetch<AviatorMyBet[]>('/aviator/my-bets');
+}

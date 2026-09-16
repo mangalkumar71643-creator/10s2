@@ -159,6 +159,7 @@ model User {
   kycVerifications     KycVerification[]
   supportTickets       SupportTicket[]
   colorGameBets        ColorGameBet[]
+  aviatorBets          AviatorBet[]
 }
 
 model KycVerification {
@@ -359,6 +360,47 @@ model ColorGameBet {
   status           BetStatus        @default(PENDING)
   payout           Decimal          @db.Decimal(12, 2) @default(0)
   createdAt        DateTime         @default(now())
+
+  @@index([userId])
+  @@index([roundId])
+}
+
+// "Aviator" — a provably-fair crash-multiplier game (see aviatorService.ts).
+// Shared rounds like ColorGame, but continuous rather than slotted: each
+// round chains directly off the previous one's endTime. crashMultiplier is
+// deterministic from serverSeed the moment the round is created (commit-
+// reveal, same as ColorGameRound), but is only exposed by the API once the
+// round has actually reached it (now >= crashTime) — until then, nobody,
+// including the server operator, can act on it early.
+model AviatorRound {
+  id               String       @id @default(uuid())
+  periodNumber     String       @unique
+  bettingStartTime DateTime
+  flyStartTime     DateTime
+  crashTime        DateTime
+  endTime          DateTime
+  crashMultiplier  Decimal      @db.Decimal(10, 2)
+  serverSeed       String
+  serverSeedHash   String
+  settled          Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  bets             AviatorBet[]
+
+  @@index([bettingStartTime])
+}
+
+model AviatorBet {
+  id                String       @id @default(uuid())
+  roundId           String
+  round             AviatorRound @relation(fields: [roundId], references: [id])
+  userId            String
+  user              User         @relation(fields: [userId], references: [id])
+  amount            Decimal      @db.Decimal(12, 2)
+  autoCashoutAt     Decimal?     @db.Decimal(10, 2)
+  cashoutMultiplier Decimal?     @db.Decimal(10, 2)
+  status            BetStatus    @default(PENDING)
+  payout            Decimal      @db.Decimal(12, 2) @default(0)
+  createdAt         DateTime     @default(now())
 
   @@index([userId])
   @@index([roundId])

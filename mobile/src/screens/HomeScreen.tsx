@@ -60,10 +60,13 @@ export default function HomeScreen() {
   const panelWidth = panelHeight * CONTROL_PANEL_ASPECT;
   const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
   const gameGridTop = panelTop + panelHeight + screenHeight * (GAME_GRID_GAP_BELOW_PANEL / REFERENCE_HEIGHT) - 50;
-  // Win Go is grid cell {row: 0, col: 0}; a later icon at, say, {row: 0, col: 1}
-  // would sit at left: GAME_GRID_LEFT + 1 * GAME_GRID_CELL, same top.
+  // Win Go is grid cell {row: 0, col: 0}, Aviator is {row: 0, col: 1} —
+  // a later icon at {row: 0, col: 2} would sit at
+  // left: GAME_GRID_LEFT + 2 * GAME_GRID_CELL, same top.
   const winGoTileTop = gameGridTop;
   const winGoTileLeft = GAME_GRID_LEFT;
+  const aviatorTileTop = gameGridTop;
+  const aviatorTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -175,6 +178,23 @@ export default function HomeScreen() {
       >
         <Image
           source={require('../../assets/wingo-home-icon.png')}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
+        />
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Aviator')}
+        style={{
+          position: 'absolute',
+          top: aviatorTileTop,
+          left: aviatorTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          overflow: 'hidden',
+        }}
+      >
+        <Image
+          source={require('../../assets/aviator-home-icon.png')}
           style={{ width: '100%', height: '100%' }}
           resizeMode="contain"
         />
