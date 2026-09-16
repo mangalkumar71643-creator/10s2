@@ -154,12 +154,12 @@ function tab1IconImageStyle(scale: number) {
 const HOWTOPLAY_BOX: Box = { left: 18, top: 733, width: 326, height: 204 };
 const COUNTDOWN_BOX: Box = { left: 342, top: 800, width: 323, height: 60 };
 // Decorative bookmark card under "Time remaining" / the countdown value,
-// centered under COUNTDOWN_BOX, sized 100x120 per user request.
+// centered under COUNTDOWN_BOX, sized 70x80 per user request.
 const TICKET_BOOKMARK_BOX: Box = {
-  left: COUNTDOWN_BOX.left + COUNTDOWN_BOX.width / 2 - 50,
-  top: 860,
-  width: 100,
-  height: 120,
+  left: COUNTDOWN_BOX.left + COUNTDOWN_BOX.width / 2 - 35,
+  top: 857,
+  width: 70,
+  height: 80,
 };
 
 // Green / Violet / Red category buttons.
