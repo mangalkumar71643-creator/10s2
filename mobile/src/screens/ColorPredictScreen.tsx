@@ -224,7 +224,7 @@ const CHART_TAB_SELECTED_BOX: Box = { left: CHART_TAB_BOX.left + 4, top: HISTORY
 // (below the tab row at y=205, down to the same table bottom at 1980).
 const CHART_AREA_TOP = HISTORY_TAB_Y + HISTORY_TAB_H + 5;
 const CHART_AREA_BOTTOM = TABLE_ROW_BOTTOM;
-const CHART_ROAD_TOP = CHART_AREA_TOP + 15;
+const CHART_ROAD_TOP = CHART_AREA_TOP + 95;
 // Same row density as the main history table, for visual consistency.
 const CHART_ROWS_PER_PAGE = 10;
 const CHART_ROW_HEIGHT = (CHART_AREA_BOTTOM - CHART_ROAD_TOP) / CHART_ROWS_PER_PAGE;
