@@ -204,7 +204,11 @@ const TAB_UNSELECTED_BG = 'rgb(231,231,231)';
 // into the one above it (row 1 into the header itself).
 const TABLE_ROW_TOP = 443;
 const TABLE_ROW_BOTTOM = 1980;
-const TABLE_ROWS_PER_PAGE = 10;
+// The background image has faint but real divider lines baked in at
+// y≈609,780,952,1123,1294,1466,1637,1808,1979 — a fixed 9-row grid.
+// TABLE_ROWS_PER_PAGE must match that exactly, or row content stops
+// landing between the printed lines and instead straddles them.
+const TABLE_ROWS_PER_PAGE = 9;
 const TABLE_ROW_HEIGHT = (TABLE_ROW_BOTTOM - TABLE_ROW_TOP) / TABLE_ROWS_PER_PAGE;
 // Header text cluster centers, detected directly from the white "Period /
 // Number / Big Small / Color" pixels — the earlier values were measured
