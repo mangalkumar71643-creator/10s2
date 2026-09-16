@@ -7,7 +7,6 @@ import { AVATARS } from '../data/avatars';
 import { BottomTabParamList } from '../navigation/types';
 import { useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
-import { colors, radius, shadow } from '../theme';
 
 const TOP_BAR_HEIGHT = 69;
 
@@ -167,11 +166,7 @@ export default function HomeScreen() {
           left: (screenWidth - winGoTileWidth) / 2,
           width: winGoTileWidth,
           height: winGoTileHeight,
-          borderRadius: radius.lg,
-          borderWidth: 2,
-          borderColor: colors.gold,
           overflow: 'hidden',
-          ...shadow.glow,
         }}
       >
         <Image
