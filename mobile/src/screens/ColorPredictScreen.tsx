@@ -208,6 +208,18 @@ const BIGSMALL_H = 69;
 const BIG_BOX: Box = { left: 62, top: BIGSMALL_Y, width: 279, height: BIGSMALL_H };
 const SMALL_BOX: Box = { left: 341, top: BIGSMALL_Y, width: 278, height: BIGSMALL_H };
 
+// Betting-locked state: in the last few seconds before a round settles, the
+// whole betting area (category buttons through Big/Small) grays out and
+// stops responding to taps, with a big two-digit countdown over it — a
+// plain (non-pointerEvents-none) View here is what blocks the taps, since
+// it renders on top of every Pressable in that area in z-order.
+const LOCK_OVERLAY_BOX: Box = { left: 0, top: GREEN_BOX.top, width: TOP_REF_WIDTH, height: BIGSMALL_Y + BIGSMALL_H - GREEN_BOX.top };
+const LOCK_DIGIT_CARD_W = 170;
+const LOCK_DIGIT_CARD_H = 250;
+const LOCK_DIGIT_GAP = 16;
+const LOCK_DIGIT_TOP = 1119;
+const LOCK_DIGIT_LEFT = (TOP_REF_WIDTH - (LOCK_DIGIT_CARD_W * 2 + LOCK_DIGIT_GAP)) / 2;
+
 // ---- BOTTOM image hotspots (1595x2636, already cropped) ----------------
 
 // Re-measured from the actual button color edges (previous values were
@@ -713,6 +725,29 @@ export default function ColorPredictScreen() {
               style={[boxStyle(selection.betValue === 'BIG' ? BIG_BOX : SMALL_BOX, scaleTop), styles.selectionOutlineRect]}
             />
           ) : null}
+
+          {/* Betting locked in the closing seconds — gray out and block
+              taps on the whole betting area, with a big countdown. */}
+          {locked && round ? (
+            <>
+              <View style={[boxStyle(LOCK_OVERLAY_BOX, scaleTop), styles.lockOverlay]} />
+              {String(Math.max(0, round.timeRemainingSeconds)).padStart(2, '0').split('').map((digit, i) => (
+                <View
+                  key={i}
+                  pointerEvents="none"
+                  style={[
+                    boxStyle(
+                      { left: LOCK_DIGIT_LEFT + i * (LOCK_DIGIT_CARD_W + LOCK_DIGIT_GAP), top: LOCK_DIGIT_TOP, width: LOCK_DIGIT_CARD_W, height: LOCK_DIGIT_CARD_H },
+                      scaleTop
+                    ),
+                    styles.lockDigitCard,
+                  ]}
+                >
+                  <Text style={[styles.lockDigitText, { fontSize: scaleTop * 160 }]}>{digit}</Text>
+                </View>
+              ))}
+            </>
+          ) : null}
         </View>
 
         {/* ---------------- BOTTOM IMAGE ---------------- */}
@@ -1076,6 +1111,21 @@ const styles = StyleSheet.create({
   selectionOutlineCircle: {
     borderWidth: 4,
     borderColor: '#F0B93D',
+  },
+  lockOverlay: {
+    position: 'absolute',
+    backgroundColor: 'rgba(45,45,45,0.6)',
+  },
+  lockDigitCard: {
+    position: 'absolute',
+    backgroundColor: '#1C8A5C',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockDigitText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   tableCell: {
     position: 'absolute',
