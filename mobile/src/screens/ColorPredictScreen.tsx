@@ -569,7 +569,7 @@ export default function ColorPredictScreen() {
             {locked ? 'Locked' : round ? formatCountdown(round.timeRemainingSeconds) : '--:--'}
           </Text>
           <Image
-            source={require('../../assets/wingo-ticket-bookmark.jpg')}
+            source={require('../../assets/wingo-ticket-bookmark.png')}
             style={boxStyle(TICKET_BOOKMARK_BOX, scaleTop)}
           />
 
