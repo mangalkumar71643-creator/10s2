@@ -346,16 +346,31 @@ function primaryColorHexForNumber(n: number): string {
   return CATEGORY_HEX[colorsForNumber(n)[0]];
 }
 
-// Theme color for the bet-confirmation sheet — matches whichever option
-// was tapped, same as the reference site's per-selection colored sheet.
-function sheetColorFor(sel: NonNullable<Selection>): string {
-  if (sel.betType === 'COLOR') return CATEGORY_HEX[sel.betValue as 'GREEN' | 'RED' | 'VIOLET'];
-  if (sel.betType === 'SIZE') return sel.betValue === 'BIG' ? BADGE_BIG_COLOR : BADGE_SMALL_COLOR;
-  return primaryColorHexForNumber(Number(sel.betValue));
+// Theme color for a bet's selection — matches whichever option was
+// tapped/placed, reused for both the confirmation sheet and the my-bets
+// detail sheet (both just need betType/betValue).
+function betColorFor(bet: { betType: ColorGameBetType; betValue: string }): string {
+  if (bet.betType === 'COLOR') return CATEGORY_HEX[bet.betValue as 'GREEN' | 'RED' | 'VIOLET'];
+  if (bet.betType === 'SIZE') return bet.betValue === 'BIG' ? BADGE_BIG_COLOR : BADGE_SMALL_COLOR;
+  return primaryColorHexForNumber(Number(bet.betValue));
 }
 
 function selectLabelFor(sel: NonNullable<Selection>): string {
   return sel.betType === 'NUMBER' ? sel.betValue : sel.label.toLowerCase();
+}
+
+// "Number 2" / "Green" / "Big" — used in the my-bets detail sheet, where
+// there's no pre-built `.label` (only the raw betType/betValue persisted
+// with the bet).
+function betLabelFor(bet: { betType: ColorGameBetType; betValue: string }): string {
+  if (bet.betType === 'NUMBER') return `Number ${bet.betValue}`;
+  return bet.betValue.charAt(0) + bet.betValue.slice(1).toLowerCase();
+}
+
+function formatOrderTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 // Dot order for the "Color" column: violet always drawn last (the plain
@@ -397,7 +412,9 @@ export default function ColorPredictScreen() {
   const [placing, setPlacing] = useState(false);
   const [historyTab, setHistoryTab] = useState<HistoryTab>('game');
   const [page, setPage] = useState(0);
+  const [detailBet, setDetailBet] = useState<ColorGameMyBet | null>(null);
   const sheetAnim = useRef(new Animated.Value(0)).current;
+  const detailAnim = useRef(new Animated.Value(0)).current;
 
   const roundRef = useRef(round);
   roundRef.current = round;
@@ -524,6 +541,16 @@ export default function ColorPredictScreen() {
     Animated.timing(sheetAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setSelection(null));
   }
 
+  function openBetDetail(bet: ColorGameMyBet) {
+    setDetailBet(bet);
+    detailAnim.setValue(0);
+    Animated.timing(detailAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+  }
+
+  function closeBetDetail() {
+    Animated.timing(detailAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setDetailBet(null));
+  }
+
   async function confirmBet() {
     if (!selection || !round) return;
     if (config && (stake < config.minStake || stake > config.maxStake)) {
@@ -570,6 +597,7 @@ export default function ColorPredictScreen() {
         rightLabel:
           bet.status === 'PENDING' ? 'Pending' : bet.status === 'WON' ? `+₹${Number(bet.payout)}` : 'Lost',
         rightColor: bet.status === 'WON' ? '#1C8A5C' : bet.status === 'LOST' ? '#E24B3F' : '#7C9089',
+        bet,
       }));
     }
     return history.map((h) => ({
@@ -580,6 +608,7 @@ export default function ColorPredictScreen() {
       dots: h.resultNumber != null ? colorDotsForNumber(h.resultNumber) : null,
       rightLabel: undefined as string | undefined,
       rightColor: undefined as string | undefined,
+      bet: null as ColorGameMyBet | null,
     }));
   }, [historyTab, history, myBets]);
 
@@ -884,6 +913,12 @@ export default function ColorPredictScreen() {
             const numberCellHeight = NUMBER_FONT * 1.3;
             return (
               <React.Fragment key={row.key}>
+                {row.bet ? (
+                  <Pressable
+                    onPress={() => openBetDetail(row.bet!)}
+                    style={boxStyle({ left: 0, top: rowTop, width: 1595, height: TABLE_ROW_HEIGHT }, scaleBottom)}
+                  />
+                ) : null}
                 <Text
                   style={[
                     styles.tableCell,
@@ -1140,7 +1175,7 @@ export default function ColorPredictScreen() {
               },
             ]}
           >
-            <View style={[styles.sheetBanner, { backgroundColor: sheetColorFor(selection) }]}>
+            <View style={[styles.sheetBanner, { backgroundColor: betColorFor(selection) }]}>
               <Text style={styles.sheetBannerTitle}>WinGo {DURATION_LONG_LABEL[duration]}</Text>
             </View>
             <View style={styles.sheetSelectPill}>
@@ -1157,7 +1192,7 @@ export default function ColorPredictScreen() {
                     <Pressable
                       key={u}
                       onPress={() => setStakeUnit(u)}
-                      style={[styles.sheetChip, stakeUnit === u && { backgroundColor: sheetColorFor(selection) }]}
+                      style={[styles.sheetChip, stakeUnit === u && { backgroundColor: betColorFor(selection) }]}
                     >
                       <Text style={[styles.sheetChipText, stakeUnit === u && styles.sheetChipTextActive]}>{u}</Text>
                     </Pressable>
@@ -1170,7 +1205,7 @@ export default function ColorPredictScreen() {
                 <View style={styles.sheetStepper}>
                   <Pressable
                     onPress={() => setMultiplier((m) => Math.max(1, m - 1))}
-                    style={[styles.sheetStepBtn, { backgroundColor: sheetColorFor(selection) }]}
+                    style={[styles.sheetStepBtn, { backgroundColor: betColorFor(selection) }]}
                   >
                     <Text style={styles.sheetStepBtnText}>−</Text>
                   </Pressable>
@@ -1185,7 +1220,7 @@ export default function ColorPredictScreen() {
                   />
                   <Pressable
                     onPress={() => setMultiplier((m) => m + 1)}
-                    style={[styles.sheetStepBtn, { backgroundColor: sheetColorFor(selection) }]}
+                    style={[styles.sheetStepBtn, { backgroundColor: betColorFor(selection) }]}
                   >
                     <Text style={styles.sheetStepBtnText}>+</Text>
                   </Pressable>
@@ -1197,7 +1232,7 @@ export default function ColorPredictScreen() {
                   <Pressable
                     key={m}
                     onPress={() => setMultiplier(m)}
-                    style={[styles.sheetMultiplierChip, multiplier === m && { backgroundColor: sheetColorFor(selection) }]}
+                    style={[styles.sheetMultiplierChip, multiplier === m && { backgroundColor: betColorFor(selection) }]}
                   >
                     <Text style={[styles.sheetMultiplierChipText, multiplier === m && styles.sheetChipTextActive]}>X{m}</Text>
                   </Pressable>
@@ -1219,9 +1254,108 @@ export default function ColorPredictScreen() {
               <Pressable
                 onPress={confirmBet}
                 disabled={placing || locked}
-                style={[styles.sheetConfirmBtn, { backgroundColor: sheetColorFor(selection), opacity: placing || locked ? 0.6 : 1 }]}
+                style={[styles.sheetConfirmBtn, { backgroundColor: betColorFor(selection), opacity: placing || locked ? 0.6 : 1 }]}
               >
                 <Text style={styles.sheetConfirmText}>{placing ? 'Placing…' : `Total amount ₹${stake.toFixed(2)}`}</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </>
+      ) : null}
+
+      {detailBet ? (
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeBetDetail}>
+            <Animated.View style={[styles.sheetBackdrop, { opacity: detailAnim }]} />
+          </Pressable>
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                transform: [
+                  { translateY: detailAnim.interpolate({ inputRange: [0, 1], outputRange: [500, 0] }) },
+                ],
+              },
+            ]}
+          >
+            <View style={[styles.sheetBanner, { backgroundColor: betColorFor(detailBet) }]}>
+              <Text style={styles.sheetBannerTitle}>Bet details</Text>
+            </View>
+            <View style={styles.sheetSelectPill}>
+              <Text style={styles.sheetSelectText}>
+                Select   <Text style={{ fontWeight: '800' }}>{betLabelFor(detailBet)}</Text>
+              </Text>
+            </View>
+
+            <ScrollView style={styles.detailBody} contentContainerStyle={{ paddingBottom: 12 }}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Period</Text>
+                <Text style={styles.detailValue}>{detailBet.round.periodNumber}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Purchase amount</Text>
+                <Text style={styles.detailValue}>₹{Number(detailBet.amount)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Result</Text>
+                {detailBet.round.resultNumber == null ? (
+                  <Text style={styles.detailValue}>Pending</Text>
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={[styles.detailValue, { color: primaryColorHexForNumber(detailBet.round.resultNumber) }]}>
+                      {detailBet.round.resultNumber}
+                    </Text>
+                    {colorDotsForNumber(detailBet.round.resultNumber).map((c, i) => (
+                      <Text key={i} style={[styles.detailValue, { color: CATEGORY_HEX[c] }]}>
+                        {c.charAt(0) + c.slice(1).toLowerCase()}
+                      </Text>
+                    ))}
+                    <Text style={styles.detailValue}>{detailBet.round.resultSize}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Status</Text>
+                <Text
+                  style={[
+                    styles.detailValue,
+                    {
+                      color:
+                        detailBet.status === 'WON' ? '#1C8A5C' : detailBet.status === 'LOST' ? '#E24B3F' : '#7C9089',
+                      fontWeight: '800',
+                    },
+                  ]}
+                >
+                  {detailBet.status}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Win/lose</Text>
+                <Text
+                  style={[
+                    styles.detailValue,
+                    detailBet.status !== 'PENDING' && {
+                      color: detailBet.status === 'WON' ? '#1C8A5C' : '#E24B3F',
+                      fontWeight: '800',
+                    },
+                  ]}
+                >
+                  {detailBet.status === 'PENDING'
+                    ? 'Pending'
+                    : detailBet.status === 'WON'
+                    ? `+₹${Number(detailBet.payout)}`
+                    : `-₹${Number(detailBet.amount)}`}
+                </Text>
+              </View>
+              <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
+                <Text style={styles.detailLabel}>Order time</Text>
+                <Text style={styles.detailValue}>{formatOrderTime(detailBet.createdAt)}</Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.sheetFooter}>
+              <Pressable onPress={closeBetDetail} style={[styles.sheetConfirmBtn, { backgroundColor: betColorFor(detailBet) }]}>
+                <Text style={styles.sheetConfirmText}>Close</Text>
               </Pressable>
             </View>
           </Animated.View>
@@ -1391,4 +1525,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheetConfirmText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
+  detailBody: { paddingHorizontal: 20, paddingTop: 16, maxHeight: 360 },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EDF1EF',
+  },
+  detailLabel: { color: '#7C9089', fontSize: 14 },
+  detailValue: { color: '#1A2E23', fontSize: 14, fontWeight: '700' },
 });
