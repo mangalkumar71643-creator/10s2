@@ -212,6 +212,38 @@ const TABLE_ROW_HEIGHT = (TABLE_ROW_BOTTOM - TABLE_ROW_TOP) / TABLE_ROWS_PER_PAG
 // header.
 const TABLE_COL_CENTER = { period: 297, number: 704, bigSmall: 1015, color: 1360 };
 
+// "Chart" tab: unlike "Game history" (baked in as permanently selected),
+// this tab is baked in unselected (gray) by default, so it only needs a
+// real green asset swapped on TOP when picked — no white patch/unselect
+// artwork required.
+const CHART_TAB_SELECTED_BOX: Box = { left: CHART_TAB_BOX.left + 4, top: HISTORY_TAB_Y + 4, width: 464, height: 155 };
+
+// The chart tab has no baked layout to overlay — it's drawn entirely as
+// plain React elements over a white patch covering the table area, sized
+// to fit the same vertical span the normal table rows/header occupy
+// (below the tab row at y=205, down to the same table bottom at 1980).
+const CHART_AREA_TOP = HISTORY_TAB_Y + HISTORY_TAB_H + 5;
+const CHART_AREA_BOTTOM = TABLE_ROW_BOTTOM;
+const CHART_STATS_TITLE_H = 60;
+const CHART_STATS_ROW_H = 66;
+const CHART_STATS_ROWS = 5; // winning number + missing + avg missing + frequency + max consecutive
+const CHART_STATS_TOP = CHART_AREA_TOP;
+const CHART_STATS_BOTTOM = CHART_STATS_TOP + CHART_STATS_TITLE_H + CHART_STATS_ROWS * CHART_STATS_ROW_H;
+const CHART_ROAD_TOP = CHART_STATS_BOTTOM + 20;
+const CHART_ROWS_PER_PAGE = 7;
+const CHART_ROW_HEIGHT = (CHART_AREA_BOTTOM - CHART_ROAD_TOP) / CHART_ROWS_PER_PAGE;
+const CHART_PERIOD_BOX: Box = { left: 20, top: 0, width: 280, height: 0 };
+const CHART_CIRCLE_DIAMETER = 60;
+const CHART_COL_LEFT = 330;
+const CHART_COL_SPACING = 98;
+const CHART_COL_X = Array.from({ length: 10 }, (_, i) => CHART_COL_LEFT + i * CHART_COL_SPACING);
+const CHART_BADGE_LEFT = 1360;
+const CHART_BADGE_DIAMETER = 64;
+const CHART_LINE_THICKNESS = 4;
+const CHART_LINE_COLOR = '#E24B3F';
+const BADGE_BIG_COLOR = '#F0B93D';
+const BADGE_SMALL_COLOR = '#4A90D9';
+
 // Font sizes below are in the same 1595-wide reference-pixel space as every
 // other measurement on this image, so `* scaleBottom` grows them with the
 // image instead of shrinking them to a fraction of a real dp (that was the
@@ -262,7 +294,7 @@ function formatCountdown(totalSeconds: number): string {
 }
 
 type Selection = { betType: ColorGameBetType; betValue: string; label: string; multiplierLabel: string } | null;
-type HistoryTab = 'game' | 'my';
+type HistoryTab = 'game' | 'chart' | 'my';
 
 export default function ColorPredictScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -411,6 +443,42 @@ export default function ColorPredictScreen() {
 
   const totalPages = Math.max(1, Math.ceil(rows.length / TABLE_ROWS_PER_PAGE));
   const pageRows = rows.slice(page * TABLE_ROWS_PER_PAGE, page * TABLE_ROWS_PER_PAGE + TABLE_ROWS_PER_PAGE);
+
+  const chartTotalPages = Math.max(1, Math.ceil(rows.length / CHART_ROWS_PER_PAGE));
+  const chartPageRows = rows.slice(page * CHART_ROWS_PER_PAGE, page * CHART_ROWS_PER_PAGE + CHART_ROWS_PER_PAGE);
+
+  // Per-digit stats over the last 100 rounds (or fewer if not that many are
+  // available yet) — same idea as the reference site's "Statistic" block:
+  // how long since each number last hit, its average gap between hits, how
+  // often it's hit, and its longest back-to-back repeat streak.
+  const chartStats = useMemo(() => {
+    const window = history.slice(0, 100);
+    return Array.from({ length: 10 }, (_, digit) => {
+      const hitIndexes: number[] = [];
+      for (let i = 0; i < window.length; i++) {
+        if (window[i].resultNumber === digit) hitIndexes.push(i);
+      }
+      const frequency = hitIndexes.length;
+      const missing = frequency > 0 ? hitIndexes[0] : window.length;
+      let avgMissing = missing;
+      if (frequency >= 2) {
+        let gapSum = 0;
+        for (let i = 1; i < hitIndexes.length; i++) gapSum += hitIndexes[i] - hitIndexes[i - 1];
+        avgMissing = Math.round(gapSum / (hitIndexes.length - 1));
+      }
+      let maxConsecutive = 0;
+      let streak = 0;
+      for (let i = window.length - 1; i >= 0; i--) {
+        if (window[i].resultNumber === digit) {
+          streak += 1;
+          maxConsecutive = Math.max(maxConsecutive, streak);
+        } else {
+          streak = 0;
+        }
+      }
+      return { digit, missing, avgMissing, frequency, maxConsecutive };
+    });
+  }, [history]);
 
   const scaleBottom = width / 1595;
 
@@ -663,17 +731,24 @@ export default function ColorPredictScreen() {
             </View>
           ) : null}
           <Pressable style={boxStyle(GAME_TAB_BOX, scaleBottom)} onPress={() => setHistoryTab('game')} />
-          <Pressable
-            style={boxStyle(CHART_TAB_BOX, scaleBottom)}
-            onPress={() => Alert.alert('Chart', 'Chart view is coming soon.')}
-          />
+          <Pressable style={boxStyle(CHART_TAB_BOX, scaleBottom)} onPress={() => setHistoryTab('chart')} />
           <Pressable style={boxStyle(MY_TAB_BOX, scaleBottom)} onPress={() => setHistoryTab('my')} />
+          {/* "Chart" is baked in unselected (gray) by default — unlike "Game
+              history" it needs no unselect patch, just the real green
+              asset on top when it's the active tab. */}
+          {historyTab === 'chart' ? (
+            <Image
+              source={require('../../assets/wingo-history-chart-selected.jpg')}
+              resizeMode="stretch"
+              style={boxStyle(CHART_TAB_SELECTED_BOX, scaleBottom)}
+            />
+          ) : null}
           {historyTab === 'my' ? (
             <View pointerEvents="none" style={[boxStyle(MY_TAB_BOX, scaleBottom), styles.selectedHistoryTabHighlight]} />
           ) : null}
 
           {/* Table rows */}
-          {pageRows.map((row, i) => {
+          {historyTab !== 'chart' && pageRows.map((row, i) => {
             const rowTop = TABLE_ROW_TOP + i * TABLE_ROW_HEIGHT;
             const rowCenter = rowTop + TABLE_ROW_HEIGHT / 2;
             const numberCellHeight = NUMBER_FONT * 1.3;
@@ -802,13 +877,191 @@ export default function ColorPredictScreen() {
             );
           })}
 
+          {/* Chart tab — no baked layout for this exists in the source
+              image, so it's a plain white patch over the table area with
+              our own per-number stats grid and a period-by-period road map
+              (each round's winning number, connected round-to-round by a
+              red line), matching the reference site's "Chart" view. */}
+          {historyTab === 'chart' ? (
+            <>
+              <View
+                pointerEvents="none"
+                style={[
+                  boxStyle({ left: 0, top: CHART_AREA_TOP, width: 1595, height: CHART_AREA_BOTTOM - CHART_AREA_TOP }, scaleBottom),
+                  { backgroundColor: '#ffffff' },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.tableCell,
+                  { left: 20 * scaleBottom, top: (CHART_STATS_TOP + 12) * scaleBottom, width: 700 * scaleBottom, fontSize: 42 * scaleBottom, color: '#7C9089' },
+                ]}
+              >
+                Statistic (last 100 periods)
+              </Text>
+              {(
+                [
+                  { label: 'Winning number', kind: 'digits' as const },
+                  { label: 'Missing', key: 'missing' as const },
+                  { label: 'Avg missing', key: 'avgMissing' as const },
+                  { label: 'Frequency', key: 'frequency' as const },
+                  { label: 'Max consecutive', key: 'maxConsecutive' as const },
+                ]
+              ).map((statRow, rowIndex) => {
+                const rowTop = CHART_STATS_TOP + CHART_STATS_TITLE_H + rowIndex * CHART_STATS_ROW_H;
+                const rowCenter = rowTop + CHART_STATS_ROW_H / 2;
+                return (
+                  <React.Fragment key={statRow.label}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { left: 20 * scaleBottom, top: (rowCenter - 28) * scaleBottom, width: 300 * scaleBottom, fontSize: 46 * scaleBottom, color: '#3A4744' },
+                      ]}
+                    >
+                      {statRow.label}
+                    </Text>
+                    {chartStats.map((s) =>
+                      statRow.kind === 'digits' ? (
+                        <View
+                          key={s.digit}
+                          pointerEvents="none"
+                          style={[
+                            boxStyle(
+                              { left: CHART_COL_X[s.digit] - CHART_CIRCLE_DIAMETER / 2, top: rowCenter - CHART_CIRCLE_DIAMETER / 2, width: CHART_CIRCLE_DIAMETER, height: CHART_CIRCLE_DIAMETER },
+                              scaleBottom
+                            ),
+                            {
+                              borderRadius: (CHART_CIRCLE_DIAMETER * scaleBottom) / 2,
+                              borderWidth: 2,
+                              borderColor: primaryColorHexForNumber(s.digit),
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            },
+                          ]}
+                        >
+                          <Text style={{ fontSize: 34 * scaleBottom, fontWeight: '700', color: primaryColorHexForNumber(s.digit) }}>{s.digit}</Text>
+                        </View>
+                      ) : (
+                        <Text
+                          key={s.digit}
+                          style={[
+                            styles.tableCell,
+                            {
+                              left: (CHART_COL_X[s.digit] - CHART_COL_SPACING / 2) * scaleBottom,
+                              width: CHART_COL_SPACING * scaleBottom,
+                              top: (rowCenter - 28) * scaleBottom,
+                              fontSize: 40 * scaleBottom,
+                              textAlign: 'center',
+                              color: '#7C9089',
+                            },
+                          ]}
+                        >
+                          {s[statRow.key!]}
+                        </Text>
+                      )
+                    )}
+                  </React.Fragment>
+                );
+              })}
+
+              {/* Road map rows */}
+              {chartPageRows.map((row, i) => {
+                const rowTop = CHART_ROAD_TOP + i * CHART_ROW_HEIGHT;
+                const rowCenter = rowTop + CHART_ROW_HEIGHT / 2;
+                const nextRow = chartPageRows[i + 1];
+                return (
+                  <React.Fragment key={row.key}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        { left: CHART_PERIOD_BOX.left * scaleBottom, width: CHART_PERIOD_BOX.width * scaleBottom, top: (rowCenter - 24) * scaleBottom, fontSize: 38 * scaleBottom },
+                      ]}
+                    >
+                      {row.period.slice(-8)}
+                    </Text>
+                    {Array.from({ length: 10 }, (_, digit) => {
+                      const hit = row.number === digit;
+                      const color = primaryColorHexForNumber(digit);
+                      return (
+                        <View
+                          key={digit}
+                          pointerEvents="none"
+                          style={[
+                            boxStyle(
+                              { left: CHART_COL_X[digit] - CHART_CIRCLE_DIAMETER / 2, top: rowCenter - CHART_CIRCLE_DIAMETER / 2, width: CHART_CIRCLE_DIAMETER, height: CHART_CIRCLE_DIAMETER },
+                              scaleBottom
+                            ),
+                            {
+                              borderRadius: (CHART_CIRCLE_DIAMETER * scaleBottom) / 2,
+                              backgroundColor: hit ? color : 'transparent',
+                              borderWidth: hit ? 0 : 1.5,
+                              borderColor: '#D8DEDB',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            },
+                          ]}
+                        >
+                          <Text style={{ fontSize: 32 * scaleBottom, fontWeight: '700', color: hit ? '#FFFFFF' : '#C7CDCA' }}>{digit}</Text>
+                        </View>
+                      );
+                    })}
+                    {row.number != null && nextRow?.number != null
+                      ? (() => {
+                          const x1 = CHART_COL_X[row.number!];
+                          const x2 = CHART_COL_X[nextRow.number!];
+                          const y1 = rowCenter;
+                          const y2 = rowCenter + CHART_ROW_HEIGHT;
+                          const dx = x2 - x1;
+                          const dy = y2 - y1;
+                          const length = Math.sqrt(dx * dx + dy * dy);
+                          const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                          return (
+                            <View
+                              pointerEvents="none"
+                              style={[
+                                boxStyle({ left: x1, top: y1, width: length, height: CHART_LINE_THICKNESS }, scaleBottom),
+                                {
+                                  backgroundColor: CHART_LINE_COLOR,
+                                  transform: [{ rotate: `${angle}deg` }],
+                                  transformOrigin: '0% 50%',
+                                },
+                              ]}
+                            />
+                          );
+                        })()
+                      : null}
+                    {row.size ? (
+                      <View
+                        pointerEvents="none"
+                        style={[
+                          boxStyle(
+                            { left: CHART_BADGE_LEFT, top: rowCenter - CHART_BADGE_DIAMETER / 2, width: CHART_BADGE_DIAMETER, height: CHART_BADGE_DIAMETER },
+                            scaleBottom
+                          ),
+                          {
+                            borderRadius: (CHART_BADGE_DIAMETER * scaleBottom) / 2,
+                            backgroundColor: row.size === 'BIG' ? BADGE_BIG_COLOR : BADGE_SMALL_COLOR,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 32 * scaleBottom, fontWeight: '700', color: '#FFFFFF' }}>{row.size === 'BIG' ? 'B' : 'S'}</Text>
+                      </View>
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
+            </>
+          ) : null}
+
           <Pressable
             style={boxStyle(PAGE_LEFT_BOX, scaleBottom)}
             onPress={() => setPage((p) => Math.max(0, p - 1))}
           />
           <Pressable
             style={boxStyle(PAGE_RIGHT_BOX, scaleBottom)}
-            onPress={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            onPress={() => setPage((p) => Math.min((historyTab === 'chart' ? chartTotalPages : totalPages) - 1, p + 1))}
           />
         </View>
       </ScrollView>
