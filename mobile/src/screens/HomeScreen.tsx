@@ -41,11 +41,10 @@ const PANEL_HEIGHT = 408;
 // the red control-panel graphic's bottom edge to the top of its "Crash" game
 // tile — reused here so our tile sits the same distance below our own panel.
 const WIN_GO_GAP_BELOW_PANEL = 250;
-// Per user request: a fixed 200x350 portrait card (the old wide banner
-// "didn't look right"), not scaled off screen width like the rest of this
-// screen's elements.
-const WIN_GO_TILE_WIDTH = 200;
-const WIN_GO_TILE_HEIGHT = 350;
+// Per user request: a fixed 150x200 portrait card, not scaled off screen
+// width like the rest of this screen's elements.
+const WIN_GO_TILE_WIDTH = 150;
+const WIN_GO_TILE_HEIGHT = 200;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
