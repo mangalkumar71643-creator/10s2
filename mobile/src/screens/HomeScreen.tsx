@@ -41,10 +41,10 @@ const PANEL_HEIGHT = 408;
 // the red control-panel graphic's bottom edge to the top of its "Crash" game
 // tile — reused here so our tile sits the same distance below our own panel.
 const WIN_GO_GAP_BELOW_PANEL = 250;
-// Per user request: a fixed 150x200 portrait card, not scaled off screen
+// Per user request: a fixed 150x150 square icon, not scaled off screen
 // width like the rest of this screen's elements.
 const WIN_GO_TILE_WIDTH = 150;
-const WIN_GO_TILE_HEIGHT = 200;
+const WIN_GO_TILE_HEIGHT = 150;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
@@ -173,7 +173,7 @@ export default function HomeScreen() {
         }}
       >
         <Image
-          source={require('../../assets/lottery-wingo-tile.jpg')}
+          source={require('../../assets/wingo-home-icon.jpg')}
           style={{ width: '100%', height: '100%' }}
           resizeMode="cover"
         />
