@@ -224,13 +224,9 @@ const CHART_TAB_SELECTED_BOX: Box = { left: CHART_TAB_BOX.left + 4, top: HISTORY
 // (below the tab row at y=205, down to the same table bottom at 1980).
 const CHART_AREA_TOP = HISTORY_TAB_Y + HISTORY_TAB_H + 5;
 const CHART_AREA_BOTTOM = TABLE_ROW_BOTTOM;
-const CHART_STATS_TITLE_H = 60;
-const CHART_STATS_ROW_H = 66;
-const CHART_STATS_ROWS = 5; // winning number + missing + avg missing + frequency + max consecutive
-const CHART_STATS_TOP = CHART_AREA_TOP;
-const CHART_STATS_BOTTOM = CHART_STATS_TOP + CHART_STATS_TITLE_H + CHART_STATS_ROWS * CHART_STATS_ROW_H;
-const CHART_ROAD_TOP = CHART_STATS_BOTTOM + 20;
-const CHART_ROWS_PER_PAGE = 7;
+const CHART_ROAD_TOP = CHART_AREA_TOP + 15;
+// Same row density as the main history table, for visual consistency.
+const CHART_ROWS_PER_PAGE = 10;
 const CHART_ROW_HEIGHT = (CHART_AREA_BOTTOM - CHART_ROAD_TOP) / CHART_ROWS_PER_PAGE;
 const CHART_PERIOD_BOX: Box = { left: 20, top: 0, width: 280, height: 0 };
 const CHART_CIRCLE_DIAMETER = 60;
@@ -446,39 +442,6 @@ export default function ColorPredictScreen() {
 
   const chartTotalPages = Math.max(1, Math.ceil(rows.length / CHART_ROWS_PER_PAGE));
   const chartPageRows = rows.slice(page * CHART_ROWS_PER_PAGE, page * CHART_ROWS_PER_PAGE + CHART_ROWS_PER_PAGE);
-
-  // Per-digit stats over the last 100 rounds (or fewer if not that many are
-  // available yet) — same idea as the reference site's "Statistic" block:
-  // how long since each number last hit, its average gap between hits, how
-  // often it's hit, and its longest back-to-back repeat streak.
-  const chartStats = useMemo(() => {
-    const window = history.slice(0, 100);
-    return Array.from({ length: 10 }, (_, digit) => {
-      const hitIndexes: number[] = [];
-      for (let i = 0; i < window.length; i++) {
-        if (window[i].resultNumber === digit) hitIndexes.push(i);
-      }
-      const frequency = hitIndexes.length;
-      const missing = frequency > 0 ? hitIndexes[0] : window.length;
-      let avgMissing = missing;
-      if (frequency >= 2) {
-        let gapSum = 0;
-        for (let i = 1; i < hitIndexes.length; i++) gapSum += hitIndexes[i] - hitIndexes[i - 1];
-        avgMissing = Math.round(gapSum / (hitIndexes.length - 1));
-      }
-      let maxConsecutive = 0;
-      let streak = 0;
-      for (let i = window.length - 1; i >= 0; i--) {
-        if (window[i].resultNumber === digit) {
-          streak += 1;
-          maxConsecutive = Math.max(maxConsecutive, streak);
-        } else {
-          streak = 0;
-        }
-      }
-      return { digit, missing, avgMissing, frequency, maxConsecutive };
-    });
-  }, [history]);
 
   const scaleBottom = width / 1595;
 
@@ -879,9 +842,8 @@ export default function ColorPredictScreen() {
 
           {/* Chart tab — no baked layout for this exists in the source
               image, so it's a plain white patch over the table area with
-              our own per-number stats grid and a period-by-period road map
-              (each round's winning number, connected round-to-round by a
-              red line), matching the reference site's "Chart" view. */}
+              a period-by-period road map (each round's winning number,
+              connected round-to-round by a red line). */}
           {historyTab === 'chart' ? (
             <>
               <View
@@ -891,78 +853,6 @@ export default function ColorPredictScreen() {
                   { backgroundColor: '#ffffff' },
                 ]}
               />
-              <Text
-                style={[
-                  styles.tableCell,
-                  { left: 20 * scaleBottom, top: (CHART_STATS_TOP + 12) * scaleBottom, width: 700 * scaleBottom, fontSize: 42 * scaleBottom, color: '#7C9089' },
-                ]}
-              >
-                Statistic (last 100 periods)
-              </Text>
-              {(
-                [
-                  { label: 'Winning number', kind: 'digits' as const },
-                  { label: 'Missing', key: 'missing' as const },
-                  { label: 'Avg missing', key: 'avgMissing' as const },
-                  { label: 'Frequency', key: 'frequency' as const },
-                  { label: 'Max consecutive', key: 'maxConsecutive' as const },
-                ]
-              ).map((statRow, rowIndex) => {
-                const rowTop = CHART_STATS_TOP + CHART_STATS_TITLE_H + rowIndex * CHART_STATS_ROW_H;
-                const rowCenter = rowTop + CHART_STATS_ROW_H / 2;
-                return (
-                  <React.Fragment key={statRow.label}>
-                    <Text
-                      style={[
-                        styles.tableCell,
-                        { left: 20 * scaleBottom, top: (rowCenter - 28) * scaleBottom, width: 300 * scaleBottom, fontSize: 46 * scaleBottom, color: '#3A4744' },
-                      ]}
-                    >
-                      {statRow.label}
-                    </Text>
-                    {chartStats.map((s) =>
-                      statRow.kind === 'digits' ? (
-                        <View
-                          key={s.digit}
-                          pointerEvents="none"
-                          style={[
-                            boxStyle(
-                              { left: CHART_COL_X[s.digit] - CHART_CIRCLE_DIAMETER / 2, top: rowCenter - CHART_CIRCLE_DIAMETER / 2, width: CHART_CIRCLE_DIAMETER, height: CHART_CIRCLE_DIAMETER },
-                              scaleBottom
-                            ),
-                            {
-                              borderRadius: (CHART_CIRCLE_DIAMETER * scaleBottom) / 2,
-                              borderWidth: 2,
-                              borderColor: primaryColorHexForNumber(s.digit),
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            },
-                          ]}
-                        >
-                          <Text style={{ fontSize: 34 * scaleBottom, fontWeight: '700', color: primaryColorHexForNumber(s.digit) }}>{s.digit}</Text>
-                        </View>
-                      ) : (
-                        <Text
-                          key={s.digit}
-                          style={[
-                            styles.tableCell,
-                            {
-                              left: (CHART_COL_X[s.digit] - CHART_COL_SPACING / 2) * scaleBottom,
-                              width: CHART_COL_SPACING * scaleBottom,
-                              top: (rowCenter - 28) * scaleBottom,
-                              fontSize: 40 * scaleBottom,
-                              textAlign: 'center',
-                              color: '#7C9089',
-                            },
-                          ]}
-                        >
-                          {s[statRow.key!]}
-                        </Text>
-                      )
-                    )}
-                  </React.Fragment>
-                );
-              })}
 
               {/* Road map rows */}
               {chartPageRows.map((row, i) => {
