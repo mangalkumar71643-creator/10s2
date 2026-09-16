@@ -3,7 +3,19 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  Alert,
+  Animated,
+  AppState,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { ApiClientError } from '../api/client';
 import {
   ColorGameBetType,
@@ -205,6 +217,16 @@ const MULTIPLIER_VALUES = [1, 5, 10, 20, 50, 100] as const;
 const MULTIPLIER_Y = 1346;
 const MULTIPLIER_H = 72;
 const DEFAULT_MULTIPLIER_HIGHLIGHT: Box = { left: 188, top: 1346, width: 70, height: 72 };
+
+// Bet-confirmation bottom sheet.
+const STAKE_UNIT_VALUES = [1, 10, 100, 1000] as const;
+const DURATION_LONG_LABEL: Record<ColorGameDuration, string> = {
+  30: '30 second',
+  60: '1 minute',
+  180: '3 minute',
+  300: '5 minute',
+  600: '10 minute',
+};
 const CHIP_BG = 'rgb(240,240,240)';
 
 // Big / Small split bar.
@@ -324,6 +346,18 @@ function primaryColorHexForNumber(n: number): string {
   return CATEGORY_HEX[colorsForNumber(n)[0]];
 }
 
+// Theme color for the bet-confirmation sheet — matches whichever option
+// was tapped, same as the reference site's per-selection colored sheet.
+function sheetColorFor(sel: NonNullable<Selection>): string {
+  if (sel.betType === 'COLOR') return CATEGORY_HEX[sel.betValue as 'GREEN' | 'RED' | 'VIOLET'];
+  if (sel.betType === 'SIZE') return sel.betValue === 'BIG' ? BADGE_BIG_COLOR : BADGE_SMALL_COLOR;
+  return primaryColorHexForNumber(Number(sel.betValue));
+}
+
+function selectLabelFor(sel: NonNullable<Selection>): string {
+  return sel.betType === 'NUMBER' ? sel.betValue : sel.label.toLowerCase();
+}
+
 // Dot order for the "Color" column: violet always drawn last (the plain
 // green/red dot leads for the mixed 0 and 5 rows) — matches how the
 // reference table lays these out.
@@ -358,10 +392,12 @@ export default function ColorPredictScreen() {
   const [history, setHistory] = useState<ColorGameHistoryEntry[]>([]);
   const [myBets, setMyBets] = useState<ColorGameMyBet[]>([]);
   const [selection, setSelection] = useState<Selection>(null);
-  const [multiplier, setMultiplier] = useState<(typeof MULTIPLIER_VALUES)[number]>(1);
+  const [multiplier, setMultiplier] = useState(1);
+  const [stakeUnit, setStakeUnit] = useState<(typeof STAKE_UNIT_VALUES)[number]>(STAKE_UNIT_VALUES[0]);
   const [placing, setPlacing] = useState(false);
   const [historyTab, setHistoryTab] = useState<HistoryTab>('game');
   const [page, setPage] = useState(0);
+  const sheetAnim = useRef(new Animated.Value(0)).current;
 
   const roundRef = useRef(round);
   roundRef.current = round;
@@ -467,12 +503,25 @@ export default function ColorPredictScreen() {
   }, [resync]);
 
   const locked = round?.locked ?? true;
-  const baseUnit = config?.minStake ?? 5;
-  const stake = baseUnit * multiplier;
+  const stake = stakeUnit * multiplier;
 
   function pickRandomNumber() {
     const n = Math.floor(Math.random() * 10);
     setSelection({ betType: 'NUMBER', betValue: String(n), label: `Number ${n}`, multiplierLabel: `${config?.payouts.number ?? 9}X` });
+  }
+
+  // Slides the bet sheet up whenever a new option is tapped (even while
+  // already open on a different one), and back down before actually
+  // clearing the selection so it never just vanishes.
+  useEffect(() => {
+    if (selection) {
+      sheetAnim.setValue(0);
+      Animated.timing(sheetAnim, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    }
+  }, [selection, sheetAnim]);
+
+  function closeSheet() {
+    Animated.timing(sheetAnim, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => setSelection(null));
   }
 
   async function confirmBet() {
@@ -490,7 +539,7 @@ export default function ColorPredictScreen() {
       await placeColorGameBet(duration, selection.betType, selection.betValue, stake);
       await Promise.all([refreshWallet(), loadMyBets()]);
       Alert.alert('Bet placed', `₹${stake} on ${selection.label} — good luck!`);
-      setSelection(null);
+      closeSheet();
     } catch (err) {
       Alert.alert('Bet failed', err instanceof ApiClientError ? err.message : 'Please try again.');
     } finally {
@@ -507,7 +556,7 @@ export default function ColorPredictScreen() {
   }
 
   const durationTabIndex = DURATION_ORDER.indexOf(duration);
-  const multiplierIndex = MULTIPLIER_VALUES.indexOf(multiplier);
+  const multiplierIndex = (MULTIPLIER_VALUES as readonly number[]).indexOf(multiplier);
   const recentResults = Array.from({ length: 5 }, (_, i) => history[i]?.resultNumber ?? null);
 
   const rows = useMemo(() => {
@@ -720,7 +769,7 @@ export default function ColorPredictScreen() {
           {/* Same deal as the duration tab above — "X1" is baked in as
               permanently selected, so redraw its label when a different
               multiplier is chosen instead of just blanking it out. */}
-          {multiplierIndex !== 0 ? (
+          {multiplierIndex > 0 ? (
             <View
               pointerEvents="none"
               style={[
@@ -742,7 +791,7 @@ export default function ColorPredictScreen() {
               />
             );
           })}
-          {multiplierIndex !== 0 ? (
+          {multiplierIndex > 0 ? (
             <View
               pointerEvents="none"
               style={[
@@ -1075,19 +1124,108 @@ export default function ColorPredictScreen() {
       </ScrollView>
 
       {selection ? (
-        <View style={styles.confirmBar}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.confirmLabel} numberOfLines={1}>
-              {selection.label} ({selection.multiplierLabel}) · x{multiplier} = ₹{stake}
-            </Text>
-          </View>
-          <Pressable onPress={() => setSelection(null)} style={styles.confirmCancel}>
-            <MaterialCommunityIcons name="close" size={18} color="#7C9089" />
+        <>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet}>
+            <Animated.View style={[styles.sheetBackdrop, { opacity: sheetAnim }]} />
           </Pressable>
-          <Pressable onPress={confirmBet} disabled={placing || locked} style={[styles.confirmButton, { opacity: placing || locked ? 0.5 : 1 }]}>
-            <Text style={styles.confirmButtonText}>{placing ? 'Placing…' : 'Place Bet'}</Text>
-          </Pressable>
-        </View>
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                transform: [
+                  {
+                    translateY: sheetAnim.interpolate({ inputRange: [0, 1], outputRange: [420, 0] }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={[styles.sheetBanner, { backgroundColor: sheetColorFor(selection) }]}>
+              <Text style={styles.sheetBannerTitle}>WinGo {DURATION_LONG_LABEL[duration]}</Text>
+            </View>
+            <View style={styles.sheetSelectPill}>
+              <Text style={styles.sheetSelectText}>
+                Select   <Text style={{ fontWeight: '800' }}>{selectLabelFor(selection)}</Text>
+              </Text>
+            </View>
+
+            <View style={styles.sheetBody}>
+              <View style={styles.sheetRow}>
+                <Text style={styles.sheetRowLabel}>Balance</Text>
+                <View style={styles.sheetChipRow}>
+                  {STAKE_UNIT_VALUES.map((u) => (
+                    <Pressable
+                      key={u}
+                      onPress={() => setStakeUnit(u)}
+                      style={[styles.sheetChip, stakeUnit === u && { backgroundColor: sheetColorFor(selection) }]}
+                    >
+                      <Text style={[styles.sheetChipText, stakeUnit === u && styles.sheetChipTextActive]}>{u}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.sheetRow}>
+                <Text style={styles.sheetRowLabel}>Quantity</Text>
+                <View style={styles.sheetStepper}>
+                  <Pressable
+                    onPress={() => setMultiplier((m) => Math.max(1, m - 1))}
+                    style={[styles.sheetStepBtn, { backgroundColor: sheetColorFor(selection) }]}
+                  >
+                    <Text style={styles.sheetStepBtnText}>−</Text>
+                  </Pressable>
+                  <TextInput
+                    value={String(multiplier)}
+                    onChangeText={(t) => {
+                      const n = parseInt(t.replace(/[^0-9]/g, ''), 10);
+                      setMultiplier(Number.isFinite(n) && n > 0 ? n : 1);
+                    }}
+                    keyboardType="number-pad"
+                    style={styles.sheetStepperInput}
+                  />
+                  <Pressable
+                    onPress={() => setMultiplier((m) => m + 1)}
+                    style={[styles.sheetStepBtn, { backgroundColor: sheetColorFor(selection) }]}
+                  >
+                    <Text style={styles.sheetStepBtnText}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.sheetMultiplierRow}>
+                {MULTIPLIER_VALUES.map((m) => (
+                  <Pressable
+                    key={m}
+                    onPress={() => setMultiplier(m)}
+                    style={[styles.sheetMultiplierChip, multiplier === m && { backgroundColor: sheetColorFor(selection) }]}
+                  >
+                    <Text style={[styles.sheetMultiplierChipText, multiplier === m && styles.sheetChipTextActive]}>X{m}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View style={styles.sheetAgreeRow}>
+                <MaterialCommunityIcons name="check-circle" size={20} color="#1C8A5C" />
+                <Text style={styles.sheetAgreeText}>
+                  I agree <Text style={styles.sheetAgreeLink}>《Pre-sale rules》</Text>
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.sheetFooter}>
+              <Pressable onPress={closeSheet} style={styles.sheetCancelBtn}>
+                <Text style={styles.sheetCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={confirmBet}
+                disabled={placing || locked}
+                style={[styles.sheetConfirmBtn, { backgroundColor: sheetColorFor(selection), opacity: placing || locked ? 0.6 : 1 }]}
+              >
+                <Text style={styles.sheetConfirmText}>{placing ? 'Placing…' : `Total amount ₹${stake.toFixed(2)}`}</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </>
       ) : null}
     </View>
   );
@@ -1161,18 +1299,96 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '800',
   },
-  confirmBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E1E7E4',
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  confirmLabel: { color: '#123524', fontSize: 13, fontWeight: '700' },
-  confirmCancel: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  confirmButton: { borderRadius: 14, backgroundColor: '#0F4D34', paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' },
-  confirmButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+  sheet: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  sheetBanner: {
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetBannerTitle: { color: '#FFFFFF', fontWeight: '800', fontSize: 20 },
+  sheetSelectPill: {
+    marginTop: -22,
+    marginHorizontal: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  sheetSelectText: { color: '#1A2E23', fontSize: 17, fontWeight: '600' },
+  sheetBody: { paddingHorizontal: 20, paddingTop: 20 },
+  sheetRow: { marginBottom: 18 },
+  sheetRowLabel: { color: '#1A2E23', fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  sheetChipRow: { flexDirection: 'row', gap: 10 },
+  sheetChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F0F2F1',
+    alignItems: 'center',
+  },
+  sheetChipText: { color: '#4C5D55', fontWeight: '700' },
+  sheetChipTextActive: { color: '#FFFFFF' },
+  sheetStepper: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  sheetStepBtn: { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sheetStepBtnText: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+  sheetStepperInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DCE3E0',
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A2E23',
+  },
+  sheetMultiplierRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  sheetMultiplierChip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#F0F2F1',
+    alignItems: 'center',
+  },
+  sheetMultiplierChipText: { color: '#4C5D55', fontWeight: '700', fontSize: 12 },
+  sheetAgreeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  sheetAgreeText: { color: '#1A2E23', fontSize: 13 },
+  sheetAgreeLink: { color: '#E24B3F' },
+  sheetFooter: { flexDirection: 'row' },
+  sheetCancelBtn: {
+    flex: 1,
+    paddingVertical: 18,
+    alignItems: 'center',
+    backgroundColor: '#1A2E23',
+  },
+  sheetCancelText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+  sheetConfirmBtn: {
+    flex: 2,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  sheetConfirmText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
 });
