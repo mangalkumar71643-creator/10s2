@@ -153,14 +153,17 @@ function tab1IconImageStyle(scale: number) {
 // Ticket bar (How to play / Time remaining).
 const HOWTOPLAY_BOX: Box = { left: 18, top: 733, width: 326, height: 204 };
 const COUNTDOWN_BOX: Box = { left: 342, top: 800, width: 323, height: 60 };
-// Decorative bookmark card under "Time remaining" / the countdown value,
-// centered under COUNTDOWN_BOX, sized 70x80 per user request.
-const TICKET_BOOKMARK_BOX: Box = {
-  left: COUNTDOWN_BOX.left + COUNTDOWN_BOX.width / 2 - 35,
-  top: 857,
-  width: 70,
-  height: 80,
-};
+
+// Recent-results strip under "How to play" (left half of the ticket): a
+// duration label plus the last 5 winning numbers as small colored balls —
+// matches the reference site's "WinGo 1 minute" + 5-ball row in the same
+// spot, built from real history data rather than a static image.
+const RECENT_LABEL_BOX: Box = { left: HOWTOPLAY_BOX.left + 10, top: 800, width: 300, height: 40 };
+const RECENT_BALL_DIAMETER = 48;
+const RECENT_BALL_GAP = 14;
+const RECENT_BALL_TOP = 848;
+const RECENT_BALL_LEFT = HOWTOPLAY_BOX.left + 10;
+const DURATION_LABEL: Record<ColorGameDuration, string> = { 60: '1Min', 30: '30S', 180: '3Min', 300: '5Min', 600: '10Min' };
 
 // Green / Violet / Red category buttons.
 const GREEN_BOX: Box = { left: 28, top: 983, width: 200, height: 64 };
@@ -425,6 +428,7 @@ export default function ColorPredictScreen() {
 
   const durationTabIndex = DURATION_ORDER.indexOf(duration);
   const multiplierIndex = MULTIPLIER_VALUES.indexOf(multiplier);
+  const recentResults = Array.from({ length: 5 }, (_, i) => history[i]?.resultNumber ?? null);
 
   const rows = useMemo(() => {
     if (historyTab === 'my') {
@@ -568,10 +572,30 @@ export default function ColorPredictScreen() {
           <Text style={[boxStyle(COUNTDOWN_BOX, scaleTop), styles.countdownText, { fontSize: scaleTop * 28 }]}>
             {locked ? 'Locked' : round ? formatCountdown(round.timeRemainingSeconds) : '--:--'}
           </Text>
-          <Image
-            source={require('../../assets/wingo-ticket-bookmark.png')}
-            style={boxStyle(TICKET_BOOKMARK_BOX, scaleTop)}
-          />
+          <Text style={[boxStyle(RECENT_LABEL_BOX, scaleTop), styles.recentLabelText, { fontSize: scaleTop * 26 }]}>
+            WinGo {DURATION_LABEL[duration]}
+          </Text>
+          {recentResults.map((n, i) => {
+            const left = RECENT_BALL_LEFT + i * (RECENT_BALL_DIAMETER + RECENT_BALL_GAP);
+            const box: Box = { left, top: RECENT_BALL_TOP, width: RECENT_BALL_DIAMETER, height: RECENT_BALL_DIAMETER };
+            return (
+              <View
+                key={i}
+                pointerEvents="none"
+                style={[
+                  boxStyle(box, scaleTop),
+                  {
+                    borderRadius: (RECENT_BALL_DIAMETER * scaleTop) / 2,
+                    backgroundColor: n == null ? '#D8DEDB' : primaryColorHexForNumber(n),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                ]}
+              >
+                {n != null ? <Text style={{ fontSize: scaleTop * 24, fontWeight: '700', color: '#FFFFFF' }}>{n}</Text> : null}
+              </View>
+            );
+          })}
 
           {/* Category buttons */}
           <Pressable
@@ -1013,6 +1037,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#FFFFFF',
     fontWeight: '800',
+  },
+  recentLabelText: {
+    position: 'absolute',
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   tab1IconClip: {
     overflow: 'hidden',
