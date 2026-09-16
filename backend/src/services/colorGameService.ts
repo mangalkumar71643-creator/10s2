@@ -80,13 +80,31 @@ export function validateBetValue(betType: ColorGameBetType, betValue: string) {
   }
 }
 
+/** IST (UTC+5:30) has no DST and no historical offset changes, so a fixed
+ * millisecond shift is exact — no timezone library needed. */
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+
+/** Period number = IST calendar date (YYMMDD) + that duration's 1-based
+ * round index within that IST day (000001-000480/.../002880), reset at
+ * every IST midnight. Always derived from `startTime`, which itself comes
+ * from the server's trusted clock via alignToBoundary/round-chaining —
+ * never from anything client-supplied — so this is deterministic and
+ * restart-safe: the same round always recomputes the same period number,
+ * and createNextRound's unique-constraint fallback (below) guarantees it
+ * is never generated twice even under concurrent requests. IST midnight
+ * (66,600s past UTC midnight) divides evenly by every entry in
+ * COLOR_GAME_DURATIONS, so this is just a display/identity relabeling —
+ * it changes no round's actual startTime/endTime and has no bearing on
+ * resultNumber (settleRound derives that from serverSeed + periodNumber
+ * as an opaque salt, not from its numeric value). */
 function periodNumberFor(durationSeconds: number, startTime: Date): string {
-  const y = startTime.getUTCFullYear();
-  const m = String(startTime.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(startTime.getUTCDate()).padStart(2, "0");
-  const secondsSinceMidnightUtc = startTime.getUTCHours() * 3600 + startTime.getUTCMinutes() * 60 + startTime.getUTCSeconds();
-  const index = Math.floor(secondsSinceMidnightUtc / durationSeconds);
-  return `${durationSeconds}-${y}${m}${d}-${String(index).padStart(5, "0")}`;
+  const ist = new Date(startTime.getTime() + IST_OFFSET_MS);
+  const y = String(ist.getUTCFullYear()).slice(-2);
+  const m = String(ist.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(ist.getUTCDate()).padStart(2, "0");
+  const secondsSinceIstMidnight = ist.getUTCHours() * 3600 + ist.getUTCMinutes() * 60 + ist.getUTCSeconds();
+  const roundNumber = Math.floor(secondsSinceIstMidnight / durationSeconds) + 1;
+  return `${y}${m}${d}${String(roundNumber).padStart(6, "0")}`;
 }
 
 function alignToBoundary(now: Date, durationSeconds: number): Date {
