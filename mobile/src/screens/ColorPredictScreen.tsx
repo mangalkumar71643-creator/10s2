@@ -217,6 +217,7 @@ const TABLE_COL_CENTER = { period: 297, number: 704, bigSmall: 1015, color: 1360
 // real green asset swapped on TOP when picked — no white patch/unselect
 // artwork required.
 const CHART_TAB_SELECTED_BOX: Box = { left: CHART_TAB_BOX.left + 4, top: HISTORY_TAB_Y + 4, width: 464, height: 155 };
+const MY_TAB_SELECTED_BOX: Box = { left: MY_TAB_BOX.left + 4, top: HISTORY_TAB_Y + 4, width: 464, height: 155 };
 
 // The chart tab has no baked layout to overlay — it's drawn entirely as
 // plain React elements over a white patch covering the table area, sized
@@ -706,8 +707,14 @@ export default function ColorPredictScreen() {
               style={boxStyle(CHART_TAB_SELECTED_BOX, scaleBottom)}
             />
           ) : null}
+          {/* Same deal for "My history" — baked in unselected by default,
+              real green asset swapped on top when it's the active tab. */}
           {historyTab === 'my' ? (
-            <View pointerEvents="none" style={[boxStyle(MY_TAB_BOX, scaleBottom), styles.selectedHistoryTabHighlight]} />
+            <Image
+              source={require('../../assets/wingo-history-my-selected.jpg')}
+              resizeMode="stretch"
+              style={boxStyle(MY_TAB_SELECTED_BOX, scaleBottom)}
+            />
           ) : null}
 
           {/* Table rows */}
@@ -1023,12 +1030,6 @@ const styles = StyleSheet.create({
   selectionOutlineCircle: {
     borderWidth: 4,
     borderColor: '#F0B93D',
-  },
-  selectedHistoryTabHighlight: {
-    borderWidth: 3,
-    borderColor: '#1C8A5C',
-    borderRadius: 14,
-    backgroundColor: 'rgba(28,138,92,0.12)',
   },
   tableCell: {
     position: 'absolute',
