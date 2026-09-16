@@ -204,7 +204,7 @@ const TAB_UNSELECTED_BG = 'rgb(231,231,231)';
 // into the one above it (row 1 into the header itself).
 const TABLE_ROW_TOP = 443;
 const TABLE_ROW_BOTTOM = 1980;
-const TABLE_ROWS_PER_PAGE = 9;
+const TABLE_ROWS_PER_PAGE = 10;
 const TABLE_ROW_HEIGHT = (TABLE_ROW_BOTTOM - TABLE_ROW_TOP) / TABLE_ROWS_PER_PAGE;
 // Header text cluster centers, detected directly from the white "Period /
 // Number / Big Small / Color" pixels — the earlier values were measured
