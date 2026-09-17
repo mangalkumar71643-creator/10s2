@@ -1,8 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useEffect, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Dimensions, Easing, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 
@@ -39,6 +39,77 @@ const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 const BET_PANEL_ASPECT = 572 / 688;
 const BET_PANEL_WIDTH = PANEL_WIDTH;
 const BET_PANEL_HEIGHT = BET_PANEL_WIDTH * BET_PANEL_ASPECT;
+
+// Plane icon's own aspect ratio, sized relative to the rays panel it flies
+// inside of.
+const PLANE_ASPECT = 215 / 441;
+const PLANE_WIDTH = PANEL_WIDTH * 0.24;
+const PLANE_HEIGHT = PLANE_WIDTH * PLANE_ASPECT;
+
+const ASCEND_DURATION = 4200;
+const FLYAWAY_PAUSE = 1400;
+
+function FlyingPlane() {
+  const progress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let cancelled = false;
+    const runCycle = () => {
+      progress.setValue(0);
+      Animated.timing(progress, {
+        toValue: 1,
+        duration: ASCEND_DURATION,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && !cancelled) {
+          setTimeout(runCycle, FLYAWAY_PAUSE);
+        }
+      });
+    };
+    runCycle();
+    return () => {
+      cancelled = true;
+    };
+  }, [progress]);
+
+  const translateX = progress.interpolate({
+    inputRange: [0, 0.8, 1],
+    outputRange: [PANEL_WIDTH * 0.05, PANEL_WIDTH * 0.62, PANEL_WIDTH * 1.05],
+  });
+  const translateY = progress.interpolate({
+    inputRange: [0, 0.4, 0.8, 1],
+    outputRange: [PANEL_HEIGHT * 0.72, PANEL_HEIGHT * 0.5, PANEL_HEIGHT * 0.32, -PANEL_HEIGHT * 0.4],
+  });
+  const rotate = progress.interpolate({
+    inputRange: [0, 0.8, 1],
+    outputRange: ['-6deg', '-16deg', '-42deg'],
+  });
+  const opacity = progress.interpolate({
+    inputRange: [0, 0.75, 0.95, 1],
+    outputRange: [1, 1, 0.5, 0],
+  });
+  const scale = progress.interpolate({
+    inputRange: [0, 0.8, 1],
+    outputRange: [1, 1, 1.15],
+  });
+
+  return (
+    <Animated.Image
+      source={require('../../assets/aviator-plane.png')}
+      resizeMode="contain"
+      style={[
+        styles.plane,
+        {
+          width: PLANE_WIDTH,
+          height: PLANE_HEIGHT,
+          opacity,
+          transform: [{ translateX }, { translateY }, { rotate }, { scale }],
+        },
+      ]}
+    />
+  );
+}
 
 function StakeStepper({
   layout,
@@ -118,6 +189,7 @@ export default function AviatorScreen() {
           style={{ width: PANEL_WIDTH, height: PANEL_HEIGHT }}
           resizeMode="contain"
         />
+        <FlyingPlane />
       </View>
 
       <View style={[styles.betPanelWrap, { width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }]}>
@@ -147,6 +219,11 @@ const styles = StyleSheet.create({
   panelWrap: {
     marginTop: 60,
     alignSelf: 'center',
+  },
+  plane: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
   betPanelWrap: {
     marginTop: 30,
