@@ -74,6 +74,28 @@ const planeRotate = (t: number) => interpolate(t, [0, 0.8, 1], [-6, -16, -42]);
 const planeOpacity = (t: number) => interpolate(t, [0, 0.75, 0.95, 1], [1, 1, 0.5, 0]);
 const planeScale = (t: number) => interpolate(t, [0, 0.8, 1], [1, 1, 1.15]);
 
+// Tail-fin tip in the source plane art (441x215px), used so the trail
+// always meets the plane at its tail instead of its geometric center.
+const TAIL_PX = { x: 12, y: 197 };
+const PLANE_CENTER_PX = { x: 441 / 2, y: 215 / 2 };
+
+// Screen-space point where the trail should end: the plane's tail tip,
+// rotated and scaled exactly like the rendered <Image> is at time t.
+function tailPoint(t: number) {
+  const scaleFactor = (PLANE_WIDTH / 441) * planeScale(t);
+  const localDx = TAIL_PX.x - PLANE_CENTER_PX.x;
+  const localDy = TAIL_PX.y - PLANE_CENTER_PX.y;
+  const rad = (planeRotate(t) * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const rx = (localDx * cos - localDy * sin) * scaleFactor;
+  const ry = (localDx * sin + localDy * cos) * scaleFactor;
+  return {
+    x: planeX(t) + PLANE_WIDTH / 2 + rx,
+    y: planeY(t) + PLANE_HEIGHT / 2 + ry,
+  };
+}
+
 function FlightTrail() {
   const [t, setT] = useState(0);
   const rafRef = useRef<number | null>(null);
@@ -107,12 +129,13 @@ function FlightTrail() {
     };
   }, []);
 
-  // Trail traces the plane's own anchor point (its bounding-box center) so
-  // the red line always meets the plane exactly, at every step so far.
+  // Trail traces the plane's tail tip (not its geometric center) so the
+  // red line always meets the plane exactly at its tail, at every step so
+  // far. The stroke itself is one fully-opaque solid path — only the glow
+  // fill beneath it fades, so the line never looks patchy.
   const points: { x: number; y: number }[] = [];
   for (let i = 0; i <= TRAIL_SAMPLES; i++) {
-    const st = (t * i) / TRAIL_SAMPLES;
-    points.push({ x: planeX(st) + PLANE_WIDTH / 2, y: planeY(st) + PLANE_HEIGHT / 2 });
+    points.push(tailPoint((t * i) / TRAIL_SAMPLES));
   }
   const lineD = points.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L ');
   const fillD = `M ${lineD} L ${points[points.length - 1].x.toFixed(1)} ${PANEL_HEIGHT} L ${points[0].x.toFixed(1)} ${PANEL_HEIGHT} Z`;
@@ -122,12 +145,20 @@ function FlightTrail() {
       <Svg width={PANEL_WIDTH} height={PANEL_HEIGHT} style={styles.trailSvg} pointerEvents="none">
         <Defs>
           <LinearGradient id="trailFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FF3B4E" stopOpacity={0.45} />
-            <Stop offset="1" stopColor="#C4172C" stopOpacity={0.04} />
+            <Stop offset="0" stopColor="#C4172C" stopOpacity={0.5} />
+            <Stop offset="1" stopColor="#C4172C" stopOpacity={0.05} />
           </LinearGradient>
         </Defs>
         <Path d={fillD} fill="url(#trailFill)" />
-        <Path d={`M ${lineD}`} stroke="#FF3B4E" strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <Path
+          d={`M ${lineD}`}
+          stroke="#E8102F"
+          strokeWidth={4}
+          strokeOpacity={1}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </Svg>
       <Image
         source={require('../../assets/aviator-plane.png')}
