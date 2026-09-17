@@ -47,8 +47,16 @@ const PLANE_ASPECT = 215 / 441;
 const PLANE_WIDTH = PANEL_WIDTH * 0.24;
 const PLANE_HEIGHT = PLANE_WIDTH * PLANE_ASPECT;
 
-const ASCEND_DURATION = 4200;
-const FLYAWAY_PAUSE = 1400;
+// Ascend time is randomized each round so the fly-away moment can't be
+// timed/predicted. The burst itself (t: 0.8 -> 1) is deliberately very
+// short — a sudden, fast dash off-screen rather than a smooth glide.
+const ASCEND_MS_MIN = 2600;
+const ASCEND_MS_MAX = 5200;
+const BURST_MS = 160;
+// How fast the red trail itself vanishes once the plane has flown away —
+// kept far shorter than the pause before the next round starts.
+const TRAIL_FADE_MS = 120;
+const ROUND_PAUSE_MS = 1000;
 const TRAIL_SAMPLES = 32;
 
 // Plain-JS interpolation (mirrors Animated.interpolate's multi-stop
@@ -96,11 +104,18 @@ function tailPoint(t: number) {
   };
 }
 
+function randomAscendMs() {
+  return ASCEND_MS_MIN + Math.random() * (ASCEND_MS_MAX - ASCEND_MS_MIN);
+}
+
 function FlightTrail() {
   const [t, setT] = useState(0);
+  const [trailFade, setTrailFade] = useState(1);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef(0);
-  const phaseRef = useRef<'flying' | 'paused'>('flying');
+  const fadeStartRef = useRef(0);
+  const ascendMsRef = useRef(randomAscendMs());
+  const phaseRef = useRef<'flying' | 'fading' | 'paused'>('flying');
 
   useEffect(() => {
     let mounted = true;
@@ -108,16 +123,30 @@ function FlightTrail() {
       if (!mounted) return;
       if (phaseRef.current === 'flying') {
         if (!startRef.current) startRef.current = now;
-        const nextT = Math.min(1, (now - startRef.current) / ASCEND_DURATION);
+        const elapsed = now - startRef.current;
+        const ascendMs = ascendMsRef.current;
+        const nextT =
+          elapsed <= ascendMs
+            ? 0.8 * (elapsed / ascendMs)
+            : 0.8 + 0.2 * Math.min(1, (elapsed - ascendMs) / BURST_MS);
         setT(nextT);
-        if (nextT >= 1) {
+        if (elapsed >= ascendMs + BURST_MS) {
+          phaseRef.current = 'fading';
+          fadeStartRef.current = now;
+        }
+      } else if (phaseRef.current === 'fading') {
+        const fadeElapsed = now - fadeStartRef.current;
+        setTrailFade(Math.max(0, 1 - fadeElapsed / TRAIL_FADE_MS));
+        if (fadeElapsed >= TRAIL_FADE_MS) {
           phaseRef.current = 'paused';
           setTimeout(() => {
             if (!mounted) return;
             startRef.current = 0;
-            phaseRef.current = 'flying';
+            ascendMsRef.current = randomAscendMs();
             setT(0);
-          }, FLYAWAY_PAUSE);
+            setTrailFade(1);
+            phaseRef.current = 'flying';
+          }, ROUND_PAUSE_MS);
         }
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -132,7 +161,8 @@ function FlightTrail() {
   // Trail traces the plane's tail tip (not its geometric center) so the
   // red line always meets the plane exactly at its tail, at every step so
   // far. The stroke itself is one fully-opaque solid path — only the glow
-  // fill beneath it fades, so the line never looks patchy.
+  // fill beneath it fades for the glow effect; trailFade is what makes the
+  // whole line vanish quickly once the plane has flown away.
   const points: { x: number; y: number }[] = [];
   for (let i = 0; i <= TRAIL_SAMPLES; i++) {
     points.push(tailPoint((t * i) / TRAIL_SAMPLES));
@@ -142,7 +172,7 @@ function FlightTrail() {
 
   return (
     <>
-      <Svg width={PANEL_WIDTH} height={PANEL_HEIGHT} style={styles.trailSvg} pointerEvents="none">
+      <Svg width={PANEL_WIDTH} height={PANEL_HEIGHT} style={[styles.trailSvg, { opacity: trailFade }]} pointerEvents="none">
         <Defs>
           <LinearGradient id="trailFill" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor="#C4172C" stopOpacity={0.5} />
