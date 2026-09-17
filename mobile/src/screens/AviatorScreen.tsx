@@ -1,8 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Dimensions, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 
@@ -49,6 +49,21 @@ function StakeStepper({
   value: number;
   onChange: (next: number) => void;
 }) {
+  const [text, setText] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setText(String(value));
+  }, [value, editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const parsed = parseInt(text, 10);
+    const clamped = Number.isFinite(parsed) ? Math.max(MIN_STAKE, parsed) : MIN_STAKE;
+    setText(String(clamped));
+    onChange(clamped);
+  };
+
   const hotspot = (key: keyof typeof STEPPER_LAYOUT) => ({
     position: 'absolute' as const,
     left: layout[key].left * BET_PANEL_WIDTH,
@@ -64,9 +79,18 @@ function StakeStepper({
         hitSlop={4}
         style={hotspot('minus')}
       />
-      <View style={[hotspot('track'), styles.stakeTrack]} pointerEvents="none">
-        <Text style={styles.stakeText}>{value}</Text>
-      </View>
+      <TextInput
+        style={[hotspot('track'), styles.stakeText]}
+        value={text}
+        onChangeText={setText}
+        onFocus={() => setEditing(true)}
+        onBlur={commit}
+        onSubmitEditing={commit}
+        keyboardType="number-pad"
+        returnKeyType="done"
+        selectTextOnFocus
+        textAlign="center"
+      />
       <Pressable onPress={() => onChange(value + STAKE_STEP)} hitSlop={4} style={hotspot('plus')} />
     </>
   );
@@ -128,13 +152,11 @@ const styles = StyleSheet.create({
     marginTop: 30,
     alignSelf: 'center',
   },
-  stakeTrack: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   stakeText: {
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
+    padding: 0,
+    backgroundColor: 'transparent',
   },
 });
