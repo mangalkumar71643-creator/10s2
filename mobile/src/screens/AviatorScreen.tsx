@@ -16,6 +16,12 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const PANEL_WIDTH = (SCREEN_WIDTH - 32) * 1.1;
 const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 
+// Bet/Auto toggle + stake stepper + Bet button block — same width as the
+// panel above it, own native aspect ratio preserved.
+const BET_PANEL_ASPECT = 572 / 688;
+const BET_PANEL_WIDTH = PANEL_WIDTH;
+const BET_PANEL_HEIGHT = BET_PANEL_WIDTH * BET_PANEL_ASPECT;
+
 export default function AviatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -37,6 +43,14 @@ export default function AviatorScreen() {
           resizeMode="contain"
         />
       </View>
+
+      <View style={[styles.betPanelWrap, { width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }]}>
+        <Image
+          source={require('../../assets/aviator-bet-panel.png')}
+          style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }}
+          resizeMode="contain"
+        />
+      </View>
     </View>
   );
 }
@@ -54,6 +68,10 @@ const styles = StyleSheet.create({
   },
   panelWrap: {
     marginTop: 60,
+    alignSelf: 'center',
+  },
+  betPanelWrap: {
+    marginTop: 30,
     alignSelf: 'center',
   },
 });
