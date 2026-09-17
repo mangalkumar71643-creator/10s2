@@ -2,9 +2,19 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Dimensions, Image, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
+
+// Panel background asset's own aspect ratio (cropped to just the rounded
+// rays panel, corners made transparent) — used so scaling it up keeps its
+// proportions instead of stretching.
+const PANEL_ASPECT = 517 / 673;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+// Base width matches the app's usual 16px-per-side card margin; the panel
+// is then sized 10% larger than that per the requested layout.
+const PANEL_WIDTH = (SCREEN_WIDTH - 32) * 1.1;
+const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 
 export default function AviatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -19,6 +29,14 @@ export default function AviatorScreen() {
       >
         <MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
       </Pressable>
+
+      <View style={[styles.panelWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
+        <Image
+          source={require('../../assets/aviator-panel-bg.png')}
+          style={{ width: PANEL_WIDTH, height: PANEL_HEIGHT }}
+          resizeMode="contain"
+        />
+      </View>
     </View>
   );
 }
@@ -33,5 +51,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
+  },
+  panelWrap: {
+    marginTop: 60,
+    alignSelf: 'center',
   },
 });
