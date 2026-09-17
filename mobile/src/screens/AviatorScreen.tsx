@@ -2,7 +2,8 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Dimensions, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 
@@ -48,66 +49,105 @@ const PLANE_HEIGHT = PLANE_WIDTH * PLANE_ASPECT;
 
 const ASCEND_DURATION = 4200;
 const FLYAWAY_PAUSE = 1400;
+const TRAIL_SAMPLES = 32;
 
-function FlyingPlane() {
-  const progress = useRef(new Animated.Value(0)).current;
+// Plain-JS interpolation (mirrors Animated.interpolate's multi-stop
+// breakpoints) so the same curve can drive both the plane's transform and
+// the SVG trail points on every animation frame, in lockstep.
+function interpolate(t: number, inputRange: number[], outputRange: number[]) {
+  const last = inputRange.length - 1;
+  if (t <= inputRange[0]) return outputRange[0];
+  if (t >= inputRange[last]) return outputRange[last];
+  for (let i = 0; i < last; i++) {
+    if (t >= inputRange[i] && t <= inputRange[i + 1]) {
+      const f = (t - inputRange[i]) / (inputRange[i + 1] - inputRange[i]);
+      return outputRange[i] + f * (outputRange[i + 1] - outputRange[i]);
+    }
+  }
+  return outputRange[last];
+}
+
+const planeX = (t: number) => interpolate(t, [0, 0.8, 1], [PANEL_WIDTH * 0.05, PANEL_WIDTH * 0.62, PANEL_WIDTH * 1.05]);
+const planeY = (t: number) =>
+  interpolate(t, [0, 0.4, 0.8, 1], [PANEL_HEIGHT * 0.72, PANEL_HEIGHT * 0.5, PANEL_HEIGHT * 0.32, -PANEL_HEIGHT * 0.4]);
+const planeRotate = (t: number) => interpolate(t, [0, 0.8, 1], [-6, -16, -42]);
+const planeOpacity = (t: number) => interpolate(t, [0, 0.75, 0.95, 1], [1, 1, 0.5, 0]);
+const planeScale = (t: number) => interpolate(t, [0, 0.8, 1], [1, 1, 1.15]);
+
+function FlightTrail() {
+  const [t, setT] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef(0);
+  const phaseRef = useRef<'flying' | 'paused'>('flying');
 
   useEffect(() => {
-    let cancelled = false;
-    const runCycle = () => {
-      progress.setValue(0);
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: ASCEND_DURATION,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished && !cancelled) {
-          setTimeout(runCycle, FLYAWAY_PAUSE);
+    let mounted = true;
+    const tick = (now: number) => {
+      if (!mounted) return;
+      if (phaseRef.current === 'flying') {
+        if (!startRef.current) startRef.current = now;
+        const nextT = Math.min(1, (now - startRef.current) / ASCEND_DURATION);
+        setT(nextT);
+        if (nextT >= 1) {
+          phaseRef.current = 'paused';
+          setTimeout(() => {
+            if (!mounted) return;
+            startRef.current = 0;
+            phaseRef.current = 'flying';
+            setT(0);
+          }, FLYAWAY_PAUSE);
         }
-      });
+      }
+      rafRef.current = requestAnimationFrame(tick);
     };
-    runCycle();
+    rafRef.current = requestAnimationFrame(tick);
     return () => {
-      cancelled = true;
+      mounted = false;
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [progress]);
+  }, []);
 
-  const translateX = progress.interpolate({
-    inputRange: [0, 0.8, 1],
-    outputRange: [PANEL_WIDTH * 0.05, PANEL_WIDTH * 0.62, PANEL_WIDTH * 1.05],
-  });
-  const translateY = progress.interpolate({
-    inputRange: [0, 0.4, 0.8, 1],
-    outputRange: [PANEL_HEIGHT * 0.72, PANEL_HEIGHT * 0.5, PANEL_HEIGHT * 0.32, -PANEL_HEIGHT * 0.4],
-  });
-  const rotate = progress.interpolate({
-    inputRange: [0, 0.8, 1],
-    outputRange: ['-6deg', '-16deg', '-42deg'],
-  });
-  const opacity = progress.interpolate({
-    inputRange: [0, 0.75, 0.95, 1],
-    outputRange: [1, 1, 0.5, 0],
-  });
-  const scale = progress.interpolate({
-    inputRange: [0, 0.8, 1],
-    outputRange: [1, 1, 1.15],
-  });
+  // Trail traces the plane's own anchor point (its bounding-box center) so
+  // the red line always meets the plane exactly, at every step so far.
+  const points: { x: number; y: number }[] = [];
+  for (let i = 0; i <= TRAIL_SAMPLES; i++) {
+    const st = (t * i) / TRAIL_SAMPLES;
+    points.push({ x: planeX(st) + PLANE_WIDTH / 2, y: planeY(st) + PLANE_HEIGHT / 2 });
+  }
+  const lineD = points.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L ');
+  const fillD = `M ${lineD} L ${points[points.length - 1].x.toFixed(1)} ${PANEL_HEIGHT} L ${points[0].x.toFixed(1)} ${PANEL_HEIGHT} Z`;
 
   return (
-    <Animated.Image
-      source={require('../../assets/aviator-plane.png')}
-      resizeMode="contain"
-      style={[
-        styles.plane,
-        {
-          width: PLANE_WIDTH,
-          height: PLANE_HEIGHT,
-          opacity,
-          transform: [{ translateX }, { translateY }, { rotate }, { scale }],
-        },
-      ]}
-    />
+    <>
+      <Svg width={PANEL_WIDTH} height={PANEL_HEIGHT} style={styles.trailSvg} pointerEvents="none">
+        <Defs>
+          <LinearGradient id="trailFill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#FF3B4E" stopOpacity={0.45} />
+            <Stop offset="1" stopColor="#C4172C" stopOpacity={0.04} />
+          </LinearGradient>
+        </Defs>
+        <Path d={fillD} fill="url(#trailFill)" />
+        <Path d={`M ${lineD}`} stroke="#FF3B4E" strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+      <Image
+        source={require('../../assets/aviator-plane.png')}
+        resizeMode="contain"
+        style={[
+          styles.plane,
+          {
+            width: PLANE_WIDTH,
+            height: PLANE_HEIGHT,
+            opacity: planeOpacity(t),
+            transform: [
+              { translateX: planeX(t) },
+              { translateY: planeY(t) },
+              { rotate: `${planeRotate(t)}deg` },
+              { scale: planeScale(t) },
+            ],
+          },
+        ]}
+      />
+    </>
   );
 }
 
@@ -189,7 +229,7 @@ export default function AviatorScreen() {
           style={{ width: PANEL_WIDTH, height: PANEL_HEIGHT }}
           resizeMode="contain"
         />
-        <FlyingPlane />
+        <FlightTrail />
       </View>
 
       <View style={[styles.betPanelWrap, { width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }]}>
@@ -221,6 +261,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   plane: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  trailSvg: {
     position: 'absolute',
     left: 0,
     top: 0,
