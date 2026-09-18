@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Dimensions, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
@@ -38,6 +38,18 @@ const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 const LOGO_ASPECT = 49 / 148;
 const LOGO_WIDTH = SCREEN_WIDTH * 0.32;
 const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
+
+// Round-history strip: sits in the gap between the logo and the panel's
+// top border. Placeholder values for now — this is just the strip itself.
+const HISTORY_BAR_HEIGHT = 28;
+const HISTORY_BAR_MARGIN_BOTTOM = 10;
+const HISTORY_BAR_TOP = 110 - HISTORY_BAR_MARGIN_BOTTOM - HISTORY_BAR_HEIGHT;
+const HISTORY_SAMPLE: number[] = [1.75, 1.0, 1.0, 1.89, 2.42, 4.25, 1.01];
+function historyColor(mult: number) {
+  if (mult >= 10) return '#E056FD';
+  if (mult >= 2) return '#8854D0';
+  return '#4B7BEC';
+}
 
 // Bet/Auto toggle + stake stepper + Bet button block — same width as the
 // panel above it, own native aspect ratio preserved.
@@ -351,6 +363,19 @@ export default function AviatorScreen() {
         ]}
       />
 
+      <View
+        style={[
+          styles.historyBar,
+          { top: HISTORY_BAR_TOP, left: (SCREEN_WIDTH - PANEL_WIDTH) / 2, width: PANEL_WIDTH, height: HISTORY_BAR_HEIGHT },
+        ]}
+      >
+        {HISTORY_SAMPLE.map((mult, i) => (
+          <Text key={i} style={[styles.historyChip, { color: historyColor(mult) }]}>
+            {mult.toFixed(2)}x
+          </Text>
+        ))}
+      </View>
+
       <View style={[styles.panelWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
         <Image
           source={require('../../assets/aviator-panel-bg.png')}
@@ -387,6 +412,20 @@ const styles = StyleSheet.create({
   logo: {
     position: 'absolute',
     zIndex: 5,
+  },
+  historyBar: {
+    position: 'absolute',
+    zIndex: 5,
+    backgroundColor: '#2C2D31',
+    borderRadius: HISTORY_BAR_HEIGHT / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  historyChip: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   panelWrap: {
     marginTop: 110,
