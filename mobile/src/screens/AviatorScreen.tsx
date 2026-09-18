@@ -76,30 +76,17 @@ const PLANE_ASPECT = 215 / 441;
 const PLANE_WIDTH = PANEL_WIDTH * 0.24;
 const PLANE_HEIGHT = PLANE_WIDTH * PLANE_ASPECT;
 
-// Mirrors the backend's exact live-multiplier formula (aviatorService.ts's
-// GROWTH_RATE / liveMultiplier: m = e^(GROWTH_RATE * secondsSinceTakeoff))
-// so the plane's position can be recomputed locally on every animation
-// frame from the round's real flyStartTime timestamp, instead of only
-// moving in visible steps whenever the ~350ms poll happens to land.
-const GROWTH_RATE = Math.log(2) / 5;
-// The plane's ascend position (t: 0 -> 0.8) is driven by ln(multiplier),
-// not the raw multiplier value. Since the multiplier itself grows
-// exponentially in real time, ln(multiplier) grows LINEARLY — so this
-// keeps the plane's own speed constant (then shaped into the hockey-stick
-// look by CURVE_POWER below) instead of decelerating to a crawl the way a
-// function of the raw multiplier would (that was the actual bug: a
-// saturating curve of the raw value loses essentially all speed once the
-// multiplier gets reasonably high, which reads as the plane freezing
-// before its final dash rather than one continuous accelerating flight).
-// ASCEND_LOG_SPAN sets how many e-folds of growth span the full ascend —
-// picked high enough that the large majority of rounds (most crash well
-// below this) never actually reach the t=0.8 cap before crashing for real.
-const ASCEND_LOG_SPAN = Math.log(25);
-// Order is: ascend (continuously tracking the real live multiplier) → the
-// round actually crashes (server-reported) → red line fades out first
-// (plane stays put) → only then does the plane dash away, so fast there's
-// no time to react to it. Both stages are deliberately very short — one
-// sudden crash, not a second slow glide.
+// The plane's ascend (t: 0 -> 0.8) is a plain, fixed-speed animation —
+// deliberately NOT calculated from the multiplier, elapsed round time, or
+// any other backend value. It always takes exactly ASCEND_MS to climb up
+// near the top of the panel and hold there, at the same fast speed every
+// single round, regardless of how the actual multiplier is behaving.
+const ASCEND_MS = 700;
+// Order is: ascend (fixed-speed, up to just short of the top border) →
+// hold there → the round actually crashes (server-reported) → red line
+// fades out first (plane stays put) → only then does the plane dash away,
+// so fast there's no time to react to it. Both crash stages are
+// deliberately very short — one sudden crash, not a second slow glide.
 const LINE_FADE_MS = 50;
 const BURST_MS = 25;
 const TRAIL_SAMPLES = 32;
@@ -154,7 +141,9 @@ const TAIL_X_START = PANEL_WIDTH * 0.02;
 const TAIL_X_MID = PANEL_WIDTH * 0.64; // hand-off point from ascend to burst
 const TAIL_X_END = PANEL_WIDTH * 1.08;
 const TAIL_Y_START = PANEL_HEIGHT * 0.94; // hugs the bottom-left corner at first
-const TAIL_Y_MID = PANEL_HEIGHT * 0.3;
+// Ascend always climbs up to just short of the panel's top border (not
+// partway down) before holding there to wait for the real crash.
+const TAIL_Y_MID = PANEL_HEIGHT * 0.06;
 const TAIL_Y_END = -PANEL_HEIGHT * 0.35;
 const CURVE_POWER = 2.8;
 
@@ -184,19 +173,11 @@ function tailPoint(t: number) {
   return { x: tailCurveX(t), y: tailCurveY(t) };
 }
 
-// Maps the real live multiplier to the plane's 0->0.8 ascend progress —
-// m=1.00x is the runway (progress 0). Log-based (see ASCEND_LOG_SPAN
-// above) so the plane's speed stays roughly constant instead of decaying
-// as the multiplier grows; only clamped once a round runs unusually long.
-function ascendProgressForMultiplier(multiplier: number) {
-  const m = Math.max(1, multiplier);
-  return Math.min(0.8, (0.8 * Math.log(m)) / ASCEND_LOG_SPAN);
-}
-
 function FlightTrail({ round }: { round: AviatorRoundView | null }) {
   const [t, setT] = useState(0);
   const [trailFade, setTrailFade] = useState(1);
   const rafRef = useRef<number | null>(null);
+  const ascendStartRef = useRef(0);
   const fadeStartRef = useRef(0);
   const burstStartRef = useRef(0);
   // 'idle' covers both "no round yet" and the BETTING phase — the plane
@@ -227,6 +208,7 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
       if (phaseRef.current === 'idle') {
         if (r && r.phase === 'FLYING') {
           phaseRef.current = 'flying';
+          ascendStartRef.current = now;
         } else {
           setT(0);
         }
@@ -240,16 +222,13 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
           setT(0.8);
           phaseRef.current = 'lineFade';
           fadeStartRef.current = now;
-        } else if (r && r.phase === 'FLYING') {
-          // Recomputed every frame from the round's real takeoff
-          // timestamp using the exact same formula the backend uses for
-          // the authoritative multiplier — this is what makes the motion
-          // continuously smooth instead of visibly stepping every time a
-          // new poll result lands (polling only decides WHEN the phase
-          // changed, never how the plane moves while it's flying).
-          const elapsedSec = Math.max(0, (Date.now() - new Date(r.flyStartTime).getTime()) / 1000);
-          const liveMultiplier = Math.exp(GROWTH_RATE * elapsedSec);
-          setT(ascendProgressForMultiplier(liveMultiplier));
+        } else {
+          // Fixed-speed climb, always the same regardless of the
+          // multiplier — reaches the hold point (just short of the top
+          // border) in ASCEND_MS, then simply stays there until the round
+          // actually crashes for real.
+          const ascendElapsed = now - ascendStartRef.current;
+          setT(Math.min(0.8, 0.8 * (ascendElapsed / ASCEND_MS)));
         }
       } else if (phaseRef.current === 'lineFade') {
         // Plane holds still while the red line fades out first.
