@@ -75,56 +75,68 @@ function interpolate(t: number, inputRange: number[], outputRange: number[]) {
   return outputRange[last];
 }
 
-// Real Aviator's curve hugs the bottom while the multiplier is still near
-// 1.00x, then rockets upward as it grows — a "hockey stick" shape, not a
-// straight diagonal. CURVE_POWER > 1 gives exactly that: y barely moves
-// while s is small, then rises sharply as s approaches 1.
-const CURVE_X_START = PANEL_WIDTH * 0.05;
-const CURVE_X_MID = PANEL_WIDTH * 0.62; // hand-off point from ascend to burst
-const CURVE_X_END = PANEL_WIDTH * 1.05;
-const CURVE_Y_START = PANEL_HEIGHT * 0.92; // hugs the bottom border at first
-const CURVE_Y_MID = PANEL_HEIGHT * 0.28;
-const CURVE_Y_END = -PANEL_HEIGHT * 0.4;
-const CURVE_POWER = 2.8;
-
-const planeX = (t: number) => {
-  if (t <= 0.8) {
-    return CURVE_X_START + (CURVE_X_MID - CURVE_X_START) * (t / 0.8);
-  }
-  return CURVE_X_MID + (CURVE_X_END - CURVE_X_MID) * ((t - 0.8) / 0.2);
-};
-const planeY = (t: number) => {
-  if (t <= 0.8) {
-    const yFrac = Math.pow(t / 0.8, CURVE_POWER);
-    return CURVE_Y_START - (CURVE_Y_START - CURVE_Y_MID) * yFrac;
-  }
-  const burstFrac = Math.pow((t - 0.8) / 0.2, 1.5);
-  return CURVE_Y_MID - (CURVE_Y_MID - CURVE_Y_END) * burstFrac;
-};
 const planeRotate = (t: number) => interpolate(t, [0, 0.8, 1], [-6, -16, -42]);
 const planeOpacity = (t: number) => interpolate(t, [0, 0.75, 0.95, 1], [1, 1, 0.5, 0]);
 const planeScale = (t: number) => interpolate(t, [0, 0.8, 1], [1, 1, 1.15]);
 
-// Tail-fin tip in the source plane art (441x215px), used so the trail
-// always meets the plane at its tail instead of its geometric center.
+// Tail-fin tip in the source plane art (441x215px), used so the curve is
+// defined by where the TAIL sits, not the image's geometric center —
+// planeX/planeY below are then solved backwards from this so the tail
+// (not just the bounding box) starts exactly at the panel's corner.
 const TAIL_PX = { x: 12, y: 197 };
 const PLANE_CENTER_PX = { x: 441 / 2, y: 215 / 2 };
 
-// Screen-space point where the trail should end: the plane's tail tip,
-// rotated and scaled exactly like the rendered <Image> is at time t.
-function tailPoint(t: number) {
+function rotatedTailOffset(t: number) {
   const scaleFactor = (PLANE_WIDTH / 441) * planeScale(t);
   const localDx = TAIL_PX.x - PLANE_CENTER_PX.x;
   const localDy = TAIL_PX.y - PLANE_CENTER_PX.y;
   const rad = (planeRotate(t) * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
-  const rx = (localDx * cos - localDy * sin) * scaleFactor;
-  const ry = (localDx * sin + localDy * cos) * scaleFactor;
   return {
-    x: planeX(t) + PLANE_WIDTH / 2 + rx,
-    y: planeY(t) + PLANE_HEIGHT / 2 + ry,
+    dx: (localDx * cos - localDy * sin) * scaleFactor,
+    dy: (localDx * sin + localDy * cos) * scaleFactor,
   };
+}
+
+// Real Aviator's curve hugs the bottom-left corner while the multiplier is
+// still near 1.00x, then rockets upward as it grows — a "hockey stick"
+// shape, not a straight diagonal. CURVE_POWER > 1 gives exactly that: y
+// barely moves while s is small, then rises sharply as s approaches 1.
+// These are TAIL positions (small inset from the corner) — the plane's own
+// box position is derived from these further down.
+const TAIL_X_START = PANEL_WIDTH * 0.02;
+const TAIL_X_MID = PANEL_WIDTH * 0.64; // hand-off point from ascend to burst
+const TAIL_X_END = PANEL_WIDTH * 1.08;
+const TAIL_Y_START = PANEL_HEIGHT * 0.94; // hugs the bottom-left corner at first
+const TAIL_Y_MID = PANEL_HEIGHT * 0.3;
+const TAIL_Y_END = -PANEL_HEIGHT * 0.35;
+const CURVE_POWER = 2.8;
+
+function tailCurveX(t: number) {
+  if (t <= 0.8) {
+    return TAIL_X_START + (TAIL_X_MID - TAIL_X_START) * (t / 0.8);
+  }
+  return TAIL_X_MID + (TAIL_X_END - TAIL_X_MID) * ((t - 0.8) / 0.2);
+}
+function tailCurveY(t: number) {
+  if (t <= 0.8) {
+    const yFrac = Math.pow(t / 0.8, CURVE_POWER);
+    return TAIL_Y_START - (TAIL_Y_START - TAIL_Y_MID) * yFrac;
+  }
+  const burstFrac = Math.pow((t - 0.8) / 0.2, 1.5);
+  return TAIL_Y_MID - (TAIL_Y_MID - TAIL_Y_END) * burstFrac;
+}
+
+// The plane's own <Image> is positioned (translateX/Y, i.e. its top-left
+// corner) by subtracting the tail's rotated offset from the desired tail
+// position, so the tail itself — not the box center — always sits exactly
+// on the curve.
+const planeX = (t: number) => tailCurveX(t) - PLANE_WIDTH / 2 - rotatedTailOffset(t).dx;
+const planeY = (t: number) => tailCurveY(t) - PLANE_HEIGHT / 2 - rotatedTailOffset(t).dy;
+
+function tailPoint(t: number) {
+  return { x: tailCurveX(t), y: tailCurveY(t) };
 }
 
 function randomAscendMs() {
