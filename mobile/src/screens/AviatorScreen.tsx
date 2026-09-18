@@ -141,11 +141,19 @@ const TAIL_X_START = PANEL_WIDTH * 0.02;
 const TAIL_X_MID = PANEL_WIDTH * 0.64; // hand-off point from ascend to burst
 const TAIL_X_END = PANEL_WIDTH * 1.08;
 const TAIL_Y_START = PANEL_HEIGHT * 0.94; // hugs the bottom-left corner at first
-// Ascend climbs well up toward the top of the panel before holding there
-// to wait for the real crash — kept low enough (with margin for the
-// plane's own height/rotation) that the plane itself stays fully inside
-// the panel border instead of clipping through the top edge.
-const TAIL_Y_MID = PANEL_HEIGHT * 0.26;
+// Ascend climbs up toward the top of the panel before holding there to
+// wait for the real crash — but stops with real margin below the top
+// border. The earlier 0.22/0.26 attempts were still tuning the wrong
+// thing: TAIL_Y_MID is the TAIL point, and the tail sits near the BOTTOM
+// of the plane's own sprite (TAIL_PX.y is 197 out of a 215px-tall image),
+// so almost the entire plane's body extends UPWARD past that point —
+// plus React Native rotates the image around its own center, not its
+// top-left corner, pushing the visible top edge higher still once
+// rotated. 0.4 leaves enough room for all of that so the plane's actual
+// visible top (not just its invisible tail anchor) stays clearly below
+// the border, matching where it was marked as off-limits until a real
+// crash.
+const TAIL_Y_MID = PANEL_HEIGHT * 0.4;
 const TAIL_Y_END = -PANEL_HEIGHT * 0.35;
 const CURVE_POWER = 2.8;
 
