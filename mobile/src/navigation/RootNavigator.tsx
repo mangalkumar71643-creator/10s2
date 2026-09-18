@@ -4,7 +4,6 @@ import React from 'react';
 import BottomTabs from './BottomTabs';
 import { AuthStackParamList, RootStackParamList } from './types';
 import AviatorScreen from '../screens/AviatorScreen';
-import AviatorScreen2 from '../screens/AviatorScreen2';
 import BalanceRecordsScreen from '../screens/BalanceRecordsScreen';
 import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
@@ -60,7 +59,6 @@ function MainNavigator() {
       <Stack.Screen name="Withdraw" component={WithdrawScreen} />
       <Stack.Screen name="ColorPredict" component={ColorPredictScreen} />
       <Stack.Screen name="Aviator" component={AviatorScreen} />
-      <Stack.Screen name="Aviator2" component={AviatorScreen2} />
     </Stack.Navigator>
   );
 }

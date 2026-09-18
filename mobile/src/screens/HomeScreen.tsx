@@ -67,8 +67,6 @@ export default function HomeScreen() {
   const winGoTileLeft = GAME_GRID_LEFT;
   const aviatorTileTop = gameGridTop;
   const aviatorTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const aviator2TileTop = gameGridTop + GAME_GRID_CELL;
-  const aviator2TileLeft = GAME_GRID_LEFT;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -190,23 +188,6 @@ export default function HomeScreen() {
           position: 'absolute',
           top: aviatorTileTop,
           left: aviatorTileLeft,
-          width: GAME_ICON_SIZE,
-          height: GAME_ICON_SIZE,
-          overflow: 'hidden',
-        }}
-      >
-        <Image
-          source={require('../../assets/aviator-home-icon.png')}
-          style={{ width: '100%', height: '100%' }}
-          resizeMode="contain"
-        />
-      </Pressable>
-      <Pressable
-        onPress={() => (navigation as any).navigate('Aviator2')}
-        style={{
-          position: 'absolute',
-          top: aviator2TileTop,
-          left: aviator2TileLeft,
           width: GAME_ICON_SIZE,
           height: GAME_ICON_SIZE,
           overflow: 'hidden',
