@@ -42,8 +42,6 @@ const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
 // Round-history strip: sits in the gap between the logo and the panel's
 // top border. Placeholder values for now — this is just the strip itself.
 const HISTORY_BAR_HEIGHT = 28;
-const HISTORY_BAR_MARGIN_BOTTOM = 10;
-const HISTORY_BAR_TOP = 110 - HISTORY_BAR_MARGIN_BOTTOM - HISTORY_BAR_HEIGHT;
 const HISTORY_SAMPLE: number[] = [1.75, 1.0, 1.0, 1.89, 2.42, 4.25, 1.01];
 function historyColor(mult: number) {
   if (mult >= 10) return '#E056FD';
@@ -357,18 +355,10 @@ export default function AviatorScreen() {
       <Image
         source={require('../../assets/aviator-logo.png')}
         resizeMode="contain"
-        style={[
-          styles.logo,
-          { top: insets.top + 8, left: (SCREEN_WIDTH - LOGO_WIDTH) / 2, width: LOGO_WIDTH, height: LOGO_HEIGHT },
-        ]}
+        style={[styles.logo, { marginTop: insets.top + 8, width: LOGO_WIDTH, height: LOGO_HEIGHT }]}
       />
 
-      <View
-        style={[
-          styles.historyBar,
-          { top: HISTORY_BAR_TOP, left: (SCREEN_WIDTH - PANEL_WIDTH) / 2, width: PANEL_WIDTH, height: HISTORY_BAR_HEIGHT },
-        ]}
-      >
+      <View style={[styles.historyBar, { width: PANEL_WIDTH, height: HISTORY_BAR_HEIGHT }]}>
         {HISTORY_SAMPLE.map((mult, i) => (
           <Text key={i} style={[styles.historyChip, { color: historyColor(mult) }]}>
             {mult.toFixed(2)}x
@@ -399,7 +389,7 @@ export default function AviatorScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000000' },
+  root: { flex: 1, backgroundColor: '#000000', alignItems: 'center' },
   backBtn: {
     position: 'absolute',
     left: 8,
@@ -409,13 +399,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
-  logo: {
-    position: 'absolute',
-    zIndex: 5,
-  },
+  // Logo, history bar and panel are stacked as normal flow siblings (each
+  // with its own marginTop gap) instead of independently-computed absolute
+  // offsets, so they can never overlap regardless of a device's actual
+  // safe-area inset.
+  logo: {},
   historyBar: {
-    position: 'absolute',
-    zIndex: 5,
+    marginTop: 10,
     backgroundColor: '#2C2D31',
     borderRadius: HISTORY_BAR_HEIGHT / 2,
     flexDirection: 'row',
@@ -428,8 +418,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   panelWrap: {
-    marginTop: 110,
-    alignSelf: 'center',
+    marginTop: 14,
   },
   plane: {
     position: 'absolute',
