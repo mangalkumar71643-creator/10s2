@@ -75,9 +75,32 @@ function interpolate(t: number, inputRange: number[], outputRange: number[]) {
   return outputRange[last];
 }
 
-const planeX = (t: number) => interpolate(t, [0, 0.8, 1], [PANEL_WIDTH * 0.05, PANEL_WIDTH * 0.62, PANEL_WIDTH * 1.05]);
-const planeY = (t: number) =>
-  interpolate(t, [0, 0.4, 0.8, 1], [PANEL_HEIGHT * 0.72, PANEL_HEIGHT * 0.5, PANEL_HEIGHT * 0.32, -PANEL_HEIGHT * 0.4]);
+// Real Aviator's curve hugs the bottom while the multiplier is still near
+// 1.00x, then rockets upward as it grows — a "hockey stick" shape, not a
+// straight diagonal. CURVE_POWER > 1 gives exactly that: y barely moves
+// while s is small, then rises sharply as s approaches 1.
+const CURVE_X_START = PANEL_WIDTH * 0.05;
+const CURVE_X_MID = PANEL_WIDTH * 0.62; // hand-off point from ascend to burst
+const CURVE_X_END = PANEL_WIDTH * 1.05;
+const CURVE_Y_START = PANEL_HEIGHT * 0.92; // hugs the bottom border at first
+const CURVE_Y_MID = PANEL_HEIGHT * 0.28;
+const CURVE_Y_END = -PANEL_HEIGHT * 0.4;
+const CURVE_POWER = 2.8;
+
+const planeX = (t: number) => {
+  if (t <= 0.8) {
+    return CURVE_X_START + (CURVE_X_MID - CURVE_X_START) * (t / 0.8);
+  }
+  return CURVE_X_MID + (CURVE_X_END - CURVE_X_MID) * ((t - 0.8) / 0.2);
+};
+const planeY = (t: number) => {
+  if (t <= 0.8) {
+    const yFrac = Math.pow(t / 0.8, CURVE_POWER);
+    return CURVE_Y_START - (CURVE_Y_START - CURVE_Y_MID) * yFrac;
+  }
+  const burstFrac = Math.pow((t - 0.8) / 0.2, 1.5);
+  return CURVE_Y_MID - (CURVE_Y_MID - CURVE_Y_END) * burstFrac;
+};
 const planeRotate = (t: number) => interpolate(t, [0, 0.8, 1], [-6, -16, -42]);
 const planeOpacity = (t: number) => interpolate(t, [0, 0.75, 0.95, 1], [1, 1, 0.5, 0]);
 const planeScale = (t: number) => interpolate(t, [0, 0.8, 1], [1, 1, 1.15]);
