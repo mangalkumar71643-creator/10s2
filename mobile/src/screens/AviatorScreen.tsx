@@ -30,9 +30,14 @@ const STEPPER_LAYOUT_2 = {
 // proportions instead of stretching.
 const PANEL_ASPECT = 517 / 673;
 const SCREEN_WIDTH = Dimensions.get('window').width;
-// Base width matches the app's usual 16px-per-side card margin; the panel
-// is then sized 10% larger than that per the requested layout.
-const PANEL_WIDTH = (SCREEN_WIDTH - 32) * 1.1;
+// Base width matches the app's usual 16px-per-side card margin, sized up
+// another ~10% per the requested layout — but capped so it can never
+// exceed the physical screen width (minus a hair of safety margin), since
+// anything wider than the device itself just gets hard-clipped by the
+// screen edge, cutting the border we just added. On most phone widths
+// this "*1.21" would already overflow, so this cap is what actually
+// determines the size: full edge-to-edge, the largest it can safely go.
+const PANEL_WIDTH = Math.min(SCREEN_WIDTH - 4, (SCREEN_WIDTH - 32) * 1.21);
 const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 
 // Bet/Auto toggle + stake stepper + Bet button block — same width as the
