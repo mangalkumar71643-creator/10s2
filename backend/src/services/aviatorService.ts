@@ -214,11 +214,14 @@ export async function placeAviatorBet(userId: string, amount: number, autoCashou
     throw new ApiError(400, "Betting is closed for this round — wait for the next one.");
   }
 
-  const existing = await prisma.aviatorBet.findFirst({
+  // Up to two concurrent bets per round (matches the mobile UI's two
+  // independent bet panels — real Aviator lets a player run a manual bet
+  // and a second auto-cashout bet side by side).
+  const existingCount = await prisma.aviatorBet.count({
     where: { roundId: round.id, userId, status: "PENDING" },
   });
-  if (existing) {
-    throw new ApiError(400, "You already have a bet placed on this round.");
+  if (existingCount >= 2) {
+    throw new ApiError(400, "You already have the maximum of two bets placed on this round.");
   }
 
   const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId } });

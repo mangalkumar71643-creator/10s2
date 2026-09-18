@@ -1,11 +1,21 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useEffect, useRef, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Dimensions, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
+import { ApiClientError } from '../api/client';
+import {
+  AviatorRoundView,
+  cashOutAviatorBet,
+  fetchAviatorCurrentRound,
+  fetchAviatorHistory,
+  fetchAviatorMyBets,
+  placeAviatorBet,
+} from '../api/backend';
+import { useGameState } from '../state/GameStateContext';
 
 const MIN_STAKE = 10;
 const STAKE_STEP = 10;
@@ -24,6 +34,11 @@ const STEPPER_LAYOUT_2 = {
   plus: { left: 235 / 688, top: 388 / 572, width: 43 / 688, height: 44 / 572 },
   track: { left: 75 / 688, top: 388 / 572, width: 160 / 688, height: 44 / 572 },
 };
+
+// Green "Bet" button hotspots — measured from the same source art as the
+// stepper layouts above (688x572px), one per panel.
+const BET_BUTTON_LAYOUT_1 = { left: 307 / 688, top: 103 / 572, width: 348 / 688, height: 154 / 572 };
+const BET_BUTTON_LAYOUT_2 = { left: 307 / 688, top: 387 / 572, width: 348 / 688, height: 153 / 572 };
 
 // Panel background asset's own aspect ratio and on-screen width, matched
 // to the reference Aviator site's panel: ~96.6% of screen width, and a
@@ -336,11 +351,204 @@ function StakeStepper({
   );
 }
 
+type PanelBetState =
+  | { status: 'idle' }
+  | { status: 'placing' }
+  | { status: 'pending'; betId: string; amount: number; periodNumber: string }
+  | { status: 'cashingOut'; betId: string; amount: number; periodNumber: string }
+  | { status: 'won'; payout: number; cashoutMultiplier: number }
+  | { status: 'lost' };
+
+// Overlays the button hotspot with the current bet's state — the source
+// art's own "Bet" text shows through untouched while idle; once a bet is
+// live this paints a same-shaped rounded rect on top so the label can
+// change (Cash Out / Won / Lost) without touching the underlying image.
+function BetButton({
+  layout,
+  state,
+  phase,
+  liveMultiplier,
+  onBet,
+  onCashout,
+}: {
+  layout: { left: number; top: number; width: number; height: number };
+  state: PanelBetState;
+  phase: AviatorRoundView['phase'] | null;
+  liveMultiplier: number;
+  onBet: () => void;
+  onCashout: () => void;
+}) {
+  const hotspot = {
+    position: 'absolute' as const,
+    left: layout.left * BET_PANEL_WIDTH,
+    top: layout.top * BET_PANEL_HEIGHT,
+    width: layout.width * BET_PANEL_WIDTH,
+    height: layout.height * BET_PANEL_HEIGHT,
+  };
+
+  if (state.status === 'idle') {
+    return <Pressable onPress={onBet} style={hotspot} />;
+  }
+
+  let label = '';
+  let bg = 'rgba(0,0,0,0.6)';
+  let onPress: (() => void) | undefined;
+
+  if (state.status === 'placing') {
+    label = 'Placing…';
+  } else if (state.status === 'pending') {
+    if (phase === 'FLYING') {
+      label = `CASH OUT\n₹${(state.amount * liveMultiplier).toFixed(2)}`;
+      bg = 'rgba(46,160,67,0.92)';
+      onPress = onCashout;
+    } else {
+      label = `Waiting…\n₹${state.amount}`;
+    }
+  } else if (state.status === 'cashingOut') {
+    label = 'Cashing out…';
+    bg = 'rgba(46,160,67,0.92)';
+  } else if (state.status === 'won') {
+    label = `WON\n+₹${state.payout.toFixed(2)}`;
+    bg = 'rgba(46,160,67,0.9)';
+  } else if (state.status === 'lost') {
+    label = 'LOST';
+    bg = 'rgba(196,23,44,0.9)';
+  }
+
+  return (
+    <Pressable onPress={onPress} disabled={!onPress} style={[hotspot, styles.betOverlay, { backgroundColor: bg }]}>
+      <Text style={styles.betOverlayText}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export default function AviatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+  const { coins, refreshWallet } = useGameState();
   const [stake1, setStake1] = useState(MIN_STAKE);
   const [stake2, setStake2] = useState(MIN_STAKE);
+  const [round, setRound] = useState<AviatorRoundView | null>(null);
+  const [history, setHistory] = useState<number[]>(HISTORY_SAMPLE);
+  const [bet1, setBet1] = useState<PanelBetState>({ status: 'idle' });
+  const [bet2, setBet2] = useState<PanelBetState>({ status: 'idle' });
+
+  // Polling reads the latest bet state via refs (not the state variables
+  // directly) so the interval set up once on mount always sees the
+  // current value without needing to be torn down and recreated.
+  const bet1Ref = useRef(bet1);
+  const bet2Ref = useRef(bet2);
+  useEffect(() => {
+    bet1Ref.current = bet1;
+  }, [bet1]);
+  useEffect(() => {
+    bet2Ref.current = bet2;
+  }, [bet2]);
+
+  const resolveIfPending = useCallback(
+    async (bet: PanelBetState, setBet: (s: PanelBetState) => void) => {
+      if (bet.status !== 'pending') return;
+      try {
+        const bets = await fetchAviatorMyBets();
+        const match = bets.find((b) => b.id === bet.betId);
+        if (!match) return;
+        if (match.status === 'WON') {
+          setBet({ status: 'won', payout: Number(match.payout), cashoutMultiplier: Number(match.cashoutMultiplier ?? 0) });
+          refreshWallet().catch(() => {});
+        } else if (match.status === 'LOST') {
+          setBet({ status: 'lost' });
+        }
+      } catch {
+        // Transient failure — next poll tick tries again.
+      }
+    },
+    [refreshWallet]
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    const lastPeriod = { current: null as string | null };
+
+    const poll = async () => {
+      try {
+        const view = await fetchAviatorCurrentRound();
+        if (!mounted) return;
+        setRound(view);
+
+        if (lastPeriod.current !== null && lastPeriod.current !== view.periodNumber) {
+          // A new round has started — any bet from the previous one is by
+          // now either won/lost (resolved below while it was CRASHED) or
+          // never got placed, so it's safe to reset both panels.
+          setBet1((b) => (b.status === 'idle' ? b : { status: 'idle' }));
+          setBet2((b) => (b.status === 'idle' ? b : { status: 'idle' }));
+          fetchAviatorHistory()
+            .then((entries) => setHistory(entries.slice(0, 7).reverse().map((e) => Number(e.crashMultiplier))))
+            .catch(() => {});
+        }
+        lastPeriod.current = view.periodNumber;
+
+        if (view.phase === 'CRASHED') {
+          resolveIfPending(bet1Ref.current, setBet1);
+          resolveIfPending(bet2Ref.current, setBet2);
+        }
+      } catch {
+        // Transient network hiccup — just try again on the next tick.
+      }
+    };
+
+    poll();
+    fetchAviatorHistory()
+      .then((entries) => setHistory(entries.slice(0, 7).reverse().map((e) => Number(e.crashMultiplier))))
+      .catch(() => {});
+    const id = setInterval(poll, 350);
+    return () => {
+      mounted = false;
+      clearInterval(id);
+    };
+  }, [resolveIfPending]);
+
+  const placeBet = useCallback(
+    async (panel: 1 | 2) => {
+      const stake = panel === 1 ? stake1 : stake2;
+      const setBet = panel === 1 ? setBet1 : setBet2;
+      if (!round || round.phase !== 'BETTING') {
+        Alert.alert('Betting closed', 'Wait for the next round to place a bet.');
+        return;
+      }
+      setBet({ status: 'placing' });
+      try {
+        const result = await placeAviatorBet(stake);
+        setBet({ status: 'pending', betId: result.id, amount: Number(result.amount), periodNumber: round.periodNumber });
+        refreshWallet().catch(() => {});
+      } catch (err) {
+        setBet({ status: 'idle' });
+        Alert.alert('Bet failed', err instanceof ApiClientError ? err.message : 'Please try again.');
+      }
+    },
+    [round, stake1, stake2, refreshWallet]
+  );
+
+  const cashout = useCallback(
+    async (panel: 1 | 2) => {
+      const bet = panel === 1 ? bet1 : bet2;
+      const setBet = panel === 1 ? setBet1 : setBet2;
+      if (bet.status !== 'pending') return;
+      const { betId, amount, periodNumber } = bet;
+      setBet({ status: 'cashingOut', betId, amount, periodNumber });
+      try {
+        const result = await cashOutAviatorBet(betId);
+        setBet({ status: 'won', payout: result.payout, cashoutMultiplier: result.multiplier });
+        refreshWallet().catch(() => {});
+      } catch (err) {
+        Alert.alert('Cash out failed', err instanceof ApiClientError ? err.message : 'Please try again.');
+        setBet({ status: 'pending', betId, amount, periodNumber });
+      }
+    },
+    [bet1, bet2, refreshWallet]
+  );
+
+  const multiplierLabel = round ? `${round.multiplier.toFixed(2)}x` : '1.00x';
+  const multiplierColor = round?.phase === 'CRASHED' ? '#FF3B4E' : '#FFFFFF';
 
   return (
     <View style={styles.root}>
@@ -352,6 +560,8 @@ export default function AviatorScreen() {
         <MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
       </Pressable>
 
+      <Text style={[styles.balanceChip, { top: insets.top + 8 }]}>₹{coins.toFixed(2)}</Text>
+
       <Image
         source={require('../../assets/aviator-logo.png')}
         resizeMode="contain"
@@ -359,7 +569,7 @@ export default function AviatorScreen() {
       />
 
       <View style={[styles.historyBar, { width: PANEL_WIDTH, height: HISTORY_BAR_HEIGHT }]}>
-        {HISTORY_SAMPLE.map((mult, i) => (
+        {history.map((mult, i) => (
           <Text key={i} style={[styles.historyChip, { color: historyColor(mult) }]}>
             {mult.toFixed(2)}x
           </Text>
@@ -373,6 +583,11 @@ export default function AviatorScreen() {
           resizeMode="contain"
         />
         <FlightTrail />
+        <View style={styles.multiplierWrap} pointerEvents="none">
+          <Text style={[styles.multiplierText, { color: multiplierColor }]}>{multiplierLabel}</Text>
+          {round?.phase === 'CRASHED' && <Text style={styles.multiplierSubLabel}>FLEW AWAY!</Text>}
+          {round?.phase === 'BETTING' && <Text style={styles.multiplierSubLabel}>Next round starting…</Text>}
+        </View>
       </View>
 
       <View style={[styles.betPanelWrap, { width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }]}>
@@ -383,6 +598,22 @@ export default function AviatorScreen() {
         />
         <StakeStepper layout={STEPPER_LAYOUT} value={stake1} onChange={setStake1} />
         <StakeStepper layout={STEPPER_LAYOUT_2} value={stake2} onChange={setStake2} />
+        <BetButton
+          layout={BET_BUTTON_LAYOUT_1}
+          state={bet1}
+          phase={round?.phase ?? null}
+          liveMultiplier={round?.multiplier ?? 1}
+          onBet={() => placeBet(1)}
+          onCashout={() => cashout(1)}
+        />
+        <BetButton
+          layout={BET_BUTTON_LAYOUT_2}
+          state={bet2}
+          phase={round?.phase ?? null}
+          liveMultiplier={round?.multiplier ?? 1}
+          onBet={() => placeBet(2)}
+          onCashout={() => cashout(2)}
+        />
       </View>
     </View>
   );
@@ -397,6 +628,14 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
+  },
+  balanceChip: {
+    position: 'absolute',
+    right: 12,
+    color: '#3ECF8E',
+    fontSize: 15,
+    fontWeight: '700',
     zIndex: 10,
   },
   // Logo, history bar and panel are stacked as normal flow siblings (each
@@ -440,5 +679,33 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: 0,
     backgroundColor: 'transparent',
+  },
+  multiplierWrap: {
+    position: 'absolute',
+    top: PANEL_HEIGHT * 0.3,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  multiplierText: {
+    fontSize: 40,
+    fontWeight: '800',
+  },
+  multiplierSubLabel: {
+    marginTop: 4,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  betOverlay: {
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  betOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });
