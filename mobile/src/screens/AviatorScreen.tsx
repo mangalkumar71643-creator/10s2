@@ -145,7 +145,7 @@ const TAIL_Y_START = PANEL_HEIGHT * 0.94; // hugs the bottom-left corner at firs
 // to wait for the real crash — kept low enough (with margin for the
 // plane's own height/rotation) that the plane itself stays fully inside
 // the panel border instead of clipping through the top edge.
-const TAIL_Y_MID = PANEL_HEIGHT * 0.22;
+const TAIL_Y_MID = PANEL_HEIGHT * 0.26;
 const TAIL_Y_END = -PANEL_HEIGHT * 0.35;
 const CURVE_POWER = 2.8;
 
