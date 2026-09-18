@@ -198,9 +198,17 @@ function FlightTrail() {
   // far. The stroke itself is one fully-opaque solid path — only the glow
   // fill beneath it fades for the glow effect; trailFade is what makes the
   // whole line vanish quickly once the plane has flown away.
+  // Clamped to the panel's own box: during the fly-away burst the plane
+  // itself is allowed to dash out above/past the border (that's the
+  // intended premium crash effect), but the line stays bounded inside the
+  // panel like a real graph, instead of leaking off past the screen edge.
   const points: { x: number; y: number }[] = [];
   for (let i = 0; i <= TRAIL_SAMPLES; i++) {
-    points.push(tailPoint((t * i) / TRAIL_SAMPLES));
+    const raw = tailPoint((t * i) / TRAIL_SAMPLES);
+    points.push({
+      x: Math.min(Math.max(raw.x, 0), PANEL_WIDTH),
+      y: Math.min(Math.max(raw.y, 0), PANEL_HEIGHT),
+    });
   }
   const lineD = points.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L ');
   const fillD = `M ${lineD} L ${points[points.length - 1].x.toFixed(1)} ${PANEL_HEIGHT} L ${points[0].x.toFixed(1)} ${PANEL_HEIGHT} Z`;
