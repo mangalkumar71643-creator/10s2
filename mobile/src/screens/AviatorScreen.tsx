@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   panelWrap: {
-    marginTop: 60,
+    marginTop: 110,
     alignSelf: 'center',
   },
   plane: {
