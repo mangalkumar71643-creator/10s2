@@ -55,7 +55,7 @@ const ASCEND_MS_MAX = 5200;
 // stays put) → only then does the plane dash away, so fast there's no
 // time to react to it.
 const LINE_FADE_MS = 50;
-const BURST_MS = 60;
+const BURST_MS = 25;
 const ROUND_PAUSE_MS = 1000;
 const TRAIL_SAMPLES = 32;
 
