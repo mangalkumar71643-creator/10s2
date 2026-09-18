@@ -51,10 +51,11 @@ const PLANE_HEIGHT = PLANE_WIDTH * PLANE_ASPECT;
 // short — a sudden, fast dash off-screen rather than a smooth glide.
 const ASCEND_MS_MIN = 2600;
 const ASCEND_MS_MAX = 5200;
-const BURST_MS = 160;
-// How fast the red trail itself vanishes once the plane has flown away —
-// kept far shorter than the pause before the next round starts.
-const TRAIL_FADE_MS = 50;
+// Order is: ascend to t=0.8 and hold → red line fades out first (plane
+// stays put) → only then does the plane dash away, so fast there's no
+// time to react to it.
+const LINE_FADE_MS = 50;
+const BURST_MS = 60;
 const ROUND_PAUSE_MS = 1000;
 const TRAIL_SAMPLES = 32;
 
@@ -148,30 +149,40 @@ function FlightTrail() {
   const rafRef = useRef<number | null>(null);
   const startRef = useRef(0);
   const fadeStartRef = useRef(0);
+  const burstStartRef = useRef(0);
   const ascendMsRef = useRef(randomAscendMs());
-  const phaseRef = useRef<'flying' | 'fading' | 'paused'>('flying');
+  const phaseRef = useRef<'ascend' | 'lineFade' | 'burst' | 'paused'>('ascend');
 
   useEffect(() => {
     let mounted = true;
     const tick = (now: number) => {
       if (!mounted) return;
-      if (phaseRef.current === 'flying') {
+      if (phaseRef.current === 'ascend') {
         if (!startRef.current) startRef.current = now;
         const elapsed = now - startRef.current;
         const ascendMs = ascendMsRef.current;
-        const nextT =
-          elapsed <= ascendMs
-            ? 0.8 * (elapsed / ascendMs)
-            : 0.8 + 0.2 * Math.min(1, (elapsed - ascendMs) / BURST_MS);
-        setT(nextT);
-        if (elapsed >= ascendMs + BURST_MS) {
-          phaseRef.current = 'fading';
+        setT(Math.min(0.8, 0.8 * (elapsed / ascendMs)));
+        if (elapsed >= ascendMs) {
+          setT(0.8);
+          phaseRef.current = 'lineFade';
           fadeStartRef.current = now;
         }
-      } else if (phaseRef.current === 'fading') {
+      } else if (phaseRef.current === 'lineFade') {
+        // Plane holds still at t=0.8 while the red line fades out first.
         const fadeElapsed = now - fadeStartRef.current;
-        setTrailFade(Math.max(0, 1 - fadeElapsed / TRAIL_FADE_MS));
-        if (fadeElapsed >= TRAIL_FADE_MS) {
+        setTrailFade(Math.max(0, 1 - fadeElapsed / LINE_FADE_MS));
+        if (fadeElapsed >= LINE_FADE_MS) {
+          setTrailFade(0);
+          phaseRef.current = 'burst';
+          burstStartRef.current = now;
+        }
+      } else if (phaseRef.current === 'burst') {
+        // Only once the line is fully gone does the plane dash away — and
+        // it does so almost instantly, too fast to react to.
+        const burstElapsed = now - burstStartRef.current;
+        const bs = Math.min(1, burstElapsed / BURST_MS);
+        setT(0.8 + 0.2 * bs);
+        if (burstElapsed >= BURST_MS) {
           phaseRef.current = 'paused';
           setTimeout(() => {
             if (!mounted) return;
@@ -179,7 +190,7 @@ function FlightTrail() {
             ascendMsRef.current = randomAscendMs();
             setT(0);
             setTrailFade(1);
-            phaseRef.current = 'flying';
+            phaseRef.current = 'ascend';
           }, ROUND_PAUSE_MS);
         }
       }
