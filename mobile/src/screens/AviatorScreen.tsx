@@ -54,7 +54,7 @@ const ASCEND_MS_MAX = 5200;
 const BURST_MS = 160;
 // How fast the red trail itself vanishes once the plane has flown away —
 // kept far shorter than the pause before the next round starts.
-const TRAIL_FADE_MS = 120;
+const TRAIL_FADE_MS = 50;
 const ROUND_PAUSE_MS = 1000;
 const TRAIL_SAMPLES = 32;
 
