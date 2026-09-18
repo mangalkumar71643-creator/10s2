@@ -67,8 +67,8 @@ export default function HomeScreen() {
   const winGoTileLeft = GAME_GRID_LEFT;
   const aviatorTileTop = gameGridTop;
   const aviatorTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const aviator2TileTop = gameGridTop;
-  const aviator2TileLeft = GAME_GRID_LEFT + 2 * GAME_GRID_CELL;
+  const aviator2TileTop = gameGridTop + GAME_GRID_CELL;
+  const aviator2TileLeft = GAME_GRID_LEFT;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
