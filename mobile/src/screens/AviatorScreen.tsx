@@ -141,9 +141,11 @@ const TAIL_X_START = PANEL_WIDTH * 0.02;
 const TAIL_X_MID = PANEL_WIDTH * 0.64; // hand-off point from ascend to burst
 const TAIL_X_END = PANEL_WIDTH * 1.08;
 const TAIL_Y_START = PANEL_HEIGHT * 0.94; // hugs the bottom-left corner at first
-// Ascend always climbs up to just short of the panel's top border (not
-// partway down) before holding there to wait for the real crash.
-const TAIL_Y_MID = PANEL_HEIGHT * 0.06;
+// Ascend climbs well up toward the top of the panel before holding there
+// to wait for the real crash — kept low enough (with margin for the
+// plane's own height/rotation) that the plane itself stays fully inside
+// the panel border instead of clipping through the top edge.
+const TAIL_Y_MID = PANEL_HEIGHT * 0.22;
 const TAIL_Y_END = -PANEL_HEIGHT * 0.35;
 const CURVE_POWER = 2.8;
 
