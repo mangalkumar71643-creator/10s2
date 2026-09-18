@@ -34,6 +34,11 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 const PANEL_WIDTH = SCREEN_WIDTH * 0.966;
 const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 
+// "Aviator" wordmark that sits in the header's empty space above the panel.
+const LOGO_ASPECT = 49 / 148;
+const LOGO_WIDTH = SCREEN_WIDTH * 0.32;
+const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
+
 // Bet/Auto toggle + stake stepper + Bet button block — same width as the
 // panel above it, own native aspect ratio preserved.
 const BET_PANEL_ASPECT = 572 / 688;
@@ -337,6 +342,15 @@ export default function AviatorScreen() {
         <MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
       </Pressable>
 
+      <Image
+        source={require('../../assets/aviator-logo.png')}
+        resizeMode="contain"
+        style={[
+          styles.logo,
+          { top: insets.top + 8, left: (SCREEN_WIDTH - LOGO_WIDTH) / 2, width: LOGO_WIDTH, height: LOGO_HEIGHT },
+        ]}
+      />
+
       <View style={[styles.panelWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
         <Image
           source={require('../../assets/aviator-panel-bg.png')}
@@ -369,6 +383,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
+  },
+  logo: {
+    position: 'absolute',
+    zIndex: 5,
   },
   panelWrap: {
     marginTop: 60,
