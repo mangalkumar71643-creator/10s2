@@ -76,17 +76,22 @@ const PLANE_ASPECT = 215 / 441;
 const PLANE_WIDTH = PANEL_WIDTH * 0.24;
 const PLANE_HEIGHT = PLANE_WIDTH * PLANE_ASPECT;
 
-// Ascend time is randomized each round so the fly-away moment can't be
-// timed/predicted. The burst itself (t: 0.8 -> 1) is deliberately very
-// short — a sudden, fast dash off-screen rather than a smooth glide.
-const ASCEND_MS_MIN = 2600;
-const ASCEND_MS_MAX = 5200;
-// Order is: ascend to t=0.8 and hold → red line fades out first (plane
-// stays put) → only then does the plane dash away, so fast there's no
-// time to react to it.
+// The plane's ascend position (t: 0 -> 0.8) is driven directly by the
+// REAL live multiplier the backend reports for the round, not by an
+// internal timer — so the plane is always exactly where the number says
+// it should be, instead of looping its own animation independently of
+// the multiplier. ASCEND_K controls how quickly the curve approaches its
+// t=0.8 asymptote as the multiplier climbs (a Michaelis-Menten-style
+// saturating curve: progress = (m-1) / (m-1+K)); tuned so the visual pace
+// roughly matches how the multiplier feels at low vs. high values.
+const ASCEND_K = 4;
+// Order is: ascend (tracking the live multiplier) → the round actually
+// crashes (server-reported) → red line fades out first (plane stays put)
+// → only then does the plane dash away, so fast there's no time to react
+// to it. Both stages are deliberately very short — a sudden crash, not a
+// smooth glide.
 const LINE_FADE_MS = 50;
 const BURST_MS = 25;
-const ROUND_PAUSE_MS = 1000;
 const TRAIL_SAMPLES = 32;
 
 // Plain-JS interpolation (mirrors Animated.interpolate's multi-stop
@@ -169,36 +174,66 @@ function tailPoint(t: number) {
   return { x: tailCurveX(t), y: tailCurveY(t) };
 }
 
-function randomAscendMs() {
-  return ASCEND_MS_MIN + Math.random() * (ASCEND_MS_MAX - ASCEND_MS_MIN);
+// Maps the real live multiplier to the plane's 0->0.8 ascend progress —
+// m=1.00x is the runway (progress 0), and progress creeps toward (but
+// never quite reaches) 0.8 as the multiplier keeps climbing.
+function ascendProgressForMultiplier(multiplier: number) {
+  const m = Math.max(1, multiplier);
+  return Math.min(0.8, (0.8 * (m - 1)) / (m - 1 + ASCEND_K));
 }
 
-function FlightTrail() {
+function FlightTrail({ round }: { round: AviatorRoundView | null }) {
   const [t, setT] = useState(0);
   const [trailFade, setTrailFade] = useState(1);
   const rafRef = useRef<number | null>(null);
-  const startRef = useRef(0);
   const fadeStartRef = useRef(0);
   const burstStartRef = useRef(0);
-  const ascendMsRef = useRef(randomAscendMs());
-  const phaseRef = useRef<'ascend' | 'lineFade' | 'burst' | 'paused'>('ascend');
+  // 'idle' covers both "no round yet" and the BETTING phase — the plane
+  // sits parked at the runway (t=0) until the round actually starts
+  // flying. 'held' is the post-burst rest state: the plane has fully
+  // flown away and stays gone until the NEXT round's real data arrives.
+  const phaseRef = useRef<'idle' | 'flying' | 'lineFade' | 'burst' | 'held'>('idle');
+  const lastPeriodRef = useRef<string | null>(null);
+  const roundRef = useRef(round);
+  roundRef.current = round;
 
   useEffect(() => {
     let mounted = true;
     const tick = (now: number) => {
       if (!mounted) return;
-      if (phaseRef.current === 'ascend') {
-        if (!startRef.current) startRef.current = now;
-        const elapsed = now - startRef.current;
-        const ascendMs = ascendMsRef.current;
-        setT(Math.min(0.8, 0.8 * (elapsed / ascendMs)));
-        if (elapsed >= ascendMs) {
+      const r = roundRef.current;
+
+      // A new round (real, server-assigned period) always resets the
+      // visual to the runway, regardless of whatever this component's
+      // own phase happened to be.
+      if (r && r.periodNumber !== lastPeriodRef.current) {
+        lastPeriodRef.current = r.periodNumber;
+        phaseRef.current = 'idle';
+        setT(0);
+        setTrailFade(1);
+      }
+
+      if (phaseRef.current === 'idle') {
+        if (r && r.phase === 'FLYING') {
+          phaseRef.current = 'flying';
+        } else {
+          setT(0);
+        }
+      }
+
+      if (phaseRef.current === 'flying') {
+        if (r && r.phase === 'CRASHED') {
+          // The round has actually crashed (server-reported) — hold the
+          // plane at its current ascend position and start the real
+          // crash sequence instead of an internal timer.
           setT(0.8);
           phaseRef.current = 'lineFade';
           fadeStartRef.current = now;
+        } else if (r && r.phase === 'FLYING') {
+          setT(ascendProgressForMultiplier(r.multiplier));
         }
       } else if (phaseRef.current === 'lineFade') {
-        // Plane holds still at t=0.8 while the red line fades out first.
+        // Plane holds still while the red line fades out first.
         const fadeElapsed = now - fadeStartRef.current;
         setTrailFade(Math.max(0, 1 - fadeElapsed / LINE_FADE_MS));
         if (fadeElapsed >= LINE_FADE_MS) {
@@ -213,17 +248,12 @@ function FlightTrail() {
         const bs = Math.min(1, burstElapsed / BURST_MS);
         setT(0.8 + 0.2 * bs);
         if (burstElapsed >= BURST_MS) {
-          phaseRef.current = 'paused';
-          setTimeout(() => {
-            if (!mounted) return;
-            startRef.current = 0;
-            ascendMsRef.current = randomAscendMs();
-            setT(0);
-            setTrailFade(1);
-            phaseRef.current = 'ascend';
-          }, ROUND_PAUSE_MS);
+          phaseRef.current = 'held';
         }
       }
+      // 'held' does nothing further — it just waits for the period-change
+      // check above to fire once the next round's real data comes in.
+
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -582,7 +612,7 @@ export default function AviatorScreen() {
           style={{ width: PANEL_WIDTH, height: PANEL_HEIGHT }}
           resizeMode="contain"
         />
-        <FlightTrail />
+        <FlightTrail round={round} />
         <View style={styles.multiplierWrap} pointerEvents="none">
           <Text style={[styles.multiplierText, { color: multiplierColor }]}>{multiplierLabel}</Text>
           {round?.phase === 'CRASHED' && <Text style={styles.multiplierSubLabel}>FLEW AWAY!</Text>}
