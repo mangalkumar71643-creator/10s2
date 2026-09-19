@@ -131,15 +131,12 @@ function rotatedTailOffset(t: number) {
   };
 }
 
-// The propeller hub location in the source plane art (441x215px),
-// measured by finding the bounding box of the propeller's own pixels
-// (x:370-436, y:5-177 — symmetric around this point, confirming it's the
-// true hub/rotation center of the two-blade prop). Used to overlay a
-// separately spinning "blur" effect in the same spot without needing to
-// cut the propeller out of the base image at all.
-const PROP_HUB_FRAC = { x: 403 / 441, y: 91 / 215 };
-const PROP_SPAN_FRAC = { w: 70 / 441, h: 176 / 215 };
-const SPIN_DEG_PER_MS = 1.1; // fast — reads as a spinning blur, not distinct blades
+// Once the ascend finishes (t reaches 0.8) the plane holds at the same
+// spot for however long the round keeps flying — for a long flight (say
+// waiting well past 1.5x-2x) that read as dead-still, so a small gentle
+// vertical bob is layered on top of the hold position instead.
+const BOB_AMPLITUDE = PANEL_HEIGHT * 0.02;
+const BOB_FREQUENCY_HZ = 0.7;
 
 // Real Aviator's curve hugs the bottom-left corner while the multiplier is
 // still near 1.00x, then rockets upward as it grows — a "hockey stick"
@@ -196,7 +193,7 @@ function tailPoint(t: number) {
 function FlightTrail({ round }: { round: AviatorRoundView | null }) {
   const [t, setT] = useState(0);
   const [trailFade, setTrailFade] = useState(1);
-  const [spinDeg, setSpinDeg] = useState(0);
+  const [bobY, setBobY] = useState(0);
   const rafRef = useRef<number | null>(null);
   const ascendStartRef = useRef(0);
   const fadeStartRef = useRef(0);
@@ -214,9 +211,6 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
     let mounted = true;
     const tick = (now: number) => {
       if (!mounted) return;
-      // The propeller keeps spinning regardless of flight phase — same as
-      // a real plane idling on the runway before takeoff.
-      setSpinDeg((now * SPIN_DEG_PER_MS) % 360);
       const r = roundRef.current;
 
       // A new round (real, server-assigned period) always resets the
@@ -227,6 +221,7 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
         phaseRef.current = 'idle';
         setT(0);
         setTrailFade(1);
+        setBobY(0);
       }
 
       if (phaseRef.current === 'idle') {
@@ -244,6 +239,7 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
           // plane at its current ascend position and start the real
           // crash sequence instead of an internal timer.
           setT(0.8);
+          setBobY(0);
           phaseRef.current = 'lineFade';
           fadeStartRef.current = now;
         } else {
@@ -252,7 +248,17 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
           // border) in ASCEND_MS, then simply stays there until the round
           // actually crashes for real.
           const ascendElapsed = now - ascendStartRef.current;
-          setT(Math.min(0.8, 0.8 * (ascendElapsed / ASCEND_MS)));
+          if (ascendElapsed >= ASCEND_MS) {
+            // Holding — a long flight (waiting well past 1.5x, 2x...)
+            // otherwise just freezes in the same spot, so bob gently
+            // instead of sitting dead-still.
+            setT(0.8);
+            const holdElapsed = ascendElapsed - ASCEND_MS;
+            setBobY(BOB_AMPLITUDE * Math.sin((holdElapsed / 1000) * BOB_FREQUENCY_HZ * Math.PI * 2));
+          } else {
+            setT(0.8 * (ascendElapsed / ASCEND_MS));
+            setBobY(0);
+          }
         }
       } else if (phaseRef.current === 'lineFade') {
         // Plane holds still while the red line fades out first.
@@ -325,7 +331,9 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
           strokeLinejoin="round"
         />
       </Svg>
-      <View
+      <Image
+        source={require('../../assets/aviator-plane.png')}
+        resizeMode="contain"
         style={[
           styles.plane,
           {
@@ -334,37 +342,13 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
             opacity: planeOpacity(t),
             transform: [
               { translateX: planeX(t) },
-              { translateY: planeY(t) },
+              { translateY: planeY(t) + bobY },
               { rotate: `${planeRotate(t)}deg` },
               { scale: planeScale(t) },
             ],
           },
         ]}
-      >
-        <Image
-          source={require('../../assets/aviator-plane.png')}
-          resizeMode="contain"
-          style={{ width: '100%', height: '100%' }}
-        />
-        {/* Spinning propeller illusion: a translucent blur disc plus a thin
-            highlight streak, both centered on the hub and continuously
-            rotating — sits right on top of the base art's own (static)
-            propeller rather than replacing any part of it. */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            left: PROP_HUB_FRAC.x * PLANE_WIDTH - (PROP_SPAN_FRAC.w * PLANE_WIDTH) / 2,
-            top: PROP_HUB_FRAC.y * PLANE_HEIGHT - (PROP_SPAN_FRAC.h * PLANE_HEIGHT) / 2,
-            width: PROP_SPAN_FRAC.w * PLANE_WIDTH,
-            height: PROP_SPAN_FRAC.h * PLANE_HEIGHT,
-          }}
-        >
-          <View style={styles.propBlur} />
-          <View style={[styles.propStreak, { transform: [{ rotate: `${spinDeg}deg` }] }]} />
-          <View style={[styles.propStreak, { transform: [{ rotate: `${spinDeg + 90}deg` }] }]} />
-        </View>
-      </View>
+      />
     </>
   );
 }
@@ -737,23 +721,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
-  },
-  propBlur: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(255,255,255,0.28)',
-  },
-  propStreak: {
-    position: 'absolute',
-    left: '48%',
-    right: '48%',
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   trailSvg: {
     position: 'absolute',
