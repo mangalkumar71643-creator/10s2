@@ -131,6 +131,16 @@ function rotatedTailOffset(t: number) {
   };
 }
 
+// The propeller hub location in the source plane art (441x215px),
+// measured by finding the bounding box of the propeller's own pixels
+// (x:370-436, y:5-177 — symmetric around this point, confirming it's the
+// true hub/rotation center of the two-blade prop). Used to overlay a
+// separately spinning "blur" effect in the same spot without needing to
+// cut the propeller out of the base image at all.
+const PROP_HUB_FRAC = { x: 403 / 441, y: 91 / 215 };
+const PROP_SPAN_FRAC = { w: 70 / 441, h: 176 / 215 };
+const SPIN_DEG_PER_MS = 1.1; // fast — reads as a spinning blur, not distinct blades
+
 // Real Aviator's curve hugs the bottom-left corner while the multiplier is
 // still near 1.00x, then rockets upward as it grows — a "hockey stick"
 // shape, not a straight diagonal. CURVE_POWER > 1 gives exactly that: y
@@ -186,6 +196,7 @@ function tailPoint(t: number) {
 function FlightTrail({ round }: { round: AviatorRoundView | null }) {
   const [t, setT] = useState(0);
   const [trailFade, setTrailFade] = useState(1);
+  const [spinDeg, setSpinDeg] = useState(0);
   const rafRef = useRef<number | null>(null);
   const ascendStartRef = useRef(0);
   const fadeStartRef = useRef(0);
@@ -203,6 +214,9 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
     let mounted = true;
     const tick = (now: number) => {
       if (!mounted) return;
+      // The propeller keeps spinning regardless of flight phase — same as
+      // a real plane idling on the runway before takeoff.
+      setSpinDeg((now * SPIN_DEG_PER_MS) % 360);
       const r = roundRef.current;
 
       // A new round (real, server-assigned period) always resets the
@@ -311,9 +325,7 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
           strokeLinejoin="round"
         />
       </Svg>
-      <Image
-        source={require('../../assets/aviator-plane.png')}
-        resizeMode="contain"
+      <View
         style={[
           styles.plane,
           {
@@ -328,7 +340,31 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
             ],
           },
         ]}
-      />
+      >
+        <Image
+          source={require('../../assets/aviator-plane.png')}
+          resizeMode="contain"
+          style={{ width: '100%', height: '100%' }}
+        />
+        {/* Spinning propeller illusion: a translucent blur disc plus a thin
+            highlight streak, both centered on the hub and continuously
+            rotating — sits right on top of the base art's own (static)
+            propeller rather than replacing any part of it. */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: PROP_HUB_FRAC.x * PLANE_WIDTH - (PROP_SPAN_FRAC.w * PLANE_WIDTH) / 2,
+            top: PROP_HUB_FRAC.y * PLANE_HEIGHT - (PROP_SPAN_FRAC.h * PLANE_HEIGHT) / 2,
+            width: PROP_SPAN_FRAC.w * PLANE_WIDTH,
+            height: PROP_SPAN_FRAC.h * PLANE_HEIGHT,
+          }}
+        >
+          <View style={styles.propBlur} />
+          <View style={[styles.propStreak, { transform: [{ rotate: `${spinDeg}deg` }] }]} />
+          <View style={[styles.propStreak, { transform: [{ rotate: `${spinDeg + 90}deg` }] }]} />
+        </View>
+      </View>
     </>
   );
 }
@@ -701,6 +737,23 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
+  },
+  propBlur: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 9999,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+  },
+  propStreak: {
+    position: 'absolute',
+    left: '48%',
+    right: '48%',
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   trailSvg: {
     position: 'absolute',
