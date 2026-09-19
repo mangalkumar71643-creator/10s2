@@ -308,11 +308,16 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
   const points: { x: number; y: number }[] = [];
   for (let i = 0; i <= TRAIL_SAMPLES; i++) {
     const raw = tailPoint((t * i) / TRAIL_SAMPLES);
-    // bobY shifts the WHOLE curve, not just the tip — otherwise only the
-    // plane moves while the line stays put, and the two visibly separate.
+    // Only the very tip curls to follow the plane's bob, tapered sharply
+    // (8th power) so it fades to ~0 well before the earlier points — those
+    // sit close to the bottom border already, so shifting them by the
+    // same amount as the tip made them clamp flat against the edge while
+    // the tip kept moving, which visibly sagged/deformed the whole curve
+    // every bob cycle instead of just gently curling near the plane.
+    const bobWeight = Math.pow(i / TRAIL_SAMPLES, 8);
     points.push({
       x: Math.min(Math.max(raw.x, 0), PANEL_WIDTH),
-      y: Math.min(Math.max(raw.y + bobY, 0), PANEL_HEIGHT),
+      y: Math.min(Math.max(raw.y + bobY * bobWeight, 0), PANEL_HEIGHT),
     });
   }
   const lineD = points.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L ');
