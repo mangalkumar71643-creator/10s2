@@ -137,8 +137,8 @@ function rotatedTailOffset(t: number) {
 // dip-and-return is layered on top of the hold position instead: it
 // sinks down noticeably, then eases back up to the hold line (never
 // higher), and repeats — not a symmetric up/down wobble.
-const BOB_AMPLITUDE = PANEL_HEIGHT * 0.06;
-const BOB_FREQUENCY_HZ = 0.35;
+const BOB_AMPLITUDE = PANEL_HEIGHT * 0.15;
+const BOB_FREQUENCY_HZ = 0.15;
 
 // Real Aviator's curve hugs the bottom-left corner while the multiplier is
 // still near 1.00x, then rockets upward as it grows — a "hockey stick"
