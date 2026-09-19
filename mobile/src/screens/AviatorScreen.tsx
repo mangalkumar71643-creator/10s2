@@ -133,10 +133,12 @@ function rotatedTailOffset(t: number) {
 
 // Once the ascend finishes (t reaches 0.8) the plane holds at the same
 // spot for however long the round keeps flying — for a long flight (say
-// waiting well past 1.5x-2x) that read as dead-still, so a small gentle
-// vertical bob is layered on top of the hold position instead.
-const BOB_AMPLITUDE = PANEL_HEIGHT * 0.02;
-const BOB_FREQUENCY_HZ = 0.7;
+// waiting well past 1.5x-2x) that read as dead-still, so a slow downward
+// dip-and-return is layered on top of the hold position instead: it
+// sinks down noticeably, then eases back up to the hold line (never
+// higher), and repeats — not a symmetric up/down wobble.
+const BOB_AMPLITUDE = PANEL_HEIGHT * 0.06;
+const BOB_FREQUENCY_HZ = 0.35;
 
 // Real Aviator's curve hugs the bottom-left corner while the multiplier is
 // still near 1.00x, then rockets upward as it grows — a "hockey stick"
@@ -254,7 +256,10 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
             // instead of sitting dead-still.
             setT(0.8);
             const holdElapsed = ascendElapsed - ASCEND_MS;
-            setBobY(BOB_AMPLITUDE * Math.sin((holdElapsed / 1000) * BOB_FREQUENCY_HZ * Math.PI * 2));
+            const phase = (holdElapsed / 1000) * BOB_FREQUENCY_HZ * Math.PI * 2;
+            // (1 - cos)/2 stays in [0, 1] the whole cycle — always a DIP
+            // downward from the hold line and back, never rising above it.
+            setBobY(BOB_AMPLITUDE * ((1 - Math.cos(phase)) / 2));
           } else {
             setT(0.8 * (ascendElapsed / ASCEND_MS));
             setBobY(0);
@@ -303,9 +308,11 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
   const points: { x: number; y: number }[] = [];
   for (let i = 0; i <= TRAIL_SAMPLES; i++) {
     const raw = tailPoint((t * i) / TRAIL_SAMPLES);
+    // bobY shifts the WHOLE curve, not just the tip — otherwise only the
+    // plane moves while the line stays put, and the two visibly separate.
     points.push({
       x: Math.min(Math.max(raw.x, 0), PANEL_WIDTH),
-      y: Math.min(Math.max(raw.y, 0), PANEL_HEIGHT),
+      y: Math.min(Math.max(raw.y + bobY, 0), PANEL_HEIGHT),
     });
   }
   const lineD = points.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' L ');
