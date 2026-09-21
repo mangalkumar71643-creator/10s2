@@ -35,14 +35,14 @@ function maskPhone(phone: string | null) {
 
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { uid, phone, avatarId, setAvatarId, logout, hasLoginPassword, setLoginPassword, requestOtp, verifyIdentityOtp, otpSent } = useAuth();
+  const { phone, avatarId, setAvatarId, logout, hasLoginPassword, setLoginPassword, requestOtp, verifyIdentityOtp, otpSent, backendUser } = useAuth();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [securityVisible, setSecurityVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  // Derived from the account's own unique uid (not the phone number) so two
-  // players can never end up sharing the same display name.
-  const playerName = uid ? `Player${uid}` : 'Player';
+  // Derived from the account's own unique 5-digit uid (not the phone
+  // number) so two players can never end up sharing the same display name.
+  const playerName = backendUser?.uid ? `Player${backendUser.uid}` : 'Player';
 
   const [otpCode, setOtpCode] = useState('');
   const [sendCooldown, setSendCooldown] = useState(0);
@@ -127,7 +127,7 @@ export default function ProfileScreen() {
             {playerName}
           </Text>
           <Text style={styles.playerUid} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-            UID: {uid ?? '—'}
+            UID: {backendUser?.uid ?? '—'}
           </Text>
         </View>
       </LinearGradient>

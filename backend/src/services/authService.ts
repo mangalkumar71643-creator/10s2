@@ -1,9 +1,36 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
 import { comparePassword, hashPassword } from "../utils/password";
 import { signToken } from "../utils/jwt";
 import { isAtLeast18 } from "../utils/age";
 import { consumeOtp, isRecentlyVerified, requestOtp as requestOtpCode, verifyOtp as verifyOtpCode } from "./otpService";
+
+function randomFiveDigitUid(): number {
+  return Math.floor(10000 + Math.random() * 90000);
+}
+
+/** Retries `createFn` with a fresh random 5-digit uid whenever it collides
+ * with an existing one (Postgres unique violation on the `uid` column) —
+ * the only reliable way to guarantee no two accounts ever share a uid
+ * without a sequence, since `db push` (this repo's schema workflow, see
+ * vercel.json) doesn't manage one. */
+async function createUserWithUniqueUid<T>(createFn: (uid: number) => Promise<T>): Promise<T> {
+  const MAX_ATTEMPTS = 25;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await createFn(randomFiveDigitUid());
+    } catch (err) {
+      const isUidConflict =
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === "P2002" &&
+        (err.meta?.target as string[] | undefined)?.includes("uid");
+      if (!isUidConflict || attempt === MAX_ATTEMPTS) throw err;
+    }
+  }
+  // Unreachable — the loop above always returns or throws.
+  throw new ApiError(500, "Could not allocate a unique account number. Please try again.");
+}
 
 export interface RegisterInput {
   email: string;
@@ -29,17 +56,20 @@ export async function registerUser(input: RegisterInput) {
   }
 
   const passwordHash = await hashPassword(input.password);
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      passwordHash,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      dateOfBirth: dob,
-      country: input.country,
-      wallet: { create: { balance: 0 } },
-    },
-  });
+  const user = await createUserWithUniqueUid((uid) =>
+    prisma.user.create({
+      data: {
+        uid,
+        email: input.email,
+        passwordHash,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        dateOfBirth: dob,
+        country: input.country,
+        wallet: { create: { balance: 0 } },
+      },
+    })
+  );
 
   const token = signToken({ userId: user.id, role: user.role });
   return { user: sanitizeUser(user), token };
@@ -131,16 +161,19 @@ export async function completePhoneRegistration(input: CompleteProfileInput) {
     throw new ApiError(403, "You must be at least 18 years old to register.");
   }
 
-  const user = await prisma.user.create({
-    data: {
-      phone,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      dateOfBirth: dob,
-      country: input.country,
-      wallet: { create: { balance: 0 } },
-    },
-  });
+  const user = await createUserWithUniqueUid((uid) =>
+    prisma.user.create({
+      data: {
+        uid,
+        phone,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        dateOfBirth: dob,
+        country: input.country,
+        wallet: { create: { balance: 0 } },
+      },
+    })
+  );
 
   await consumeOtp(phone);
   const token = signToken({ userId: user.id, role: user.role });

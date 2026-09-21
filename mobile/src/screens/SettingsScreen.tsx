@@ -27,7 +27,7 @@ const KYC_LABELS: Record<string, string> = {
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { phone, uid, logout, backendUser, submitKyc, setDepositLimits, selfExclude } = useAuth();
+  const { phone, logout, backendUser, submitKyc, setDepositLimits, selfExclude } = useAuth();
   const [sound, setSound] = useState(true);
   const [music, setMusic] = useState(true);
   const [vibration, setVibration] = useState(true);
@@ -135,7 +135,7 @@ export default function SettingsScreen() {
 
       <SectionHeader title="Account" />
       <View style={styles.card}>
-        {uid ? <InfoRow icon="identifier" label="User ID" value={uid} /> : null}
+        {backendUser?.uid ? <InfoRow icon="identifier" label="User ID" value={String(backendUser.uid)} /> : null}
         {phone ? <InfoRow icon="cellphone" label="Mobile Number" value={`+91 ${phone}`} /> : null}
         <NavRow icon="account-circle-outline" label="Account" onPress={() => navigation.navigate('Profile')} />
         <NavRow icon="shield-lock-outline" label="Privacy" onPress={() => Alert.alert('Privacy', 'Privacy policy coming soon.')} />

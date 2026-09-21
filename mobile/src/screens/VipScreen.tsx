@@ -133,7 +133,7 @@ function DiamondBadge({
 export default function VipScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const { avatarId, uid } = useAuth();
+  const { avatarId, backendUser } = useAuth();
   const { user, vipBonusHistory, isVipBonusClaimed, claimVipBonus } = useGameState();
   const [levels, setLevels] = useState<VipLevelDef[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +179,7 @@ export default function VipScreen() {
     );
   }
 
-  const playerName = uid ? `Player${uid}` : 'Player';
+  const playerName = backendUser?.uid ? `Player${backendUser.uid}` : 'Player';
   const scrollLevels = levels.filter((l) => l.level >= 1);
   const current = levels.find((l) => l.level === focusedLevel) ?? scrollLevels[0];
   const prev = levels.find((l) => l.level === focusedLevel - 1) ?? levels[0];

@@ -2,6 +2,9 @@ import { apiFetch } from './client';
 
 export interface BackendUser {
   id: string;
+  // Short public-facing account number ("UID" in the UI) — a 5-digit
+  // number unique per account, separate from the internal `id` above.
+  uid: number | null;
   phone: string | null;
   email: string | null;
   firstName: string;
