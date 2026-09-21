@@ -19,6 +19,12 @@ import { useGameState } from '../state/GameStateContext';
 
 const MIN_STAKE = 10;
 const STAKE_STEP = 10;
+// Mirrors the backend's own MIN_AUTO_CASHOUT (aviatorService.ts) so the
+// stepper can clamp locally without a round-trip; the backend still
+// enforces this too.
+const MIN_AUTO_CASHOUT = 1.01;
+const AUTO_CASHOUT_STEP = 0.1;
+const DEFAULT_AUTO_CASHOUT = 2;
 
 // Stepper hotspot positions as fractions of the bet-panel image (688x688
 // source pixels), measured from the minus/plus circle art so the overlay
@@ -472,7 +478,7 @@ function BetAutoToggle({
 type PanelBetState =
   | { status: 'idle' }
   | { status: 'placing' }
-  | { status: 'pending'; betId: string; amount: number; periodNumber: string }
+  | { status: 'pending'; betId: string; amount: number; periodNumber: string; autoCashoutAt?: number }
   | { status: 'cashingOut'; betId: string; amount: number; periodNumber: string }
   | { status: 'won'; payout: number; cashoutMultiplier: number }
   | { status: 'lost' };
@@ -486,6 +492,9 @@ function BetButton({
   state,
   phase,
   liveMultiplier,
+  mode,
+  autoCashout,
+  onAutoCashoutChange,
   onBet,
   onCashout,
 }: {
@@ -493,6 +502,9 @@ function BetButton({
   state: PanelBetState;
   phase: AviatorRoundView['phase'] | null;
   liveMultiplier: number;
+  mode: BetAutoMode;
+  autoCashout: number;
+  onAutoCashoutChange: (next: number) => void;
   onBet: () => void;
   onCashout: () => void;
 }) {
@@ -505,7 +517,35 @@ function BetButton({
   };
 
   if (state.status === 'idle') {
-    return <Pressable onPress={onBet} style={hotspot} />;
+    // Auto mode: the player sets an auto cash-out multiplier before
+    // betting — placeBet() sends it along as autoCashoutAt, and the
+    // backend resolves WON/LOST on its own at that multiplier once the
+    // round crashes, the same way it already does for a manual cash-out.
+    // A manual cash-out during FLYING (below) still works too — the auto
+    // value is only a fallback for whenever the player doesn't act first.
+    return (
+      <Pressable onPress={onBet} style={hotspot}>
+        {mode === 'auto' && (
+          <View style={styles.autoCashoutRow} pointerEvents="box-none">
+            <Pressable
+              onPress={() => onAutoCashoutChange(Math.max(MIN_AUTO_CASHOUT, Math.round((autoCashout - AUTO_CASHOUT_STEP) * 100) / 100))}
+              hitSlop={6}
+              style={styles.autoCashoutStepBtn}
+            >
+              <Text style={styles.autoCashoutStepText}>−</Text>
+            </Pressable>
+            <Text style={styles.autoCashoutValueText}>Cash out @ {autoCashout.toFixed(2)}x</Text>
+            <Pressable
+              onPress={() => onAutoCashoutChange(Math.round((autoCashout + AUTO_CASHOUT_STEP) * 100) / 100)}
+              hitSlop={6}
+              style={styles.autoCashoutStepBtn}
+            >
+              <Text style={styles.autoCashoutStepText}>+</Text>
+            </Pressable>
+          </View>
+        )}
+      </Pressable>
+    );
   }
 
   let label = '';
@@ -520,7 +560,9 @@ function BetButton({
       bg = 'rgba(46,160,67,0.92)';
       onPress = onCashout;
     } else {
-      label = `Waiting…\n₹${state.amount}`;
+      label = state.autoCashoutAt
+        ? `Waiting…\n₹${state.amount} · Auto @${state.autoCashoutAt.toFixed(2)}x`
+        : `Waiting…\n₹${state.amount}`;
     }
   } else if (state.status === 'cashingOut') {
     label = 'Cashing out…';
@@ -548,6 +590,13 @@ export default function AviatorScreen() {
   const [stake2, setStake2] = useState(MIN_STAKE);
   const [mode1, setMode1] = useState<BetAutoMode>('bet');
   const [mode2, setMode2] = useState<BetAutoMode>('bet');
+  // Auto mode keeps its own stake and cash-out target per panel, separate
+  // from the manual "Bet" mode's stake — switching tabs never overwrites
+  // whatever the player had set on the other one.
+  const [autoStake1, setAutoStake1] = useState(MIN_STAKE);
+  const [autoStake2, setAutoStake2] = useState(MIN_STAKE);
+  const [autoCashout1, setAutoCashout1] = useState(DEFAULT_AUTO_CASHOUT);
+  const [autoCashout2, setAutoCashout2] = useState(DEFAULT_AUTO_CASHOUT);
   const [round, setRound] = useState<AviatorRoundView | null>(null);
   const [history, setHistory] = useState<number[]>(HISTORY_SAMPLE);
   const [bet1, setBet1] = useState<PanelBetState>({ status: 'idle' });
@@ -629,7 +678,10 @@ export default function AviatorScreen() {
 
   const placeBet = useCallback(
     async (panel: 1 | 2) => {
-      const stake = panel === 1 ? stake1 : stake2;
+      const mode = panel === 1 ? mode1 : mode2;
+      const isAuto = mode === 'auto';
+      const stake = isAuto ? (panel === 1 ? autoStake1 : autoStake2) : panel === 1 ? stake1 : stake2;
+      const autoCashoutAt = isAuto ? (panel === 1 ? autoCashout1 : autoCashout2) : undefined;
       const setBet = panel === 1 ? setBet1 : setBet2;
       if (!round || round.phase !== 'BETTING') {
         Alert.alert('Betting closed', 'Wait for the next round to place a bet.');
@@ -637,15 +689,21 @@ export default function AviatorScreen() {
       }
       setBet({ status: 'placing' });
       try {
-        const result = await placeAviatorBet(stake);
-        setBet({ status: 'pending', betId: result.id, amount: Number(result.amount), periodNumber: round.periodNumber });
+        const result = await placeAviatorBet(stake, autoCashoutAt);
+        setBet({
+          status: 'pending',
+          betId: result.id,
+          amount: Number(result.amount),
+          periodNumber: round.periodNumber,
+          autoCashoutAt,
+        });
         refreshWallet().catch(() => {});
       } catch (err) {
         setBet({ status: 'idle' });
         Alert.alert('Bet failed', err instanceof ApiClientError ? err.message : 'Please try again.');
       }
     },
-    [round, stake1, stake2, refreshWallet]
+    [round, mode1, mode2, stake1, stake2, autoStake1, autoStake2, autoCashout1, autoCashout2, refreshWallet]
   );
 
   const cashout = useCallback(
@@ -718,13 +776,24 @@ export default function AviatorScreen() {
         />
         <BetAutoToggle topFrac={TOGGLE_TOP_1} mode={mode1} onChange={setMode1} />
         <BetAutoToggle topFrac={TOGGLE_TOP_2} mode={mode2} onChange={setMode2} />
-        <StakeStepper layout={STEPPER_LAYOUT} value={stake1} onChange={setStake1} />
-        <StakeStepper layout={STEPPER_LAYOUT_2} value={stake2} onChange={setStake2} />
+        <StakeStepper
+          layout={STEPPER_LAYOUT}
+          value={mode1 === 'auto' ? autoStake1 : stake1}
+          onChange={mode1 === 'auto' ? setAutoStake1 : setStake1}
+        />
+        <StakeStepper
+          layout={STEPPER_LAYOUT_2}
+          value={mode2 === 'auto' ? autoStake2 : stake2}
+          onChange={mode2 === 'auto' ? setAutoStake2 : setStake2}
+        />
         <BetButton
           layout={BET_BUTTON_LAYOUT_1}
           state={bet1}
           phase={round?.phase ?? null}
           liveMultiplier={round?.multiplier ?? 1}
+          mode={mode1}
+          autoCashout={autoCashout1}
+          onAutoCashoutChange={setAutoCashout1}
           onBet={() => placeBet(1)}
           onCashout={() => cashout(1)}
         />
@@ -733,6 +802,9 @@ export default function AviatorScreen() {
           state={bet2}
           phase={round?.phase ?? null}
           liveMultiplier={round?.multiplier ?? 1}
+          mode={mode2}
+          autoCashout={autoCashout2}
+          onAutoCashoutChange={setAutoCashout2}
           onBet={() => placeBet(2)}
           onCashout={() => cashout(2)}
         />
@@ -837,5 +909,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  autoCashoutRow: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 12,
+    paddingVertical: 4,
+  },
+  autoCashoutStepBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoCashoutStepText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    lineHeight: 16,
+  },
+  autoCashoutValueText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
