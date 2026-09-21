@@ -30,7 +30,7 @@ const pctY = (px: number) => px / IMAGE_HEIGHT;
 
 export default function LoginScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
-  const { requestOtp, verifyOtp, otpSent, devOtpCode, loginWithPassword } = useAuth();
+  const { quickLogin, verifyOtp, otpSent, devOtpCode, loginWithPassword } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -71,7 +71,7 @@ export default function LoginScreen() {
     if (resendCooldown > 0 || sendingOtp) return;
     setLoginMode('otp');
     setSendingOtp(true);
-    const error = await requestOtp(phone.trim());
+    const error = await quickLogin(phone.trim());
     setSendingOtp(false);
     if (error) {
       Alert.alert('Could not send code', error);
