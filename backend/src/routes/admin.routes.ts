@@ -101,6 +101,7 @@ router.get(
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
+        uid: true,
         email: true,
         phone: true,
         firstName: true,
@@ -112,6 +113,7 @@ router.get(
         bannedAt: true,
         role: true,
         createdAt: true,
+        wallet: { select: { balance: true, currency: true } },
       },
       take: 200,
     });
@@ -168,6 +170,46 @@ router.get(
       include: { user: { select: { email: true } }, selection: true },
     });
     res.json(bets);
+  })
+);
+
+router.get(
+  "/dashboard-summary",
+  asyncHandler(async (_req, res) => {
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [totalUsers, newUsers7d, totalDeposit, deposit7d, totalWithdrawal, withdrawal7d, activePlayerRows] =
+      await Promise.all([
+        prisma.user.count(),
+        prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
+        prisma.transaction.aggregate({ where: { type: "DEPOSIT", status: "COMPLETED" }, _sum: { amount: true } }),
+        prisma.transaction.aggregate({
+          where: { type: "DEPOSIT", status: "COMPLETED", createdAt: { gte: weekAgo } },
+          _sum: { amount: true },
+        }),
+        prisma.transaction.aggregate({ where: { type: "WITHDRAWAL", status: "COMPLETED" }, _sum: { amount: true } }),
+        prisma.transaction.aggregate({
+          where: { type: "WITHDRAWAL", status: "COMPLETED", createdAt: { gte: weekAgo } },
+          _sum: { amount: true },
+        }),
+        // "Active" = staked something (a sports bet or any game round) in the last 24h.
+        prisma.transaction.findMany({
+          where: { type: { in: ["GAME_STAKE", "BET_STAKE"] }, createdAt: { gte: dayAgo } },
+          distinct: ["userId"],
+          select: { userId: true },
+        }),
+      ]);
+
+    res.json({
+      totalUsers,
+      newUsersLast7Days: newUsers7d,
+      totalDeposit: totalDeposit._sum.amount ?? 0,
+      depositLast7Days: deposit7d._sum.amount ?? 0,
+      totalWithdrawal: totalWithdrawal._sum.amount ?? 0,
+      withdrawalLast7Days: withdrawal7d._sum.amount ?? 0,
+      activePlayers: activePlayerRows.length,
+    });
   })
 );
 
