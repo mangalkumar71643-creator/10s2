@@ -23,37 +23,49 @@ const STAKE_STEP = 10;
 // stepper can clamp locally without a round-trip; the backend still
 // enforces this too.
 const MIN_AUTO_CASHOUT = 1.01;
-const AUTO_CASHOUT_STEP = 0.1;
 const DEFAULT_AUTO_CASHOUT = 2;
 
-// Stepper hotspot positions as fractions of the bet-panel image (688x688
-// source pixels), measured from the minus/plus circle art so the overlay
-// lines up with the drawn buttons at any screen size.
+// The bet-panel art used to be one 688x572 bitmap with both panels baked
+// together, which left no room to add anything BELOW an individual panel
+// (only after both). It's now two separate crops — aviator-bet-panel-1.png
+// (0-284 of the original) and aviator-bet-panel-2.png (284-572) — so the
+// Auto options row below can be inserted between/after each panel as an
+// ordinary flow sibling. All the hotspot fractions below are measured
+// against each crop's OWN height (284 / 288), not the original 572.
+const BET_PANEL_1_SOURCE_HEIGHT = 284;
+const BET_PANEL_2_SOURCE_HEIGHT = 288;
+const BET_PANEL_1_ASPECT = BET_PANEL_1_SOURCE_HEIGHT / 688;
+const BET_PANEL_2_ASPECT = BET_PANEL_2_SOURCE_HEIGHT / 688;
+
+// Stepper hotspot positions as fractions of each panel's own crop, measured
+// from the minus/plus circle art so the overlay lines up with the drawn
+// buttons at any screen size.
 const STEPPER_LAYOUT = {
-  minus: { left: 32 / 688, top: 105 / 572, width: 43 / 688, height: 43 / 572 },
-  plus: { left: 235 / 688, top: 104 / 572, width: 43 / 688, height: 44 / 572 },
-  track: { left: 75 / 688, top: 105 / 572, width: 160 / 688, height: 43 / 572 },
+  minus: { left: 32 / 688, top: 105 / 284, width: 43 / 688, height: 43 / 284 },
+  plus: { left: 235 / 688, top: 104 / 284, width: 43 / 688, height: 44 / 284 },
+  track: { left: 75 / 688, top: 105 / 284, width: 160 / 688, height: 43 / 284 },
 };
-// Second (lower) panel's stepper row sits at the same x layout, lower y.
+// Second (lower) panel's stepper row sits at the same x layout — the
+// original y (388) minus the crop offset (284), over the crop's own height.
 const STEPPER_LAYOUT_2 = {
-  minus: { left: 32 / 688, top: 388 / 572, width: 43 / 688, height: 44 / 572 },
-  plus: { left: 235 / 688, top: 388 / 572, width: 43 / 688, height: 44 / 572 },
-  track: { left: 75 / 688, top: 388 / 572, width: 160 / 688, height: 44 / 572 },
+  minus: { left: 32 / 688, top: (388 - 284) / 288, width: 43 / 688, height: 44 / 288 },
+  plus: { left: 235 / 688, top: (388 - 284) / 288, width: 43 / 688, height: 44 / 288 },
+  track: { left: 75 / 688, top: (388 - 284) / 288, width: 160 / 688, height: 44 / 288 },
 };
 
-// Green "Bet" button hotspots — measured from the same source art as the
-// stepper layouts above (688x572px), one per panel.
-const BET_BUTTON_LAYOUT_1 = { left: 307 / 688, top: 103 / 572, width: 348 / 688, height: 154 / 572 };
-const BET_BUTTON_LAYOUT_2 = { left: 307 / 688, top: 387 / 572, width: 348 / 688, height: 153 / 572 };
+// Green "Bet" button hotspots — measured the same way as the stepper
+// layouts above, one per panel's own crop.
+const BET_BUTTON_LAYOUT_1 = { left: 307 / 688, top: 103 / 284, width: 348 / 688, height: 154 / 284 };
+const BET_BUTTON_LAYOUT_2 = { left: 307 / 688, top: (387 - 284) / 288, width: 348 / 688, height: 153 / 288 };
 
-// Bet/Auto toggle hotspots — measured from the same source art (688x572px)
-// as the layouts above: the pill sits at the top of each panel, split into
-// a left "Bet" half and a right "Auto" half.
-const TOGGLE_ROW_HEIGHT = (93 - 6) / 572;
+// Bet/Auto toggle hotspots — the pill sits at the top of each panel, split
+// into a left "Bet" half and a right "Auto" half.
 const TOGGLE_BET_TAB = { left: 145 / 688, width: (344 - 145) / 688 };
 const TOGGLE_AUTO_TAB = { left: 344 / 688, width: (540 - 344) / 688 };
-const TOGGLE_TOP_1 = 6 / 572;
-const TOGGLE_TOP_2 = 289 / 572;
+const TOGGLE_TOP_1 = 6 / 284;
+const TOGGLE_ROW_HEIGHT_1 = (93 - 6) / 284;
+const TOGGLE_TOP_2 = (289 - 284) / 288;
+const TOGGLE_ROW_HEIGHT_2 = (93 - 6) / 288;
 
 // Panel background asset's own aspect ratio and on-screen width, matched
 // to the reference Aviator site's panel: ~96.6% of screen width, and a
@@ -80,10 +92,10 @@ function historyColor(mult: number) {
 }
 
 // Bet/Auto toggle + stake stepper + Bet button block — same width as the
-// panel above it, own native aspect ratio preserved.
-const BET_PANEL_ASPECT = 572 / 688;
+// panel above it, each half's own native aspect ratio preserved.
 const BET_PANEL_WIDTH = PANEL_WIDTH;
-const BET_PANEL_HEIGHT = BET_PANEL_WIDTH * BET_PANEL_ASPECT;
+const BET_PANEL_1_HEIGHT = BET_PANEL_WIDTH * BET_PANEL_1_ASPECT;
+const BET_PANEL_2_HEIGHT = BET_PANEL_WIDTH * BET_PANEL_2_ASPECT;
 
 // Plane icon's own aspect ratio, sized relative to the rays panel it flies
 // inside of.
@@ -382,10 +394,12 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
 
 function StakeStepper({
   layout,
+  panelHeight,
   value,
   onChange,
 }: {
   layout: typeof STEPPER_LAYOUT;
+  panelHeight: number;
   value: number;
   onChange: (next: number) => void;
 }) {
@@ -407,9 +421,9 @@ function StakeStepper({
   const hotspot = (key: keyof typeof STEPPER_LAYOUT) => ({
     position: 'absolute' as const,
     left: layout[key].left * BET_PANEL_WIDTH,
-    top: layout[key].top * BET_PANEL_HEIGHT,
+    top: layout[key].top * panelHeight,
     width: layout[key].width * BET_PANEL_WIDTH,
-    height: layout[key].height * BET_PANEL_HEIGHT,
+    height: layout[key].height * panelHeight,
   });
 
   return (
@@ -445,19 +459,23 @@ type BetAutoMode = 'bet' | 'auto';
 // showing the panel art's own dark background and label untouched.
 function BetAutoToggle({
   topFrac,
+  rowHeightFrac,
+  panelHeight,
   mode,
   onChange,
 }: {
   topFrac: number;
+  rowHeightFrac: number;
+  panelHeight: number;
   mode: BetAutoMode;
   onChange: (next: BetAutoMode) => void;
 }) {
   const tabStyle = (tab: typeof TOGGLE_BET_TAB) => ({
     position: 'absolute' as const,
     left: tab.left * BET_PANEL_WIDTH,
-    top: topFrac * BET_PANEL_HEIGHT,
+    top: topFrac * panelHeight,
     width: tab.width * BET_PANEL_WIDTH,
-    height: TOGGLE_ROW_HEIGHT * BET_PANEL_HEIGHT,
+    height: rowHeightFrac * panelHeight,
     borderRadius: 9999,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
@@ -489,63 +507,31 @@ type PanelBetState =
 // change (Cash Out / Won / Lost) without touching the underlying image.
 function BetButton({
   layout,
+  panelHeight,
   state,
   phase,
   liveMultiplier,
-  mode,
-  autoCashout,
-  onAutoCashoutChange,
   onBet,
   onCashout,
 }: {
   layout: { left: number; top: number; width: number; height: number };
+  panelHeight: number;
   state: PanelBetState;
   phase: AviatorRoundView['phase'] | null;
   liveMultiplier: number;
-  mode: BetAutoMode;
-  autoCashout: number;
-  onAutoCashoutChange: (next: number) => void;
   onBet: () => void;
   onCashout: () => void;
 }) {
   const hotspot = {
     position: 'absolute' as const,
     left: layout.left * BET_PANEL_WIDTH,
-    top: layout.top * BET_PANEL_HEIGHT,
+    top: layout.top * panelHeight,
     width: layout.width * BET_PANEL_WIDTH,
-    height: layout.height * BET_PANEL_HEIGHT,
+    height: layout.height * panelHeight,
   };
 
   if (state.status === 'idle') {
-    // Auto mode: the player sets an auto cash-out multiplier before
-    // betting — placeBet() sends it along as autoCashoutAt, and the
-    // backend resolves WON/LOST on its own at that multiplier once the
-    // round crashes, the same way it already does for a manual cash-out.
-    // A manual cash-out during FLYING (below) still works too — the auto
-    // value is only a fallback for whenever the player doesn't act first.
-    return (
-      <Pressable onPress={onBet} style={hotspot}>
-        {mode === 'auto' && (
-          <View style={styles.autoCashoutRow} pointerEvents="box-none">
-            <Pressable
-              onPress={() => onAutoCashoutChange(Math.max(MIN_AUTO_CASHOUT, Math.round((autoCashout - AUTO_CASHOUT_STEP) * 100) / 100))}
-              hitSlop={6}
-              style={styles.autoCashoutStepBtn}
-            >
-              <Text style={styles.autoCashoutStepText}>−</Text>
-            </Pressable>
-            <Text style={styles.autoCashoutValueText}>Cash out @ {autoCashout.toFixed(2)}x</Text>
-            <Pressable
-              onPress={() => onAutoCashoutChange(Math.round((autoCashout + AUTO_CASHOUT_STEP) * 100) / 100)}
-              hitSlop={6}
-              style={styles.autoCashoutStepBtn}
-            >
-              <Text style={styles.autoCashoutStepText}>+</Text>
-            </Pressable>
-          </View>
-        )}
-      </Pressable>
-    );
+    return <Pressable onPress={onBet} style={hotspot} />;
   }
 
   let label = '';
@@ -582,6 +568,82 @@ function BetButton({
   );
 }
 
+// Small flat on/off switch matching the reference screenshot's minimal
+// style — plain Views instead of RN's native Switch, which looks quite
+// different (and more platform-chunky) than that flat dark look.
+function MiniToggle({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <Pressable onPress={() => onChange(!value)} style={[styles.miniToggleTrack, value && styles.miniToggleTrackOn]}>
+      <View style={[styles.miniToggleThumb, value && styles.miniToggleThumbOn]} />
+    </Pressable>
+  );
+}
+
+// The row that sits below each bet panel once it's in Auto mode: "Auto
+// bet" (auto-place a bet every new round) and "Auto Cash Out" (send the
+// multiplier below as autoCashoutAt when placing) are independent
+// switches — matching real Aviator, where auto cash-out is a fallback a
+// player can enable/disable separately from auto-betting itself.
+function AutoOptionsRow({
+  panelWidth,
+  autoBetOn,
+  onToggleAutoBet,
+  autoCashOutOn,
+  onToggleAutoCashOut,
+  cashOutValue,
+  onChangeCashOutValue,
+}: {
+  panelWidth: number;
+  autoBetOn: boolean;
+  onToggleAutoBet: (next: boolean) => void;
+  autoCashOutOn: boolean;
+  onToggleAutoCashOut: (next: boolean) => void;
+  cashOutValue: number;
+  onChangeCashOutValue: (next: number) => void;
+}) {
+  const [text, setText] = useState(cashOutValue.toFixed(2));
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setText(cashOutValue.toFixed(2));
+  }, [cashOutValue, editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const parsed = parseFloat(text);
+    const clamped = Number.isFinite(parsed) ? Math.max(MIN_AUTO_CASHOUT, parsed) : DEFAULT_AUTO_CASHOUT;
+    setText(clamped.toFixed(2));
+    onChangeCashOutValue(clamped);
+  };
+
+  return (
+    <View style={[styles.autoOptionsRow, { width: panelWidth }]}>
+      <Text style={styles.autoOptionsLabel}>Auto bet</Text>
+      <MiniToggle value={autoBetOn} onChange={onToggleAutoBet} />
+      <Text style={styles.autoOptionsLabel}>Auto Cash Out</Text>
+      <MiniToggle value={autoCashOutOn} onChange={onToggleAutoCashOut} />
+      {autoCashOutOn && (
+        <>
+          <TextInput
+            style={styles.autoOptionsValueInput}
+            value={text}
+            onChangeText={setText}
+            onFocus={() => setEditing(true)}
+            onBlur={commit}
+            onSubmitEditing={commit}
+            keyboardType="decimal-pad"
+            returnKeyType="done"
+            selectTextOnFocus
+          />
+          <Pressable onPress={() => onChangeCashOutValue(DEFAULT_AUTO_CASHOUT)} hitSlop={8}>
+            <MaterialCommunityIcons name="close" size={16} color="#8A8A8E" />
+          </Pressable>
+        </>
+      )}
+    </View>
+  );
+}
+
 export default function AviatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -597,6 +659,12 @@ export default function AviatorScreen() {
   const [autoStake2, setAutoStake2] = useState(MIN_STAKE);
   const [autoCashout1, setAutoCashout1] = useState(DEFAULT_AUTO_CASHOUT);
   const [autoCashout2, setAutoCashout2] = useState(DEFAULT_AUTO_CASHOUT);
+  // Both start off, matching the reference: entering Auto mode alone
+  // doesn't commit to anything until the player flips a switch.
+  const [autoBetOn1, setAutoBetOn1] = useState(false);
+  const [autoBetOn2, setAutoBetOn2] = useState(false);
+  const [autoCashOutOn1, setAutoCashOutOn1] = useState(false);
+  const [autoCashOutOn2, setAutoCashOutOn2] = useState(false);
   const [round, setRound] = useState<AviatorRoundView | null>(null);
   const [history, setHistory] = useState<number[]>(HISTORY_SAMPLE);
   const [bet1, setBet1] = useState<PanelBetState>({ status: 'idle' });
@@ -613,6 +681,17 @@ export default function AviatorScreen() {
   useEffect(() => {
     bet2Ref.current = bet2;
   }, [bet2]);
+
+  // Read directly (not via an effect) inside the polling loop below, the
+  // same way FlightTrail reads its own roundRef — always the latest
+  // render's values without tearing down/recreating the poll interval
+  // whenever the player flips a switch or edits a stake.
+  const autoBetConfigRef = useRef({ mode1, mode2, autoBetOn1, autoBetOn2 });
+  autoBetConfigRef.current = { mode1, mode2, autoBetOn1, autoBetOn2 };
+  // Assigned once placeBetForRound is defined below (component body order
+  // doesn't matter for a ref written during render — the poll effect only
+  // reads it later, asynchronously, by which point it's always set).
+  const placeBetForRoundRef = useRef<(panel: 1 | 2, roundView: AviatorRoundView) => Promise<void>>(async () => {});
 
   const resolveIfPending = useCallback(
     async (bet: PanelBetState, setBet: (s: PanelBetState) => void) => {
@@ -653,6 +732,16 @@ export default function AviatorScreen() {
           fetchAviatorHistory()
             .then((entries) => setHistory(entries.slice(0, 7).reverse().map((e) => Number(e.crashMultiplier))))
             .catch(() => {});
+
+          // Auto bet: fire once per new round's betting window for any
+          // panel that's in Auto mode with the "Auto bet" switch on. Uses
+          // the freshly fetched view (not the `round` state, which hasn't
+          // re-rendered yet) so the phase check inside is never stale.
+          if (view.phase === 'BETTING') {
+            const cfg = autoBetConfigRef.current;
+            if (cfg.mode1 === 'auto' && cfg.autoBetOn1) placeBetForRoundRef.current(1, view);
+            if (cfg.mode2 === 'auto' && cfg.autoBetOn2) placeBetForRoundRef.current(2, view);
+          }
         }
         lastPeriod.current = view.periodNumber;
 
@@ -676,17 +765,21 @@ export default function AviatorScreen() {
     };
   }, [resolveIfPending]);
 
-  const placeBet = useCallback(
-    async (panel: 1 | 2) => {
+  // Takes the round view explicitly (rather than reading the `round`
+  // state) so the auto-bet trigger in the polling effect above can pass
+  // the just-fetched view straight in — using the `round` state there
+  // would race against React's render cycle and could see the previous
+  // round's stale phase for a tick.
+  const placeBetForRound = useCallback(
+    async (panel: 1 | 2, roundView: AviatorRoundView) => {
       const mode = panel === 1 ? mode1 : mode2;
       const isAuto = mode === 'auto';
+      const autoCashOutOn = panel === 1 ? autoCashOutOn1 : autoCashOutOn2;
       const stake = isAuto ? (panel === 1 ? autoStake1 : autoStake2) : panel === 1 ? stake1 : stake2;
-      const autoCashoutAt = isAuto ? (panel === 1 ? autoCashout1 : autoCashout2) : undefined;
+      // Auto Cash Out is its own switch — Auto mode can auto-bet without
+      // ever sending an auto cash-out target, if that switch is off.
+      const autoCashoutAt = isAuto && autoCashOutOn ? (panel === 1 ? autoCashout1 : autoCashout2) : undefined;
       const setBet = panel === 1 ? setBet1 : setBet2;
-      if (!round || round.phase !== 'BETTING') {
-        Alert.alert('Betting closed', 'Wait for the next round to place a bet.');
-        return;
-      }
       setBet({ status: 'placing' });
       try {
         const result = await placeAviatorBet(stake, autoCashoutAt);
@@ -694,7 +787,7 @@ export default function AviatorScreen() {
           status: 'pending',
           betId: result.id,
           amount: Number(result.amount),
-          periodNumber: round.periodNumber,
+          periodNumber: roundView.periodNumber,
           autoCashoutAt,
         });
         refreshWallet().catch(() => {});
@@ -703,7 +796,21 @@ export default function AviatorScreen() {
         Alert.alert('Bet failed', err instanceof ApiClientError ? err.message : 'Please try again.');
       }
     },
-    [round, mode1, mode2, stake1, stake2, autoStake1, autoStake2, autoCashout1, autoCashout2, refreshWallet]
+    [mode1, mode2, stake1, stake2, autoStake1, autoStake2, autoCashout1, autoCashout2, autoCashOutOn1, autoCashOutOn2, refreshWallet]
+  );
+  placeBetForRoundRef.current = placeBetForRound;
+
+  // Manual "Bet" button handler — placeBetForRound does the actual work,
+  // this just supplies the current round state and its own "closed" guard.
+  const placeBet = useCallback(
+    (panel: 1 | 2) => {
+      if (!round || round.phase !== 'BETTING') {
+        Alert.alert('Betting closed', 'Wait for the next round to place a bet.');
+        return;
+      }
+      placeBetForRound(panel, round);
+    },
+    [round, placeBetForRound]
   );
 
   const cashout = useCallback(
@@ -768,46 +875,88 @@ export default function AviatorScreen() {
         </View>
       </View>
 
-      <View style={[styles.betPanelWrap, { width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }]}>
-        <Image
-          source={require('../../assets/aviator-bet-panel.png')}
-          style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }}
-          resizeMode="contain"
-        />
-        <BetAutoToggle topFrac={TOGGLE_TOP_1} mode={mode1} onChange={setMode1} />
-        <BetAutoToggle topFrac={TOGGLE_TOP_2} mode={mode2} onChange={setMode2} />
-        <StakeStepper
-          layout={STEPPER_LAYOUT}
-          value={mode1 === 'auto' ? autoStake1 : stake1}
-          onChange={mode1 === 'auto' ? setAutoStake1 : setStake1}
-        />
-        <StakeStepper
-          layout={STEPPER_LAYOUT_2}
-          value={mode2 === 'auto' ? autoStake2 : stake2}
-          onChange={mode2 === 'auto' ? setAutoStake2 : setStake2}
-        />
-        <BetButton
-          layout={BET_BUTTON_LAYOUT_1}
-          state={bet1}
-          phase={round?.phase ?? null}
-          liveMultiplier={round?.multiplier ?? 1}
-          mode={mode1}
-          autoCashout={autoCashout1}
-          onAutoCashoutChange={setAutoCashout1}
-          onBet={() => placeBet(1)}
-          onCashout={() => cashout(1)}
-        />
-        <BetButton
-          layout={BET_BUTTON_LAYOUT_2}
-          state={bet2}
-          phase={round?.phase ?? null}
-          liveMultiplier={round?.multiplier ?? 1}
-          mode={mode2}
-          autoCashout={autoCashout2}
-          onAutoCashoutChange={setAutoCashout2}
-          onBet={() => placeBet(2)}
-          onCashout={() => cashout(2)}
-        />
+      <View style={[styles.betPanelWrap, { width: BET_PANEL_WIDTH }]}>
+        <View style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_1_HEIGHT }}>
+          <Image
+            source={require('../../assets/aviator-bet-panel-1.png')}
+            style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_1_HEIGHT }}
+            resizeMode="contain"
+          />
+          <BetAutoToggle
+            topFrac={TOGGLE_TOP_1}
+            rowHeightFrac={TOGGLE_ROW_HEIGHT_1}
+            panelHeight={BET_PANEL_1_HEIGHT}
+            mode={mode1}
+            onChange={setMode1}
+          />
+          <StakeStepper
+            layout={STEPPER_LAYOUT}
+            panelHeight={BET_PANEL_1_HEIGHT}
+            value={mode1 === 'auto' ? autoStake1 : stake1}
+            onChange={mode1 === 'auto' ? setAutoStake1 : setStake1}
+          />
+          <BetButton
+            layout={BET_BUTTON_LAYOUT_1}
+            panelHeight={BET_PANEL_1_HEIGHT}
+            state={bet1}
+            phase={round?.phase ?? null}
+            liveMultiplier={round?.multiplier ?? 1}
+            onBet={() => placeBet(1)}
+            onCashout={() => cashout(1)}
+          />
+        </View>
+        {mode1 === 'auto' && (
+          <AutoOptionsRow
+            panelWidth={BET_PANEL_WIDTH}
+            autoBetOn={autoBetOn1}
+            onToggleAutoBet={setAutoBetOn1}
+            autoCashOutOn={autoCashOutOn1}
+            onToggleAutoCashOut={setAutoCashOutOn1}
+            cashOutValue={autoCashout1}
+            onChangeCashOutValue={setAutoCashout1}
+          />
+        )}
+
+        <View style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_2_HEIGHT }}>
+          <Image
+            source={require('../../assets/aviator-bet-panel-2.png')}
+            style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_2_HEIGHT }}
+            resizeMode="contain"
+          />
+          <BetAutoToggle
+            topFrac={TOGGLE_TOP_2}
+            rowHeightFrac={TOGGLE_ROW_HEIGHT_2}
+            panelHeight={BET_PANEL_2_HEIGHT}
+            mode={mode2}
+            onChange={setMode2}
+          />
+          <StakeStepper
+            layout={STEPPER_LAYOUT_2}
+            panelHeight={BET_PANEL_2_HEIGHT}
+            value={mode2 === 'auto' ? autoStake2 : stake2}
+            onChange={mode2 === 'auto' ? setAutoStake2 : setStake2}
+          />
+          <BetButton
+            layout={BET_BUTTON_LAYOUT_2}
+            panelHeight={BET_PANEL_2_HEIGHT}
+            state={bet2}
+            phase={round?.phase ?? null}
+            liveMultiplier={round?.multiplier ?? 1}
+            onBet={() => placeBet(2)}
+            onCashout={() => cashout(2)}
+          />
+        </View>
+        {mode2 === 'auto' && (
+          <AutoOptionsRow
+            panelWidth={BET_PANEL_WIDTH}
+            autoBetOn={autoBetOn2}
+            onToggleAutoBet={setAutoBetOn2}
+            autoCashOutOn={autoCashOutOn2}
+            onToggleAutoCashOut={setAutoCashOutOn2}
+            cashOutValue={autoCashout2}
+            onChangeCashOutValue={setAutoCashout2}
+          />
+        )}
       </View>
     </View>
   );
@@ -910,36 +1059,51 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  autoCashoutRow: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
+  autoOptionsRow: {
+    marginTop: 10,
+    backgroundColor: '#17171A',
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 12,
-    paddingVertical: 4,
+    flexWrap: 'wrap',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 8,
   },
-  autoCashoutStepBtn: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  autoOptionsLabel: {
+    color: '#B9B9BE',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  autoCashoutStepText: {
+  autoOptionsValueInput: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 16,
-  },
-  autoCashoutValueText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 15,
     fontWeight: '700',
+    minWidth: 46,
+    textAlign: 'center',
+    padding: 0,
+  },
+  miniToggleTrack: {
+    width: 40,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#3A3A3E',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  miniToggleTrackOn: {
+    backgroundColor: '#3ECF8E',
+  },
+  miniToggleThumb: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#8A8A8E',
+    alignSelf: 'flex-start',
+  },
+  miniToggleThumbOn: {
+    backgroundColor: '#FFFFFF',
+    alignSelf: 'flex-end',
   },
 });
