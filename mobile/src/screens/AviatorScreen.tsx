@@ -40,6 +40,15 @@ const STEPPER_LAYOUT_2 = {
 const BET_BUTTON_LAYOUT_1 = { left: 307 / 688, top: 103 / 572, width: 348 / 688, height: 154 / 572 };
 const BET_BUTTON_LAYOUT_2 = { left: 307 / 688, top: 387 / 572, width: 348 / 688, height: 153 / 572 };
 
+// Bet/Auto toggle hotspots — measured from the same source art (688x572px)
+// as the layouts above: the pill sits at the top of each panel, split into
+// a left "Bet" half and a right "Auto" half.
+const TOGGLE_ROW_HEIGHT = (93 - 6) / 572;
+const TOGGLE_BET_TAB = { left: 145 / 688, width: (344 - 145) / 688 };
+const TOGGLE_AUTO_TAB = { left: 344 / 688, width: (540 - 344) / 688 };
+const TOGGLE_TOP_1 = 6 / 572;
+const TOGGLE_TOP_2 = 289 / 572;
+
 // Panel background asset's own aspect ratio and on-screen width, matched
 // to the reference Aviator site's panel: ~96.6% of screen width, and a
 // shorter/wider aspect ratio than our first crop (measured directly off a
@@ -421,6 +430,45 @@ function StakeStepper({
   );
 }
 
+type BetAutoMode = 'bet' | 'auto';
+
+// Bet/Auto tab toggle overlaid on the panel art's own pill. Whichever tab
+// is active gets a white background + our own dark label drawn on top of
+// the static image (the baked-in label there is a light color meant for
+// the dark, unselected look); the inactive tab is left completely alone,
+// showing the panel art's own dark background and label untouched.
+function BetAutoToggle({
+  topFrac,
+  mode,
+  onChange,
+}: {
+  topFrac: number;
+  mode: BetAutoMode;
+  onChange: (next: BetAutoMode) => void;
+}) {
+  const tabStyle = (tab: typeof TOGGLE_BET_TAB) => ({
+    position: 'absolute' as const,
+    left: tab.left * BET_PANEL_WIDTH,
+    top: topFrac * BET_PANEL_HEIGHT,
+    width: tab.width * BET_PANEL_WIDTH,
+    height: TOGGLE_ROW_HEIGHT * BET_PANEL_HEIGHT,
+    borderRadius: 9999,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  });
+
+  return (
+    <>
+      <Pressable onPress={() => onChange('bet')} style={[tabStyle(TOGGLE_BET_TAB), mode === 'bet' && styles.toggleTabActive]}>
+        {mode === 'bet' && <Text style={styles.toggleTabActiveText}>Bet</Text>}
+      </Pressable>
+      <Pressable onPress={() => onChange('auto')} style={[tabStyle(TOGGLE_AUTO_TAB), mode === 'auto' && styles.toggleTabActive]}>
+        {mode === 'auto' && <Text style={styles.toggleTabActiveText}>Auto</Text>}
+      </Pressable>
+    </>
+  );
+}
+
 type PanelBetState =
   | { status: 'idle' }
   | { status: 'placing' }
@@ -498,6 +546,8 @@ export default function AviatorScreen() {
   const { coins, refreshWallet } = useGameState();
   const [stake1, setStake1] = useState(MIN_STAKE);
   const [stake2, setStake2] = useState(MIN_STAKE);
+  const [mode1, setMode1] = useState<BetAutoMode>('bet');
+  const [mode2, setMode2] = useState<BetAutoMode>('bet');
   const [round, setRound] = useState<AviatorRoundView | null>(null);
   const [history, setHistory] = useState<number[]>(HISTORY_SAMPLE);
   const [bet1, setBet1] = useState<PanelBetState>({ status: 'idle' });
@@ -666,6 +716,8 @@ export default function AviatorScreen() {
           style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_HEIGHT }}
           resizeMode="contain"
         />
+        <BetAutoToggle topFrac={TOGGLE_TOP_1} mode={mode1} onChange={setMode1} />
+        <BetAutoToggle topFrac={TOGGLE_TOP_2} mode={mode2} onChange={setMode2} />
         <StakeStepper layout={STEPPER_LAYOUT} value={stake1} onChange={setStake1} />
         <StakeStepper layout={STEPPER_LAYOUT_2} value={stake2} onChange={setStake2} />
         <BetButton
@@ -749,6 +801,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: 0,
     backgroundColor: 'transparent',
+  },
+  toggleTabActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  toggleTabActiveText: {
+    color: '#101012',
+    fontSize: 15,
+    fontWeight: '700',
   },
   multiplierWrap: {
     position: 'absolute',
