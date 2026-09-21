@@ -252,8 +252,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return null;
         } catch (err) {
           if (err instanceof ApiClientError && err.status === 428) {
-            setPendingPhone(phoneNumber);
-            setNeedsProfile(true);
+            // Brand-new number — testing shortcut fills a throwaway profile
+            // instead of showing CompleteProfileScreen, so Login is truly
+            // one tap. Remove once real profile entry is required.
+            const result = await completePhoneProfile({
+              phone: phoneNumber,
+              firstName: 'Test',
+              lastName: 'User',
+              dateOfBirth: '2000-01-01',
+              country: 'IN',
+            });
+            await completeBackendLogin(phoneNumber, result);
             return null;
           }
           throw err;

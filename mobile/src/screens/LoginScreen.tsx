@@ -28,6 +28,11 @@ const IMAGE_HEIGHT = 1536;
 const pctX = (px: number) => px / IMAGE_WIDTH;
 const pctY = (px: number) => px / IMAGE_HEIGHT;
 
+// Testing shortcut: when no number is typed, Login still needs *some*
+// phone to identify the (mock) OTP session with — use a fixed one so a
+// bare tap on Login always works. Remove once real login is required.
+const DEFAULT_TEST_PHONE = '9999999999';
+
 export default function LoginScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const { quickLogin, verifyOtp, otpSent, devOtpCode, loginWithPassword } = useAuth();
@@ -63,15 +68,15 @@ export default function LoginScreen() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  function effectivePhone() {
+    return phone.trim().length === 10 ? phone.trim() : DEFAULT_TEST_PHONE;
+  }
+
   async function sendOtpInline() {
-    if (!isValid) {
-      Alert.alert('Enter your number', 'Please enter a valid 10-digit mobile number first.');
-      return;
-    }
     if (resendCooldown > 0 || sendingOtp) return;
     setLoginMode('otp');
     setSendingOtp(true);
-    const error = await quickLogin(phone.trim());
+    const error = await quickLogin(effectivePhone());
     setSendingOtp(false);
     if (error) {
       Alert.alert('Could not send code', error);
@@ -82,11 +87,11 @@ export default function LoginScreen() {
   }
 
   async function handleSubmit() {
-    if (!isValid) {
-      Alert.alert('Enter your number', 'Please enter a valid 10-digit mobile number first.');
-      return;
-    }
     if (loginMode === 'password') {
+      if (!isValid) {
+        Alert.alert('Enter your number', 'Please enter a valid 10-digit mobile number first.');
+        return;
+      }
       if (!password.trim()) {
         Alert.alert('Enter your password', 'Please enter your password, or switch to Verification Login.');
         return;
@@ -97,6 +102,8 @@ export default function LoginScreen() {
       }
       return;
     }
+    // Testing shortcut: a bare tap on Login signs you straight in, no
+    // number or code needed — see quickLogin/DEFAULT_TEST_PHONE above.
     if (otpSent && otpCode.length === 6) {
       setVerifying(true);
       const error = await verifyOtp(otpCode);
@@ -107,7 +114,12 @@ export default function LoginScreen() {
       return;
     }
     if (!otpSent) {
-      await sendOtpInline();
+      setVerifying(true);
+      const error = await quickLogin(effectivePhone());
+      setVerifying(false);
+      if (error) {
+        Alert.alert('Login failed', error);
+      }
       return;
     }
     Alert.alert('Enter the code', 'Please enter the 6-digit code sent to your number.');
