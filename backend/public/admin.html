@@ -149,6 +149,24 @@
   .stat-delta svg { flex: none; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+
+  .game-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 14px; overflow: hidden; }
+  .game-card-header {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 16px 20px; background: transparent; border: none; color: var(--text); font-size: 14.5px; font-weight: 700;
+  }
+  .game-card-header:hover { background: var(--surface-alt); }
+  .game-card-header.open { color: var(--green); }
+  .game-card-title { display: flex; align-items: center; gap: 10px; }
+  .game-card-header .chev { transition: transform 0.15s ease; color: var(--text-muted); }
+  .game-card-header.open .chev { transform: rotate(180deg); color: var(--green); }
+  .game-card-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .game-card-body.open { display: block; }
+  .live-box { background: var(--surface-alt); border: 1px solid var(--border-strong); border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.9; }
+  .live-box .seed-hash { word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--text-secondary); }
+  .verify-btn { font-size: 11px; padding: 3px 8px; }
+  .verify-ok { color: var(--green); font-weight: 700; }
+  .verify-bad { color: var(--red); font-weight: 700; }
   .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
   .card-head h2 { font-size: 16px; font-weight: 800; }
 
@@ -343,26 +361,94 @@
 
       <div class="panel" id="panel-games">
         <h1 class="page-title">Games</h1>
-        <div class="page-sub">Manage sportsbook events, markets and odds.</div>
-        <div class="card">
-          <h2 style="margin-bottom:12px;">Create Sport</h2>
-          <div class="form-row">
-            <input id="sportName" placeholder="Name (e.g. Cricket)" />
-            <input id="sportSlug" placeholder="Slug (e.g. cricket)" />
-            <button class="btn" id="createSportBtn" style="flex:0 0 auto;">Create</button>
+        <div class="page-sub">Tap a game to watch it live, check its round history and see who's been betting.</div>
+
+        <div class="game-card">
+          <button class="game-card-header" data-game-toggle="colorpredict">
+            <span class="game-card-title"><span id="gameIcon-colorpredict"></span> Win Go</span><span class="chev">▾</span>
+          </button>
+          <div class="game-card-body" id="gamebody-colorpredict">
+            <div class="form-row">
+              <select id="cpDuration">
+                <option value="30">30 seconds</option>
+                <option value="60">1 minute</option>
+                <option value="180">3 minutes</option>
+                <option value="300">5 minutes</option>
+                <option value="600">10 minutes</option>
+              </select>
+              <button class="btn secondary" id="cpRefresh" style="flex:0 0 auto;">Refresh now</button>
+            </div>
+            <h2 style="margin-bottom:10px;">Live round</h2>
+            <div id="cpLive"></div>
+            <hr class="divider" />
+            <h2 style="margin-bottom:10px;">Round history</h2>
+            <div class="table-scroll" id="cpHistory"></div>
+            <hr class="divider" />
+            <h2 style="margin-bottom:10px;">Recent bets — audit for suspicious activity</h2>
+            <div class="table-scroll" id="cpBets"></div>
           </div>
-          <hr class="divider" />
-          <h2 style="margin-bottom:12px;">Events</h2>
-          <div class="form-row">
-            <select id="sportSelect"></select>
-            <button class="btn secondary" id="refreshSportsBtn" style="flex:0 0 auto;">Refresh sports</button>
+        </div>
+
+        <div class="game-card">
+          <button class="game-card-header" data-game-toggle="aviator">
+            <span class="game-card-title"><span id="gameIcon-aviator"></span> Aviator</span><span class="chev">▾</span>
+          </button>
+          <div class="game-card-body" id="gamebody-aviator">
+            <h2 style="margin-bottom:10px;">Live round</h2>
+            <div id="avLive"></div>
+            <hr class="divider" />
+            <h2 style="margin-bottom:10px;">Round history</h2>
+            <div class="table-scroll" id="avHistory"></div>
+            <hr class="divider" />
+            <h2 style="margin-bottom:10px;">Recent bets — audit for suspicious activity</h2>
+            <div class="table-scroll" id="avBets"></div>
           </div>
-          <div class="form-row">
-            <input id="eventName" placeholder="Event name (e.g. Team A vs Team B)" />
-            <input id="eventStart" type="datetime-local" />
-            <button class="btn" id="createEventBtn" style="flex:0 0 auto;">Create</button>
+        </div>
+
+        <div class="game-card">
+          <button class="game-card-header" data-game-toggle="dice">
+            <span class="game-card-title"><span id="gameIcon-dice"></span> Dice</span><span class="chev">▾</span>
+          </button>
+          <div class="game-card-body" id="gamebody-dice">
+            <h2 style="margin-bottom:10px;">Recent plays</h2>
+            <div class="table-scroll" id="diceRounds"></div>
           </div>
-          <div id="eventsList"></div>
+        </div>
+
+        <div class="game-card">
+          <button class="game-card-header" data-game-toggle="coinflip">
+            <span class="game-card-title"><span id="gameIcon-coinflip"></span> Coin Flip</span><span class="chev">▾</span>
+          </button>
+          <div class="game-card-body" id="gamebody-coinflip">
+            <h2 style="margin-bottom:10px;">Recent plays</h2>
+            <div class="table-scroll" id="coinflipRounds"></div>
+          </div>
+        </div>
+
+        <div class="game-card">
+          <button class="game-card-header" data-game-toggle="sportsbook">
+            <span class="game-card-title"><span id="gameIcon-sportsbook"></span> Sportsbook</span><span class="chev">▾</span>
+          </button>
+          <div class="game-card-body" id="gamebody-sportsbook">
+            <h2 style="margin-bottom:12px;">Create Sport</h2>
+            <div class="form-row">
+              <input id="sportName" placeholder="Name (e.g. Cricket)" />
+              <input id="sportSlug" placeholder="Slug (e.g. cricket)" />
+              <button class="btn" id="createSportBtn" style="flex:0 0 auto;">Create</button>
+            </div>
+            <hr class="divider" />
+            <h2 style="margin-bottom:12px;">Events</h2>
+            <div class="form-row">
+              <select id="sportSelect"></select>
+              <button class="btn secondary" id="refreshSportsBtn" style="flex:0 0 auto;">Refresh sports</button>
+            </div>
+            <div class="form-row">
+              <input id="eventName" placeholder="Event name (e.g. Team A vs Team B)" />
+              <input id="eventStart" type="datetime-local" />
+              <button class="btn" id="createEventBtn" style="flex:0 0 auto;">Create</button>
+            </div>
+            <div id="eventsList"></div>
+          </div>
         </div>
       </div>
 
@@ -559,13 +645,14 @@
     dashboard: loadDashboard,
     users: function () { loadUsers(1); },
     transactions: loadWithdrawals,
-    games: loadSports,
+    games: initGamesAccordion,
     support: loadTickets,
     reports: loadReports,
     settings: loadSettings,
   };
 
   function switchTab(tabId) {
+    if (tabId !== 'games') stopGamePolling();
     document.querySelectorAll('.nav-item[data-tab]').forEach(function (b) {
       b.classList.toggle('active', b.getAttribute('data-tab') === tabId);
     });
@@ -844,6 +931,175 @@
   }
   document.getElementById('withdrawalRefresh').addEventListener('click', loadWithdrawals);
   document.getElementById('withdrawalStatus').addEventListener('change', loadWithdrawals);
+
+  // ---------- Games: live monitoring / history / bet audit ----------
+
+  ['colorpredict', 'aviator', 'dice', 'coinflip', 'sportsbook'].forEach(function (key) {
+    var el = document.getElementById('gameIcon-' + key);
+    if (el) el.innerHTML = icon(key === 'aviator' ? 'trendUp' : key === 'sportsbook' ? 'transactions' : 'games', 17);
+  });
+
+  var activeGameKey = null;
+  var activeGamePollInterval = null;
+
+  function stopGamePolling() {
+    if (activeGamePollInterval) { clearInterval(activeGamePollInterval); activeGamePollInterval = null; }
+  }
+
+  var GAME_LOADERS = {
+    colorpredict: function () { loadColorPredictPanel(); activeGamePollInterval = setInterval(loadColorPredictPanel, 4000); },
+    aviator: function () { loadAviatorPanel(); activeGamePollInterval = setInterval(loadAviatorPanel, 2000); },
+    dice: function () { loadInstantGameRounds('dice', 'diceRounds'); },
+    coinflip: function () { loadInstantGameRounds('coinflip', 'coinflipRounds'); },
+    sportsbook: function () { loadSports(); },
+  };
+
+  document.querySelectorAll('[data-game-toggle]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var key = btn.getAttribute('data-game-toggle');
+      var body = document.getElementById('gamebody-' + key);
+      var alreadyOpen = key === activeGameKey;
+      // Accordion: collapse whichever game is open (and stop its polling)
+      // before opening a different one.
+      document.querySelectorAll('.game-card-header').forEach(function (b) { b.classList.remove('open'); });
+      document.querySelectorAll('.game-card-body').forEach(function (b) { b.classList.remove('open'); });
+      stopGamePolling();
+      if (alreadyOpen) { activeGameKey = null; return; }
+      btn.classList.add('open');
+      body.classList.add('open');
+      activeGameKey = key;
+      GAME_LOADERS[key]();
+    });
+  });
+
+  function initGamesAccordion() {
+    // Nothing to preload — each game's panel fetches its own data once
+    // opened, and the accordion above handles start/stop of live polling.
+  }
+
+  async function sha256Hex(text) {
+    var enc = new TextEncoder().encode(text);
+    var buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  function seedCellHtml(serverSeed, serverSeedHash) {
+    if (!serverSeed) return '<span class="item-meta">Not revealed yet — round still running</span>';
+    var id = 'verify-' + Math.random().toString(36).slice(2);
+    return (
+      '<span class="seed-hash">' + serverSeed.slice(0, 14) + '…</span> ' +
+      '<button class="icon-btn verify-btn" data-verify-seed="' + escapeHtml(serverSeed) + '" data-verify-hash="' + escapeHtml(serverSeedHash) + '" data-verify-target="' + id + '">Verify</button> ' +
+      '<span id="' + id + '"></span>'
+    );
+  }
+  function wireVerifyButtons(container) {
+    container.querySelectorAll('[data-verify-seed]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var seed = btn.getAttribute('data-verify-seed');
+        var hash = btn.getAttribute('data-verify-hash');
+        var target = document.getElementById(btn.getAttribute('data-verify-target'));
+        sha256Hex(seed).then(function (computed) {
+          target.innerHTML = computed === hash
+            ? '<span class="verify-ok">✓ matches committed hash</span>'
+            : '<span class="verify-bad">✗ does not match — tampered!</span>';
+        });
+      });
+    });
+  }
+
+  function playerCellHtml(u) {
+    if (!u) return 'Unknown';
+    var name = [u.firstName, u.lastName].filter(Boolean).join(' ') || 'Unnamed';
+    return escapeHtml(name) + (u.uid ? ' <span class="item-meta">(UID ' + u.uid + ')</span>' : '');
+  }
+
+  // --- Win Go (Color Predict) ---
+  function loadColorPredictPanel() {
+    var duration = Number(document.getElementById('cpDuration').value);
+    api('/admin/color-game/live?duration=' + duration).then(function (v) {
+      document.getElementById('cpLive').innerHTML =
+        '<div class="live-box">Period <b>' + v.periodNumber + '</b> &nbsp;·&nbsp; Time left: <b>' + v.timeRemainingSeconds + 's</b> &nbsp;·&nbsp; ' +
+        '<span class="pill ' + (v.locked ? 'banned' : 'active') + '">' + (v.locked ? 'Betting locked' : 'Betting open') + '</span>' +
+        '<br/>Committed hash (fixed before the round started): <span class="seed-hash">' + v.serverSeedHash + '</span></div>';
+    }).catch(function (err) { if (err.authError) doLogout(); });
+
+    api('/admin/color-game/rounds?duration=' + duration + '&limit=15').then(function (rounds) {
+      var rows = rounds.map(function (r) {
+        return '<tr><td>' + r.periodNumber + '</td>' +
+          '<td>' + (r.resultNumber != null ? r.resultNumber + ' · ' + r.resultSize : '—') + '</td>' +
+          '<td>' + seedCellHtml(r.serverSeed, r.serverSeedHash) + '</td></tr>';
+      }).join('');
+      var el = document.getElementById('cpHistory');
+      el.innerHTML = rounds.length ? '<table><thead><tr><th>Period</th><th>Result</th><th>Server seed (verify)</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="empty">No settled rounds yet.</div>';
+      wireVerifyButtons(el);
+    }).catch(function (err) { if (err.authError) doLogout(); });
+
+    api('/admin/color-game/bets?duration=' + duration + '&limit=40').then(function (bets) {
+      var rows = bets.map(function (b) {
+        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + b.betType + ': ' + escapeHtml(b.betValue) + '</td>' +
+          '<td>' + fmtMoney(b.amount) + '</td><td>' + b.round.periodNumber + '</td>' +
+          '<td><span class="pill ' + (b.status === 'WON' ? 'approved' : b.status === 'LOST' ? 'rejected' : 'pending') + '">' + b.status + '</span></td>' +
+          '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
+      }).join('');
+      document.getElementById('cpBets').innerHTML = bets.length
+        ? '<table><thead><tr><th>Player</th><th>Bet</th><th>Amount</th><th>Period</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<div class="empty">No bets yet.</div>';
+    }).catch(function (err) { if (err.authError) doLogout(); });
+  }
+  document.getElementById('cpDuration').addEventListener('change', loadColorPredictPanel);
+  document.getElementById('cpRefresh').addEventListener('click', loadColorPredictPanel);
+
+  // --- Aviator ---
+  function loadAviatorPanel() {
+    api('/admin/aviator/live').then(function (v) {
+      var phasePill = v.phase === 'FLYING' ? 'active' : v.phase === 'CRASHED' ? 'banned' : 'pending';
+      document.getElementById('avLive').innerHTML =
+        '<div class="live-box">Period <b>' + v.periodNumber + '</b> &nbsp;·&nbsp; Phase: <span class="pill ' + phasePill + '">' + v.phase + '</span> ' +
+        '&nbsp;·&nbsp; Multiplier: <b>' + Number(v.multiplier).toFixed(2) + 'x</b>' +
+        (v.crashMultiplier != null ? ' &nbsp;·&nbsp; Crashed at <b>' + Number(v.crashMultiplier).toFixed(2) + 'x</b>' : '') +
+        '<br/>Committed hash (fixed before the round started): <span class="seed-hash">' + v.serverSeedHash + '</span></div>';
+    }).catch(function (err) { if (err.authError) doLogout(); });
+
+    api('/admin/aviator/rounds?limit=15').then(function (rounds) {
+      var rows = rounds.map(function (r) {
+        return '<tr><td>' + r.periodNumber + '</td><td>' + Number(r.crashMultiplier).toFixed(2) + 'x</td>' +
+          '<td>' + seedCellHtml(r.serverSeed, r.serverSeedHash) + '</td></tr>';
+      }).join('');
+      var el = document.getElementById('avHistory');
+      el.innerHTML = rounds.length ? '<table><thead><tr><th>Period</th><th>Crashed at</th><th>Server seed (verify)</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="empty">No settled rounds yet.</div>';
+      wireVerifyButtons(el);
+    }).catch(function (err) { if (err.authError) doLogout(); });
+
+    api('/admin/aviator/bets?limit=40').then(function (bets) {
+      var rows = bets.map(function (b) {
+        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + fmtMoney(b.amount) + '</td>' +
+          '<td>' + (b.autoCashoutAt ? Number(b.autoCashoutAt).toFixed(2) + 'x' : '—') + '</td>' +
+          '<td>' + (b.cashoutMultiplier ? Number(b.cashoutMultiplier).toFixed(2) + 'x' : '—') + '</td>' +
+          '<td>' + fmtMoney(b.payout) + '</td>' +
+          '<td><span class="pill ' + (b.status === 'WON' ? 'approved' : b.status === 'LOST' ? 'rejected' : 'pending') + '">' + b.status + '</span></td>' +
+          '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
+      }).join('');
+      document.getElementById('avBets').innerHTML = bets.length
+        ? '<table><thead><tr><th>Player</th><th>Stake</th><th>Auto cashout</th><th>Cashed out</th><th>Payout</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<div class="empty">No bets yet.</div>';
+    }).catch(function (err) { if (err.authError) doLogout(); });
+  }
+
+  // --- Dice / Coin Flip (instant, per-play games) ---
+  function loadInstantGameRounds(gameType, containerId) {
+    api('/admin/instant-games/rounds?gameType=' + gameType + '&limit=40').then(function (rounds) {
+      var rows = rounds.map(function (r) {
+        return '<tr><td>' + playerCellHtml(r.user) + '</td><td>' + fmtMoney(r.stake) + '</td>' +
+          '<td>' + (r.target != null ? 'Under ' + r.target : '—') + '</td>' +
+          '<td>' + Number(r.multiplier).toFixed(2) + 'x</td><td>' + fmtMoney(r.payout) + '</td>' +
+          '<td><span class="pill ' + (r.won ? 'approved' : 'rejected') + '">' + (r.won ? 'Won' : 'Lost') + '</span></td>' +
+          '<td>' + new Date(r.createdAt).toLocaleString() + '</td></tr>';
+      }).join('');
+      document.getElementById(containerId).innerHTML = rounds.length
+        ? '<table><thead><tr><th>Player</th><th>Stake</th><th>Target</th><th>Multiplier</th><th>Payout</th><th>Result</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<div class="empty">No plays yet.</div>';
+    }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+  }
 
   // ---------- Games (sports / events / markets) ----------
   var sportsCache = [];

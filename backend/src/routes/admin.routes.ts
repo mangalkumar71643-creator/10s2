@@ -5,9 +5,13 @@ import { requireAdmin, requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { settleMarket } from "../services/betService";
 import { paymentProvider } from "../services/paymentService";
+import * as colorGameService from "../services/colorGameService";
+import * as aviatorService from "../services/aviatorService";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
+
+const userSummarySelect = { firstName: true, lastName: true, uid: true, email: true, phone: true } as const;
 
 // --- Sports / events / markets / odds management ---
 
@@ -358,6 +362,99 @@ router.patch(
       data: { status: "RESOLVED", resolvedAt: new Date() },
     });
     res.json(ticket);
+  })
+);
+
+// --- Live game monitoring (Color Predict / Aviator / Dice / Coin Flip) ---
+// Everything here is read-only — lets an admin watch a round unfold, check
+// past rounds against their revealed seed, and audit who's actually been
+// betting, without granting any special foresight the game's fairness
+// model wouldn't otherwise allow (the live views below return exactly what
+// a player already sees).
+
+const colorGameDurationQuery = z.coerce.number().refine((n) => colorGameService.COLOR_GAME_DURATIONS.includes(n as any), {
+  message: "Invalid duration",
+});
+
+router.get(
+  "/color-game/live",
+  asyncHandler(async (req, res) => {
+    const duration = colorGameDurationQuery.parse(req.query.duration ?? 30);
+    res.json(await colorGameService.getCurrentRoundView(duration));
+  })
+);
+
+router.get(
+  "/color-game/rounds",
+  asyncHandler(async (req, res) => {
+    const duration = colorGameDurationQuery.parse(req.query.duration ?? 30);
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    res.json(await colorGameService.getHistory(duration, limit));
+  })
+);
+
+router.get(
+  "/color-game/bets",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const duration = req.query.duration ? colorGameDurationQuery.parse(req.query.duration) : undefined;
+    const bets = await prisma.colorGameBet.findMany({
+      where: duration ? { round: { durationSeconds: duration } } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        user: { select: userSummarySelect },
+        round: { select: { periodNumber: true, durationSeconds: true, settled: true } },
+      },
+    });
+    res.json(bets);
+  })
+);
+
+router.get(
+  "/aviator/live",
+  asyncHandler(async (_req, res) => {
+    res.json(await aviatorService.getCurrentRoundView());
+  })
+);
+
+router.get(
+  "/aviator/rounds",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    res.json(await aviatorService.getHistory(limit));
+  })
+);
+
+router.get(
+  "/aviator/bets",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const bets = await prisma.aviatorBet.findMany({
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        user: { select: userSummarySelect },
+        round: { select: { periodNumber: true, crashMultiplier: true, settled: true } },
+      },
+    });
+    res.json(bets);
+  })
+);
+
+const instantGameTypeQuery = z.enum(["dice", "coinflip"]);
+router.get(
+  "/instant-games/rounds",
+  asyncHandler(async (req, res) => {
+    const gameType = instantGameTypeQuery.parse(req.query.gameType);
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const rounds = await prisma.gameRound.findMany({
+      where: { gameType },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: { user: { select: userSummarySelect } },
+    });
+    res.json(rounds);
   })
 );
 
