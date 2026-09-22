@@ -7,6 +7,7 @@ import { settleMarket } from "../services/betService";
 import { paymentProvider } from "../services/paymentService";
 import * as colorGameService from "../services/colorGameService";
 import * as aviatorService from "../services/aviatorService";
+import { getChickenRoadConfig } from "../services/chickenRoadService";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -450,6 +451,23 @@ router.get(
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const rounds = await prisma.gameRound.findMany({
       where: { gameType },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: { user: { select: userSummarySelect } },
+    });
+    res.json(rounds);
+  })
+);
+
+router.get("/chicken-road/config", (_req, res) => {
+  res.json(getChickenRoadConfig());
+});
+
+router.get(
+  "/chicken-road/rounds",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const rounds = await prisma.chickenRoadRound.findMany({
       orderBy: { createdAt: "desc" },
       take: limit,
       include: { user: { select: userSummarySelect } },

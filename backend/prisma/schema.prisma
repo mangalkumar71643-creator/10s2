@@ -100,6 +100,13 @@ enum ColorGameSize {
   SMALL
 }
 
+enum ChickenRoadDifficulty {
+  EASY
+  MEDIUM
+  HARD
+  HARDCORE
+}
+
 model User {
   id                   String    @id @default(uuid())
   // Short public-facing account number shown to the player (mobile UI's
@@ -167,6 +174,7 @@ model User {
   supportTickets       SupportTicket[]
   colorGameBets        ColorGameBet[]
   aviatorBets          AviatorBet[]
+  chickenRoadRounds    ChickenRoadRound[]
 }
 
 model KycVerification {
@@ -419,4 +427,29 @@ model AviatorBet {
 
   @@index([userId])
   @@index([roundId])
+}
+
+// One row per play — unlike Aviator/ColorGame there's no shared betting
+// window here: each player starts, steps through, and cashes out (or
+// busts) their own private round. status reuses BetStatus the same way
+// AviatorBet does: PENDING while in progress, WON once cashed out, LOST
+// once busted (VOID unused).
+model ChickenRoadRound {
+  id             String                @id @default(uuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id])
+  difficulty     ChickenRoadDifficulty
+  stake          Decimal               @db.Decimal(12, 2)
+  currentStep    Int                   @default(0)
+  multiplier     Decimal               @db.Decimal(10, 2) @default(1)
+  payout         Decimal               @db.Decimal(12, 2) @default(0)
+  status         BetStatus             @default(PENDING)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime              @default(now())
+  settledAt      DateTime?
+
+  @@index([userId])
 }

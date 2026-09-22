@@ -13,6 +13,7 @@ import adminRoutes from "./routes/admin.routes";
 import supportRoutes from "./routes/support.routes";
 import colorGameRoutes from "./routes/colorGame.routes";
 import aviatorRoutes from "./routes/aviator.routes";
+import chickenRoadRoutes from "./routes/chickenRoad.routes";
 
 export const app = express();
 
@@ -32,5 +33,6 @@ app.use("/admin", adminRoutes);
 app.use("/support", supportRoutes);
 app.use("/color-game", colorGameRoutes);
 app.use("/aviator", aviatorRoutes);
+app.use("/chicken-road", chickenRoadRoutes);
 
 app.use(errorHandler);

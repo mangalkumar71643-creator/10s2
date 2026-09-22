@@ -444,3 +444,69 @@ export function fetchAviatorRoundBets(periodNumber: string, limit = 100) {
 export function fetchAviatorTopBets(limit = 50) {
   return apiFetch<AviatorPublicBet[]>(`/aviator/top-bets?limit=${limit}`);
 }
+
+// ---- Chicken Road ----------------------------------------------------
+// Unlike Aviator/Win Go there's no shared round — each play is its own
+// private round the player steps through and cashes out (or busts) on
+// their own.
+
+export type ChickenRoadDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'HARDCORE';
+
+export interface ChickenRoadDifficultyConfig {
+  difficulty: ChickenRoadDifficulty;
+  steps: number;
+  multipliers: number[];
+}
+
+export interface ChickenRoadConfig {
+  minStake: number;
+  maxStake: number;
+  difficulties: ChickenRoadDifficultyConfig[];
+}
+
+export interface ChickenRoadRound {
+  id: string;
+  userId: string;
+  difficulty: ChickenRoadDifficulty;
+  stake: string;
+  currentStep: number;
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  serverSeedHash: string;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export function fetchChickenRoadConfig() {
+  return apiFetch<ChickenRoadConfig>('/chicken-road/config');
+}
+
+export function fetchChickenRoadCurrent() {
+  return apiFetch<ChickenRoadRound | null>('/chicken-road/current');
+}
+
+export function fetchChickenRoadHistory(limit = 30) {
+  return apiFetch<ChickenRoadRound[]>(`/chicken-road/my-history?limit=${limit}`);
+}
+
+export function startChickenRoadRound(stake: number, difficulty: ChickenRoadDifficulty) {
+  return apiFetch<ChickenRoadRound>('/chicken-road/start', {
+    method: 'POST',
+    body: JSON.stringify({ stake, difficulty }),
+  });
+}
+
+export function advanceChickenRoadStep(roundId: string) {
+  return apiFetch<{ round: ChickenRoadRound; busted: boolean }>('/chicken-road/advance', {
+    method: 'POST',
+    body: JSON.stringify({ roundId }),
+  });
+}
+
+export function cashOutChickenRoadRound(roundId: string) {
+  return apiFetch<ChickenRoadRound>('/chicken-road/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ roundId }),
+  });
+}
