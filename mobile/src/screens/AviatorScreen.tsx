@@ -81,23 +81,29 @@ const LOGO_ASPECT = 49 / 148;
 const LOGO_WIDTH = SCREEN_WIDTH * 0.32;
 const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
 
-// Code-drawn horizontal bands instead of the old static background image,
-// scrolling straight down. An SVG <Pattern> whose y attribute changed
-// every frame turned out not to reliably repaint on device, so this uses
-// plain Views translated with a real transform instead — the same kind of
-// style-driven transform FlightTrail already uses for the plane, which is
-// known to actually repaint every frame. Fully self-contained (its own
-// rAF loop, no shared state) so it can never interfere with that
-// animation above.
+// Code-drawn diagonal bands instead of the old static background image,
+// tilted to match the real reference (rays leaning toward the bottom-left
+// takeoff corner) and scrolling slowly. An SVG <Pattern> whose y attribute
+// changed every frame turned out not to reliably repaint on device, so
+// this uses a plain View translated (and rotated) with a real transform
+// instead — the same style-driven mechanism FlightTrail already uses for
+// the plane every frame, which is proven to actually repaint. Fully
+// self-contained (its own rAF loop, no shared state) so it can never
+// interfere with that animation above.
 const BG_STRIPE_TILE = PANEL_HEIGHT * 0.16;
 const BG_BAND_HEIGHT = BG_STRIPE_TILE / 2;
 const BG_SCROLL_PX_PER_SEC = BG_STRIPE_TILE / 5;
 const BG_STRIPE_DARK = '#0a0a0d';
 const BG_STRIPE_LIGHT = '#1c1c22';
-// Enough bands to cover the panel plus one extra tile's worth above the
-// top edge, so sliding everything down by up to one tile never uncovers
-// a gap at either edge.
-const BG_BAND_COUNT = Math.ceil(PANEL_HEIGHT / BG_BAND_HEIGHT) + 2;
+const BG_ANGLE_DEG = 20;
+// The rotated band-stack has to be sized off the panel's diagonal (not
+// just its width/height) so that once tilted, it still fully covers every
+// corner of the panel with no gap — plus one extra tile of height so
+// sliding it down by up to one tile never uncovers an edge either.
+const BG_DIAGONAL = Math.sqrt(PANEL_WIDTH ** 2 + PANEL_HEIGHT ** 2);
+const BG_CONTENT_WIDTH = BG_DIAGONAL + 20;
+const BG_BAND_COUNT = Math.ceil((BG_DIAGONAL + BG_STRIPE_TILE) / BG_BAND_HEIGHT) + 4;
+const BG_CONTENT_HEIGHT = BG_BAND_COUNT * BG_BAND_HEIGHT;
 
 function PanelBackground() {
   const [offset, setOffset] = useState(0);
@@ -121,7 +127,7 @@ function PanelBackground() {
   }, []);
 
   const bands = [];
-  for (let i = -2; i < BG_BAND_COUNT; i++) {
+  for (let i = 0; i < BG_BAND_COUNT; i++) {
     bands.push(
       <View
         key={i}
@@ -139,7 +145,18 @@ function PanelBackground() {
 
   return (
     <View style={styles.panelBgClip}>
-      <View style={{ transform: [{ translateY: offset }] }}>{bands}</View>
+      <View
+        style={{
+          position: 'absolute',
+          width: BG_CONTENT_WIDTH,
+          height: BG_CONTENT_HEIGHT,
+          left: (PANEL_WIDTH - BG_CONTENT_WIDTH) / 2,
+          top: (PANEL_HEIGHT - BG_CONTENT_HEIGHT) / 2,
+          transform: [{ rotate: `${BG_ANGLE_DEG}deg` }, { translateY: offset }],
+        }}
+      >
+        {bands}
+      </View>
     </View>
   );
 }
