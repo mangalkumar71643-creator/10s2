@@ -2,6 +2,7 @@ package com.novaplay.admin
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
@@ -29,6 +30,9 @@ class MainActivity : AppCompatActivity() {
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
         webView.settings.databaseEnabled = true
+        // This is a live admin dashboard, not a static page — every open
+        // must hit the server, never a cached copy from a previous visit.
+        webView.settings.cacheMode = WebSettings.LOAD_NO_CACHE
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -39,11 +43,10 @@ class MainActivity : AppCompatActivity() {
 
         swipeRefresh.setOnRefreshListener { webView.reload() }
 
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState)
-        } else {
-            webView.loadUrl(ADMIN_URL)
-        }
+        // Always a fresh load — restoring saved WebView state after the OS
+        // recreates this activity was showing whatever the panel looked
+        // like the last time it was open, not what's live now.
+        webView.loadUrl(ADMIN_URL)
     }
 
     // Hides the OS status bar (clock, battery, signal icons) so the page's
@@ -60,11 +63,6 @@ class MainActivity : AppCompatActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemStatusBar()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        webView.saveState(outState)
     }
 
     override fun onBackPressed() {
