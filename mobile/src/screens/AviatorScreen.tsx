@@ -76,6 +76,7 @@ const TOGGLE_ROW_HEIGHT_2 = (93 - 6) / 288;
 // reference screenshot: panel width/height ≈ 1237/722 px there).
 const PANEL_ASPECT = 393 / 673;
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 const PANEL_WIDTH = SCREEN_WIDTH * 0.966;
 const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 
@@ -1263,7 +1264,7 @@ export default function AviatorScreen() {
 const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: '#000000' },
   scrollArea: { flex: 1 },
-  root: { alignItems: 'center', paddingBottom: 24 },
+  root: { alignItems: 'center', paddingBottom: SCREEN_HEIGHT * 0.85 },
   backBtn: {
     position: 'absolute',
     left: 8,
