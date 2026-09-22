@@ -3,7 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -81,15 +81,56 @@ const LOGO_ASPECT = 49 / 148;
 const LOGO_WIDTH = SCREEN_WIDTH * 0.32;
 const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
 
-// Confirmed against a real Aviator recording (compared frames 10+ seconds
-// apart, pixel-for-pixel — the ray pattern never shifts at all): the
-// background is static. Only the plane and the red trail actually move;
-// that alone is what reads as "flying". Kept as its own component (rather
-// than inlining the Image where it's used) purely so this note has
-// somewhere to live next to the thing it explains.
+// Code-drawn diagonal stripes instead of the old static background image
+// — an SVG pattern tiles infinitely in its own coordinate space, so
+// shifting its origin every frame scrolls it seamlessly forever with no
+// wraparound seam. Fully self-contained (its own rAF loop, no shared
+// state) so it can never interfere with FlightTrail's animation above.
+const BG_STRIPE_TILE = PANEL_HEIGHT * 0.16;
+const BG_STRIPE_ANGLE = 22;
+const BG_SCROLL_PX_PER_SEC = BG_STRIPE_TILE / 1.6;
+const BG_STRIPE_DARK = '#0a0a0d';
+const BG_STRIPE_LIGHT = '#1c1c22';
+
 function PanelBackground() {
+  const [offset, setOffset] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const tick = (now: number) => {
+      if (!mounted) return;
+      if (startRef.current == null) startRef.current = now;
+      const elapsedSec = (now - startRef.current) / 1000;
+      setOffset((elapsedSec * BG_SCROLL_PX_PER_SEC) % BG_STRIPE_TILE);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      mounted = false;
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
   return (
-    <Image source={require('../../assets/aviator-panel-bg.png')} resizeMode="contain" style={styles.panelBgImage} />
+    <Svg width={PANEL_WIDTH} height={PANEL_HEIGHT}>
+      <Defs>
+        <Pattern
+          id="bgStripes"
+          patternUnits="userSpaceOnUse"
+          x={0}
+          y={offset}
+          width={BG_STRIPE_TILE}
+          height={BG_STRIPE_TILE}
+          patternTransform={`rotate(${BG_STRIPE_ANGLE})`}
+        >
+          <Rect x={0} y={0} width={BG_STRIPE_TILE} height={BG_STRIPE_TILE / 2} fill={BG_STRIPE_LIGHT} />
+          <Rect x={0} y={BG_STRIPE_TILE / 2} width={BG_STRIPE_TILE} height={BG_STRIPE_TILE / 2} fill={BG_STRIPE_DARK} />
+        </Pattern>
+      </Defs>
+      <Rect x={0} y={0} width={PANEL_WIDTH} height={PANEL_HEIGHT} fill="url(#bgStripes)" />
+    </Svg>
   );
 }
 
@@ -1035,10 +1076,6 @@ const styles = StyleSheet.create({
   },
   panelWrap: {
     marginTop: 14,
-  },
-  panelBgImage: {
-    width: PANEL_WIDTH,
-    height: PANEL_HEIGHT,
   },
   plane: {
     position: 'absolute',
