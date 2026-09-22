@@ -623,24 +623,21 @@ function StakeStepper({
 function QuickStakeGrid({
   layout,
   panelHeight,
-  value,
-  onSelect,
+  onAdd,
 }: {
   layout: typeof QUICK_STAKE_LAYOUT_1;
   panelHeight: number;
-  value: number;
-  onSelect: (amount: number) => void;
+  onAdd: (amount: number) => void;
 }) {
   return (
     <>
       {QUICK_STAKE_VALUES.map((amount, i) => {
         const col = i % 2;
         const row = Math.floor(i / 2);
-        const active = value === amount;
         return (
           <Pressable
             key={amount}
-            onPress={() => onSelect(amount)}
+            onPress={() => onAdd(amount)}
             style={[
               styles.quickStakeBtn,
               {
@@ -649,12 +646,9 @@ function QuickStakeGrid({
                 width: layout.colWidth * BET_PANEL_WIDTH,
                 height: layout.rowHeight * panelHeight,
               },
-              active && styles.quickStakeBtnActive,
             ]}
           >
-            <Text style={[styles.quickStakeText, active && styles.quickStakeTextActive]}>
-              {amount.toLocaleString('en-IN')}.00
-            </Text>
+            <Text style={styles.quickStakeText}>{amount.toLocaleString('en-IN')}.00</Text>
           </Pressable>
         );
       })}
@@ -1269,8 +1263,7 @@ export default function AviatorScreen() {
           <QuickStakeGrid
             layout={QUICK_STAKE_LAYOUT_1}
             panelHeight={BET_PANEL_1_HEIGHT}
-            value={mode1 === 'auto' ? autoStake1 : stake1}
-            onSelect={mode1 === 'auto' ? setAutoStake1 : setStake1}
+            onAdd={(amount) => (mode1 === 'auto' ? setAutoStake1 : setStake1)((prev) => prev + amount)}
           />
           <BetButton
             layout={BET_BUTTON_LAYOUT_1}
@@ -1316,8 +1309,7 @@ export default function AviatorScreen() {
           <QuickStakeGrid
             layout={QUICK_STAKE_LAYOUT_2}
             panelHeight={BET_PANEL_2_HEIGHT}
-            value={mode2 === 'auto' ? autoStake2 : stake2}
-            onSelect={mode2 === 'auto' ? setAutoStake2 : setStake2}
+            onAdd={(amount) => (mode2 === 'auto' ? setAutoStake2 : setStake2)((prev) => prev + amount)}
           />
           <BetButton
             layout={BET_BUTTON_LAYOUT_2}
@@ -1430,17 +1422,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickStakeBtnActive: {
-    borderWidth: 1.5,
-    borderColor: '#3ECF8E',
-  },
   quickStakeText: {
     color: '#B8B8BE',
     fontSize: 14,
     fontWeight: '600',
-  },
-  quickStakeTextActive: {
-    color: '#3ECF8E',
   },
   toggleTabActive: {
     backgroundColor: '#FFFFFF',
