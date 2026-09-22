@@ -3,7 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -89,6 +89,25 @@ function historyColor(mult: number) {
   if (mult >= 10) return '#E056FD';
   if (mult >= 2) return '#8854D0';
   return '#4B7BEC';
+}
+
+// Soft radial glow behind the live multiplier — same blue/purple/pink
+// tiers as the history strip above, so the two stay consistent.
+const MULTIPLIER_GLOW_SIZE = PANEL_WIDTH * 0.62;
+function MultiplierGlow({ color }: { color: string }) {
+  const size = MULTIPLIER_GLOW_SIZE;
+  return (
+    <Svg width={size} height={size}>
+      <Defs>
+        <RadialGradient id="multiplierGlow" cx="50%" cy="50%" r="50%">
+          <Stop offset="0%" stopColor={color} stopOpacity={0.6} />
+          <Stop offset="55%" stopColor={color} stopOpacity={0.25} />
+          <Stop offset="100%" stopColor={color} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#multiplierGlow)" />
+    </Svg>
+  );
 }
 
 // Bet/Auto toggle + stake stepper + Bet button block — same width as the
@@ -833,7 +852,9 @@ export default function AviatorScreen() {
   );
 
   const multiplierLabel = round ? `${round.multiplier.toFixed(2)}x` : '1.00x';
-  const multiplierColor = round?.phase === 'CRASHED' ? '#FF3B4E' : '#FFFFFF';
+  const isCrashed = round?.phase === 'CRASHED';
+  const multiplierColor = isCrashed ? '#FF3B4E' : '#FFFFFF';
+  const multiplierGlowColor = isCrashed ? null : historyColor(round?.multiplier ?? 1);
 
   return (
     <View style={styles.root}>
@@ -869,6 +890,11 @@ export default function AviatorScreen() {
         />
         <FlightTrail round={round} />
         <View style={styles.multiplierWrap} pointerEvents="none">
+          {multiplierGlowColor && (
+            <View style={styles.multiplierGlowBox}>
+              <MultiplierGlow color={multiplierGlowColor} />
+            </View>
+          )}
           <Text style={[styles.multiplierText, { color: multiplierColor }]}>{multiplierLabel}</Text>
           {round?.phase === 'CRASHED' && <Text style={styles.multiplierSubLabel}>FLEW AWAY!</Text>}
           {round?.phase === 'BETTING' && <Text style={styles.multiplierSubLabel}>Next round starting…</Text>}
@@ -1037,6 +1063,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  multiplierGlowBox: {
+    position: 'absolute',
+    top: 28 - MULTIPLIER_GLOW_SIZE / 2,
+    left: '50%',
+    width: MULTIPLIER_GLOW_SIZE,
+    height: MULTIPLIER_GLOW_SIZE,
+    marginLeft: -MULTIPLIER_GLOW_SIZE / 2,
   },
   multiplierText: {
     fontSize: 40,
