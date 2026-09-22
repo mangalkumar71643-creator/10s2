@@ -3,7 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Dimensions, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -81,16 +81,23 @@ const LOGO_ASPECT = 49 / 148;
 const LOGO_WIDTH = SCREEN_WIDTH * 0.32;
 const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
 
-// Code-drawn diagonal stripes instead of the old static background image
-// — an SVG pattern tiles infinitely in its own coordinate space, so
-// shifting its origin every frame scrolls it seamlessly forever with no
-// wraparound seam. Fully self-contained (its own rAF loop, no shared
-// state) so it can never interfere with FlightTrail's animation above.
+// Code-drawn horizontal bands instead of the old static background image,
+// scrolling straight down. An SVG <Pattern> whose y attribute changed
+// every frame turned out not to reliably repaint on device, so this uses
+// plain Views translated with a real transform instead — the same kind of
+// style-driven transform FlightTrail already uses for the plane, which is
+// known to actually repaint every frame. Fully self-contained (its own
+// rAF loop, no shared state) so it can never interfere with that
+// animation above.
 const BG_STRIPE_TILE = PANEL_HEIGHT * 0.16;
-const BG_STRIPE_ANGLE = 22;
+const BG_BAND_HEIGHT = BG_STRIPE_TILE / 2;
 const BG_SCROLL_PX_PER_SEC = BG_STRIPE_TILE / 5;
 const BG_STRIPE_DARK = '#0a0a0d';
 const BG_STRIPE_LIGHT = '#1c1c22';
+// Enough bands to cover the panel plus one extra tile's worth above the
+// top edge, so sliding everything down by up to one tile never uncovers
+// a gap at either edge.
+const BG_BAND_COUNT = Math.ceil(PANEL_HEIGHT / BG_BAND_HEIGHT) + 2;
 
 function PanelBackground() {
   const [offset, setOffset] = useState(0);
@@ -113,24 +120,27 @@ function PanelBackground() {
     };
   }, []);
 
+  const bands = [];
+  for (let i = -2; i < BG_BAND_COUNT; i++) {
+    bands.push(
+      <View
+        key={i}
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: i * BG_BAND_HEIGHT,
+          height: BG_BAND_HEIGHT,
+          backgroundColor: i % 2 === 0 ? BG_STRIPE_LIGHT : BG_STRIPE_DARK,
+        }}
+      />
+    );
+  }
+
   return (
-    <Svg width={PANEL_WIDTH} height={PANEL_HEIGHT}>
-      <Defs>
-        <Pattern
-          id="bgStripes"
-          patternUnits="userSpaceOnUse"
-          x={0}
-          y={offset}
-          width={BG_STRIPE_TILE}
-          height={BG_STRIPE_TILE}
-          patternTransform={`rotate(${BG_STRIPE_ANGLE})`}
-        >
-          <Rect x={0} y={0} width={BG_STRIPE_TILE} height={BG_STRIPE_TILE / 2} fill={BG_STRIPE_LIGHT} />
-          <Rect x={0} y={BG_STRIPE_TILE / 2} width={BG_STRIPE_TILE} height={BG_STRIPE_TILE / 2} fill={BG_STRIPE_DARK} />
-        </Pattern>
-      </Defs>
-      <Rect x={0} y={0} width={PANEL_WIDTH} height={PANEL_HEIGHT} fill="url(#bgStripes)" />
-    </Svg>
+    <View style={styles.panelBgClip}>
+      <View style={{ transform: [{ translateY: offset }] }}>{bands}</View>
+    </View>
   );
 }
 
@@ -1076,6 +1086,15 @@ const styles = StyleSheet.create({
   },
   panelWrap: {
     marginTop: 14,
+  },
+  // Clips only the scrolling background layer — the plane/trail render as
+  // separate siblings above this, so they're unaffected and can still fly
+  // past the panel's border during the crash burst as before.
+  panelBgClip: {
+    width: PANEL_WIDTH,
+    height: PANEL_HEIGHT,
+    overflow: 'hidden',
+    backgroundColor: '#0a0a0d',
   },
   plane: {
     position: 'absolute',
