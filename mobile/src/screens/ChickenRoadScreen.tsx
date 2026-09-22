@@ -175,7 +175,12 @@ export default function ChickenRoadScreen() {
         <Text style={styles.balanceChip}>₹{coins.toFixed(2)}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.historyRow} horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView
+        style={styles.historyScroll}
+        contentContainerStyle={styles.historyRow}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
         {history.length === 0 ? (
           <Text style={styles.historyEmptyText}>No rounds yet.</Text>
         ) : (
@@ -307,11 +312,11 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, color: '#FFFFFF', fontSize: 17, fontWeight: '700', textAlign: 'center' },
   balanceChip: { color: '#3ECF8E', fontSize: 15, fontWeight: '700', minWidth: 40, textAlign: 'right' },
+  historyScroll: { height: 40, flexGrow: 0 },
   historyRow: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 12,
-    paddingBottom: 10,
     alignItems: 'center',
   },
   historyEmptyText: { color: '#8A8A8E', fontSize: 12 },
