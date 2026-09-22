@@ -61,6 +61,28 @@ const STEPPER_LAYOUT_2 = {
 const BET_BUTTON_LAYOUT_1 = { left: 307 / 688, top: 103 / 284, width: 348 / 688, height: 154 / 284 };
 const BET_BUTTON_LAYOUT_2 = { left: 307 / 688, top: (387 - 284) / 288, width: 348 / 688, height: 153 / 288 };
 
+// Quick-select stake amounts drawn into the blank space below the stepper
+// (the panel art itself has nothing there) — a 2x2 grid spanning the same
+// left/right edges as the stepper's minus/plus buttons above it, sized to
+// end level with the green Bet button's own bottom edge.
+const QUICK_STAKE_VALUES = [100, 200, 500, 1000];
+const QUICK_STAKE_LAYOUT_1 = {
+  left: 32 / 688,
+  colWidth: 118 / 688,
+  colGap: 10 / 688,
+  top: 160 / 284,
+  rowHeight: 43 / 284,
+  rowGap: 10 / 284,
+};
+const QUICK_STAKE_LAYOUT_2 = {
+  left: 32 / 688,
+  colWidth: 118 / 688,
+  colGap: 10 / 688,
+  top: 160 / 288,
+  rowHeight: 43 / 288,
+  rowGap: 10 / 288,
+};
+
 // Bet/Auto toggle hotspots — the pill sits at the top of each panel, split
 // into a left "Bet" half and a right "Auto" half.
 const TOGGLE_BET_TAB = { left: 145 / 688, width: (344 - 145) / 688 };
@@ -594,6 +616,48 @@ function StakeStepper({
         textAlign="center"
       />
       <Pressable onPress={() => onChange(value + STAKE_STEP)} hitSlop={4} style={hotspot('plus')} />
+    </>
+  );
+}
+
+function QuickStakeGrid({
+  layout,
+  panelHeight,
+  value,
+  onSelect,
+}: {
+  layout: typeof QUICK_STAKE_LAYOUT_1;
+  panelHeight: number;
+  value: number;
+  onSelect: (amount: number) => void;
+}) {
+  return (
+    <>
+      {QUICK_STAKE_VALUES.map((amount, i) => {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const active = value === amount;
+        return (
+          <Pressable
+            key={amount}
+            onPress={() => onSelect(amount)}
+            style={[
+              styles.quickStakeBtn,
+              {
+                left: (layout.left + col * (layout.colWidth + layout.colGap)) * BET_PANEL_WIDTH,
+                top: (layout.top + row * (layout.rowHeight + layout.rowGap)) * panelHeight,
+                width: layout.colWidth * BET_PANEL_WIDTH,
+                height: layout.rowHeight * panelHeight,
+              },
+              active && styles.quickStakeBtnActive,
+            ]}
+          >
+            <Text style={[styles.quickStakeText, active && styles.quickStakeTextActive]}>
+              {amount.toLocaleString('en-IN')}.00
+            </Text>
+          </Pressable>
+        );
+      })}
     </>
   );
 }
@@ -1202,6 +1266,12 @@ export default function AviatorScreen() {
             value={mode1 === 'auto' ? autoStake1 : stake1}
             onChange={mode1 === 'auto' ? setAutoStake1 : setStake1}
           />
+          <QuickStakeGrid
+            layout={QUICK_STAKE_LAYOUT_1}
+            panelHeight={BET_PANEL_1_HEIGHT}
+            value={mode1 === 'auto' ? autoStake1 : stake1}
+            onSelect={mode1 === 'auto' ? setAutoStake1 : setStake1}
+          />
           <BetButton
             layout={BET_BUTTON_LAYOUT_1}
             panelHeight={BET_PANEL_1_HEIGHT}
@@ -1242,6 +1312,12 @@ export default function AviatorScreen() {
             panelHeight={BET_PANEL_2_HEIGHT}
             value={mode2 === 'auto' ? autoStake2 : stake2}
             onChange={mode2 === 'auto' ? setAutoStake2 : setStake2}
+          />
+          <QuickStakeGrid
+            layout={QUICK_STAKE_LAYOUT_2}
+            panelHeight={BET_PANEL_2_HEIGHT}
+            value={mode2 === 'auto' ? autoStake2 : stake2}
+            onSelect={mode2 === 'auto' ? setAutoStake2 : setStake2}
           />
           <BetButton
             layout={BET_BUTTON_LAYOUT_2}
@@ -1346,6 +1422,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     padding: 0,
     backgroundColor: 'transparent',
+  },
+  quickStakeBtn: {
+    position: 'absolute',
+    backgroundColor: '#2C2D31',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickStakeBtnActive: {
+    borderWidth: 1.5,
+    borderColor: '#3ECF8E',
+  },
+  quickStakeText: {
+    color: '#B8B8BE',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  quickStakeTextActive: {
+    color: '#3ECF8E',
   },
   toggleTabActive: {
     backgroundColor: '#FFFFFF',
