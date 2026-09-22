@@ -198,6 +198,44 @@ function MultiplierGlow({ color }: { color: string }) {
   );
 }
 
+// Countdown bar shown under the multiplier during BETTING — the red fill
+// drains away over the fixed betting window (bettingStartTime ->
+// flyStartTime, both server-provided) and the plane takes off exactly
+// when it empties. Own rAF loop driven straight off those timestamps and
+// Date.now(), so it's smooth regardless of how often `round` itself
+// re-polls, and it never touches FlightTrail's state.
+const COUNTDOWN_BAR_WIDTH = PANEL_WIDTH * 0.5;
+const COUNTDOWN_BAR_HEIGHT = 10;
+
+function BettingCountdownBar({ round }: { round: AviatorRoundView }) {
+  const [redFraction, setRedFraction] = useState(1);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const bettingStart = new Date(round.bettingStartTime).getTime();
+    const flyStart = new Date(round.flyStartTime).getTime();
+    const totalMs = Math.max(1, flyStart - bettingStart);
+    const tick = () => {
+      if (!mounted) return;
+      const elapsed = Date.now() - bettingStart;
+      setRedFraction(Math.min(1, Math.max(0, 1 - elapsed / totalMs)));
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      mounted = false;
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [round.periodNumber, round.bettingStartTime, round.flyStartTime]);
+
+  return (
+    <View style={styles.countdownTrack}>
+      <View style={[styles.countdownFill, { width: `${redFraction * 100}%` }]} />
+    </View>
+  );
+}
+
 // Bet/Auto toggle + stake stepper + Bet button block — same width as the
 // panel above it, each half's own native aspect ratio preserved.
 const BET_PANEL_WIDTH = PANEL_WIDTH;
@@ -981,7 +1019,12 @@ export default function AviatorScreen() {
           )}
           <Text style={[styles.multiplierText, { color: multiplierColor }]}>{multiplierLabel}</Text>
           {round?.phase === 'CRASHED' && <Text style={styles.multiplierSubLabel}>FLEW AWAY!</Text>}
-          {round?.phase === 'BETTING' && <Text style={styles.multiplierSubLabel}>Next round starting…</Text>}
+          {round?.phase === 'BETTING' && (
+            <>
+              <Text style={styles.multiplierSubLabel}>Next round starting…</Text>
+              <BettingCountdownBar round={round} />
+            </>
+          )}
         </View>
       </View>
 
@@ -1174,6 +1217,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+  },
+  countdownTrack: {
+    marginTop: 10,
+    width: COUNTDOWN_BAR_WIDTH,
+    height: COUNTDOWN_BAR_HEIGHT,
+    borderRadius: COUNTDOWN_BAR_HEIGHT / 2,
+    backgroundColor: '#232733',
+    overflow: 'hidden',
+  },
+  countdownFill: {
+    height: '100%',
+    borderRadius: COUNTDOWN_BAR_HEIGHT / 2,
+    backgroundColor: '#E8102F',
   },
   betOverlay: {
     borderRadius: 16,
