@@ -29,8 +29,9 @@ router.get(
 
 router.get(
   "/history",
-  asyncHandler(async (_req, res) => {
-    res.json(await getHistory());
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 30, 100);
+    res.json(await getHistory(limit));
   })
 );
 

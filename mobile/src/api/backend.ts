@@ -377,8 +377,8 @@ export interface AviatorHistoryEntry {
   serverSeedHash: string;
 }
 
-export function fetchAviatorHistory() {
-  return apiFetch<AviatorHistoryEntry[]>('/aviator/history');
+export function fetchAviatorHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/aviator/history?limit=${limit}`);
 }
 
 export interface AviatorBetResult {

@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
@@ -198,6 +198,10 @@ function PanelBackground({ isFlying }: { isFlying: boolean }) {
 // top border. Placeholder values for now — this is just the strip itself.
 const HISTORY_BAR_HEIGHT = 28;
 const HISTORY_SAMPLE: number[] = [1.75, 1.0, 1.0, 1.89, 2.42, 4.25, 1.01];
+// "..." button at the strip's end opens a modal with the full history.
+const HISTORY_DOTS_SIZE = HISTORY_BAR_HEIGHT;
+const HISTORY_ROW_GAP = 8;
+const FULL_HISTORY_LIMIT = 40;
 function historyColor(mult: number) {
   if (mult >= 10) return '#E056FD';
   if (mult >= 2) return '#8854D0';
@@ -1018,6 +1022,17 @@ export default function AviatorScreen() {
   const [autoCashOutOn2, setAutoCashOutOn2] = useState(false);
   const [round, setRound] = useState<AviatorRoundView | null>(null);
   const [history, setHistory] = useState<number[]>(HISTORY_SAMPLE);
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [fullHistory, setFullHistory] = useState<number[]>([]);
+  const [fullHistoryLoading, setFullHistoryLoading] = useState(false);
+  const openHistoryModal = useCallback(() => {
+    setHistoryModalVisible(true);
+    setFullHistoryLoading(true);
+    fetchAviatorHistory(FULL_HISTORY_LIMIT)
+      .then((entries) => setFullHistory(entries.map((e) => Number(e.crashMultiplier))))
+      .catch(() => {})
+      .finally(() => setFullHistoryLoading(false));
+  }, []);
   const [bet1, setBet1] = useState<PanelBetState>({ status: 'idle' });
   const [bet2, setBet2] = useState<PanelBetState>({ status: 'idle' });
 
@@ -1212,13 +1227,56 @@ export default function AviatorScreen() {
         style={[styles.logo, { marginTop: insets.top + 8, width: LOGO_WIDTH, height: LOGO_HEIGHT }]}
       />
 
-      <View style={[styles.historyBar, { width: PANEL_WIDTH, height: HISTORY_BAR_HEIGHT }]}>
-        {history.map((mult, i) => (
-          <Text key={i} style={[styles.historyChip, { color: historyColor(mult) }]}>
-            {mult.toFixed(2)}x
-          </Text>
-        ))}
+      <View style={[styles.historyRow, { width: PANEL_WIDTH }]}>
+        <View
+          style={[
+            styles.historyBar,
+            { width: PANEL_WIDTH - HISTORY_DOTS_SIZE - HISTORY_ROW_GAP, height: HISTORY_BAR_HEIGHT },
+          ]}
+        >
+          {history.map((mult, i) => (
+            <Text key={i} style={[styles.historyChip, { color: historyColor(mult) }]}>
+              {mult.toFixed(2)}x
+            </Text>
+          ))}
+        </View>
+        <Pressable onPress={openHistoryModal} hitSlop={6} style={styles.historyDotsBtn}>
+          <MaterialCommunityIcons name="dots-horizontal" size={18} color="#B8B8BE" />
+        </Pressable>
       </View>
+
+      <Modal
+        visible={historyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHistoryModalVisible(false)}
+      >
+        <Pressable style={styles.historyModalBackdrop} onPress={() => setHistoryModalVisible(false)}>
+          <Pressable style={styles.historyModalCard} onPress={() => {}}>
+            <View style={styles.historyModalHeader}>
+              <Text style={styles.historyModalTitle}>Round History</Text>
+              <Pressable onPress={() => setHistoryModalVisible(false)} hitSlop={10}>
+                <MaterialCommunityIcons name="close" size={22} color="#FFFFFF" />
+              </Pressable>
+            </View>
+            {fullHistoryLoading ? (
+              <Text style={styles.historyModalEmptyText}>Loading…</Text>
+            ) : fullHistory.length === 0 ? (
+              <Text style={styles.historyModalEmptyText}>No rounds yet.</Text>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View style={styles.historyModalGrid}>
+                  {fullHistory.map((mult, i) => (
+                    <Text key={i} style={[styles.historyModalChip, { color: historyColor(mult) }]}>
+                      {mult.toFixed(2)}x
+                    </Text>
+                  ))}
+                </View>
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <View style={[styles.panelWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
         <PanelBackground isFlying={round?.phase === 'FLYING'} />
@@ -1369,8 +1427,13 @@ const styles = StyleSheet.create({
   // offsets, so they can never overlap regardless of a device's actual
   // safe-area inset.
   logo: {},
-  historyBar: {
+  historyRow: {
     marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: HISTORY_ROW_GAP,
+  },
+  historyBar: {
     backgroundColor: '#2C2D31',
     borderRadius: HISTORY_BAR_HEIGHT / 2,
     flexDirection: 'row',
@@ -1381,6 +1444,59 @@ const styles = StyleSheet.create({
   historyChip: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  historyDotsBtn: {
+    width: HISTORY_DOTS_SIZE,
+    height: HISTORY_DOTS_SIZE,
+    borderRadius: HISTORY_DOTS_SIZE / 2,
+    backgroundColor: '#2C2D31',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  historyModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  historyModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '70%',
+    backgroundColor: '#1A1B1E',
+    borderRadius: 16,
+    padding: 16,
+  },
+  historyModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  historyModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  historyModalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  historyModalChip: {
+    fontSize: 13,
+    fontWeight: '600',
+    backgroundColor: '#2C2D31',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  historyModalEmptyText: {
+    color: '#8A8A8E',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 24,
   },
   panelWrap: {
     marginTop: 14,
