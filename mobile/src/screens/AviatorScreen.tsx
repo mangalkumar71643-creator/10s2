@@ -936,12 +936,11 @@ export default function AviatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { coins, refreshWallet } = useGameState();
-  // Lets the bets panel below stretch to fill exactly the leftover space in
-  // the viewport (rather than a fixed guess), so it reads as one continuous
-  // screen instead of a black gap, while still growing past the fold and
-  // scrolling normally once there are enough bet rows to need it.
+  // Guarantees the bets panel below is always at least one full screen
+  // tall (same background color as the rest of the screen), so scrolling
+  // down reveals a whole extra "page" of it rather than however little
+  // space happens to be left over above the fold.
   const [scrollViewportHeight, setScrollViewportHeight] = useState(0);
-  const [aboveBetsHeight, setAboveBetsHeight] = useState(0);
   const [stake1, setStake1] = useState(MIN_STAKE);
   const [stake2, setStake2] = useState(MIN_STAKE);
   const [mode1, setMode1] = useState<BetAutoMode>('bet');
@@ -1149,10 +1148,6 @@ export default function AviatorScreen() {
         showsVerticalScrollIndicator={false}
         onLayout={(e) => setScrollViewportHeight(e.nativeEvent.layout.height)}
       >
-      <View
-        style={styles.aboveBetsPanel}
-        onLayout={(e) => setAboveBetsHeight(e.nativeEvent.layout.height)}
-      >
       <Image
         source={require('../../assets/aviator-logo.png')}
         resizeMode="contain"
@@ -1270,11 +1265,10 @@ export default function AviatorScreen() {
           />
         )}
       </View>
-      </View>
 
       <AviatorBetsPanel
         currentPeriodNumber={round?.periodNumber ?? null}
-        minHeight={Math.max(0, scrollViewportHeight - aboveBetsHeight)}
+        minHeight={scrollViewportHeight}
       />
       </ScrollView>
     </View>
@@ -1285,7 +1279,6 @@ const styles = StyleSheet.create({
   screenRoot: { flex: 1, backgroundColor: '#1A1B1E' },
   scrollArea: { flex: 1 },
   root: { alignItems: 'center', flexGrow: 1, paddingBottom: 24 },
-  aboveBetsPanel: { alignItems: 'center', width: '100%' },
   backBtn: {
     position: 'absolute',
     left: 8,
