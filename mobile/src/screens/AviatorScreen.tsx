@@ -105,18 +105,26 @@ const BG_CONTENT_WIDTH = BG_DIAGONAL + 20;
 const BG_BAND_COUNT = Math.ceil((BG_DIAGONAL + BG_STRIPE_TILE) / BG_BAND_HEIGHT) + 4;
 const BG_CONTENT_HEIGHT = BG_BAND_COUNT * BG_BAND_HEIGHT;
 
-function PanelBackground() {
+// Only scrolls while the plane is actually flying — parked (holding its
+// last position) during betting and after the crash, same as the plane
+// itself effectively is at those times.
+function PanelBackground({ isFlying }: { isFlying: boolean }) {
   const [offset, setOffset] = useState(0);
   const rafRef = useRef<number | null>(null);
-  const startRef = useRef<number | null>(null);
+  const lastNowRef = useRef<number | null>(null);
+  const isFlyingRef = useRef(isFlying);
+  isFlyingRef.current = isFlying;
 
   useEffect(() => {
     let mounted = true;
     const tick = (now: number) => {
       if (!mounted) return;
-      if (startRef.current == null) startRef.current = now;
-      const elapsedSec = (now - startRef.current) / 1000;
-      setOffset((elapsedSec * BG_SCROLL_PX_PER_SEC) % BG_STRIPE_TILE);
+      if (lastNowRef.current == null) lastNowRef.current = now;
+      const dtSec = (now - lastNowRef.current) / 1000;
+      lastNowRef.current = now;
+      if (isFlyingRef.current) {
+        setOffset((prev) => (prev + dtSec * BG_SCROLL_PX_PER_SEC) % BG_STRIPE_TILE);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -963,7 +971,7 @@ export default function AviatorScreen() {
       </View>
 
       <View style={[styles.panelWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
-        <PanelBackground />
+        <PanelBackground isFlying={round?.phase === 'FLYING'} />
         <FlightTrail round={round} />
         <View style={styles.multiplierWrap} pointerEvents="none">
           {multiplierGlowColor && (
