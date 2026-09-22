@@ -340,7 +340,14 @@ model Bet {
 model ColorGameRound {
   id              String          @id @default(uuid())
   durationSeconds Int
-  periodNumber    String          @unique
+  // periodNumber (YYMMDD + that duration's 1-based round index for the
+  // day — see periodNumberFor) is only unique WITHIN a duration: e.g.
+  // 30s round #60 and 60s round #60 both land on "...000060" the same
+  // day. Only @@unique below, not a bare @unique here, or two different
+  // durations' rounds sharing a round index would collide on write and
+  // silently return the wrong duration's round (a real bug this fixed —
+  // see the commit that added this comment).
+  periodNumber    String
   startTime       DateTime
   endTime         DateTime
   serverSeed      String?
@@ -351,6 +358,7 @@ model ColorGameRound {
   createdAt       DateTime        @default(now())
   bets            ColorGameBet[]
 
+  @@unique([durationSeconds, periodNumber])
   @@index([durationSeconds, startTime])
 }
 

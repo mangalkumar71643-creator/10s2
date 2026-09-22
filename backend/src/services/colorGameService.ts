@@ -124,8 +124,12 @@ async function createNextRound(durationSeconds: number, startTime: Date) {
   } catch {
     // periodNumber is a deterministic function of (duration, startTime), so
     // a unique-constraint failure here just means a concurrent request beat
-    // us to creating this exact round — use theirs.
-    return prisma.colorGameRound.findUniqueOrThrow({ where: { periodNumber } });
+    // us to creating this exact round — use theirs. Looked up by the
+    // compound key since periodNumber alone isn't unique across durations
+    // (see the schema comment on ColorGameRound.periodNumber).
+    return prisma.colorGameRound.findUniqueOrThrow({
+      where: { durationSeconds_periodNumber: { durationSeconds, periodNumber } },
+    });
   }
 }
 
