@@ -1282,7 +1282,7 @@ export default function AviatorScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenRoot: { flex: 1, backgroundColor: '#000000' },
+  screenRoot: { flex: 1, backgroundColor: '#1A1B1E' },
   scrollArea: { flex: 1 },
   root: { alignItems: 'center', flexGrow: 1, paddingBottom: 24 },
   aboveBetsPanel: { alignItems: 'center', width: '100%' },
