@@ -158,8 +158,8 @@
   .game-card-header:hover { background: var(--surface-alt); }
   .game-card-header.open { color: var(--green); }
   .game-card-title { display: flex; align-items: center; gap: 10px; }
-  .game-card-header .chev { transition: transform 0.15s ease; color: var(--text-muted); }
-  .game-card-header.open .chev { transform: rotate(180deg); color: var(--green); }
+  .game-card-header .chev { display: inline-block; transition: transform 0.15s ease; color: var(--text-muted); }
+  .game-card-header.open .chev { transform: rotate(90deg); color: var(--green); }
   .game-card-body { display: none; padding: 0 20px 20px; border-top: 1px solid var(--border); padding-top: 16px; }
   .game-card-body.open { display: block; }
   .live-box { background: var(--surface-alt); border: 1px solid var(--border-strong); border-radius: 12px; padding: 14px 16px; font-size: 13px; line-height: 1.9; }
@@ -365,7 +365,7 @@
 
         <div class="game-card">
           <button class="game-card-header" data-game-toggle="colorpredict">
-            <span class="game-card-title"><span id="gameIcon-colorpredict"></span> Win Go</span><span class="chev">▾</span>
+            <span class="game-card-title"><span id="gameIcon-colorpredict"></span> Win Go</span><span class="chev">▸</span>
           </button>
           <div class="game-card-body" id="gamebody-colorpredict">
             <div class="form-row">
@@ -381,33 +381,39 @@
             <h2 style="margin-bottom:10px;">Live round</h2>
             <div id="cpLive"></div>
             <hr class="divider" />
+            <h2 style="margin-bottom:10px;">Players active in this round (<span id="cpActiveCount">0</span>)</h2>
+            <div class="table-scroll" id="cpActiveBets"></div>
+            <hr class="divider" />
             <h2 style="margin-bottom:10px;">Round history</h2>
             <div class="table-scroll" id="cpHistory"></div>
             <hr class="divider" />
-            <h2 style="margin-bottom:10px;">Recent bets — audit for suspicious activity</h2>
+            <h2 style="margin-bottom:10px;">All recent bets — audit for suspicious activity</h2>
             <div class="table-scroll" id="cpBets"></div>
           </div>
         </div>
 
         <div class="game-card">
           <button class="game-card-header" data-game-toggle="aviator">
-            <span class="game-card-title"><span id="gameIcon-aviator"></span> Aviator</span><span class="chev">▾</span>
+            <span class="game-card-title"><span id="gameIcon-aviator"></span> Aviator</span><span class="chev">▸</span>
           </button>
           <div class="game-card-body" id="gamebody-aviator">
             <h2 style="margin-bottom:10px;">Live round</h2>
             <div id="avLive"></div>
             <hr class="divider" />
+            <h2 style="margin-bottom:10px;">Players active in this round (<span id="avActiveCount">0</span>)</h2>
+            <div class="table-scroll" id="avActiveBets"></div>
+            <hr class="divider" />
             <h2 style="margin-bottom:10px;">Round history</h2>
             <div class="table-scroll" id="avHistory"></div>
             <hr class="divider" />
-            <h2 style="margin-bottom:10px;">Recent bets — audit for suspicious activity</h2>
+            <h2 style="margin-bottom:10px;">All recent bets — audit for suspicious activity</h2>
             <div class="table-scroll" id="avBets"></div>
           </div>
         </div>
 
         <div class="game-card">
           <button class="game-card-header" data-game-toggle="dice">
-            <span class="game-card-title"><span id="gameIcon-dice"></span> Dice</span><span class="chev">▾</span>
+            <span class="game-card-title"><span id="gameIcon-dice"></span> Dice</span><span class="chev">▸</span>
           </button>
           <div class="game-card-body" id="gamebody-dice">
             <h2 style="margin-bottom:10px;">Recent plays</h2>
@@ -417,7 +423,7 @@
 
         <div class="game-card">
           <button class="game-card-header" data-game-toggle="coinflip">
-            <span class="game-card-title"><span id="gameIcon-coinflip"></span> Coin Flip</span><span class="chev">▾</span>
+            <span class="game-card-title"><span id="gameIcon-coinflip"></span> Coin Flip</span><span class="chev">▸</span>
           </button>
           <div class="game-card-body" id="gamebody-coinflip">
             <h2 style="margin-bottom:10px;">Recent plays</h2>
@@ -427,7 +433,7 @@
 
         <div class="game-card">
           <button class="game-card-header" data-game-toggle="sportsbook">
-            <span class="game-card-title"><span id="gameIcon-sportsbook"></span> Sportsbook</span><span class="chev">▾</span>
+            <span class="game-card-title"><span id="gameIcon-sportsbook"></span> Sportsbook</span><span class="chev">▸</span>
           </button>
           <div class="game-card-body" id="gamebody-sportsbook">
             <h2 style="margin-bottom:12px;">Create Sport</h2>
@@ -1014,13 +1020,49 @@
   }
 
   // --- Win Go (Color Predict) ---
+  // Counts how many bets each player has in the given list — more than
+  // one per round is normal (a player can bet color + size + number all
+  // at once), so this is shown as a neutral count, not an accusation; the
+  // admin decides what looks off from the raw list.
+  function perPlayerCounts(bets) {
+    var counts = {};
+    bets.forEach(function (b) { counts[b.userId] = (counts[b.userId] || 0) + 1; });
+    return counts;
+  }
+
   function loadColorPredictPanel() {
     var duration = Number(document.getElementById('cpDuration').value);
-    api('/admin/color-game/live?duration=' + duration).then(function (v) {
+    Promise.all([
+      api('/admin/color-game/live?duration=' + duration),
+      api('/admin/color-game/bets?duration=' + duration + '&limit=100'),
+    ]).then(function (results) {
+      var v = results[0], allBets = results[1];
       document.getElementById('cpLive').innerHTML =
         '<div class="live-box">Period <b>' + v.periodNumber + '</b> &nbsp;·&nbsp; Time left: <b>' + v.timeRemainingSeconds + 's</b> &nbsp;·&nbsp; ' +
         '<span class="pill ' + (v.locked ? 'banned' : 'active') + '">' + (v.locked ? 'Betting locked' : 'Betting open') + '</span>' +
         '<br/>Committed hash (fixed before the round started): <span class="seed-hash">' + v.serverSeedHash + '</span></div>';
+
+      var activeBets = allBets.filter(function (b) { return b.round.periodNumber === v.periodNumber; });
+      var activeCounts = perPlayerCounts(activeBets);
+      document.getElementById('cpActiveCount').textContent = Object.keys(activeCounts).length;
+      var activeRows = activeBets.map(function (b) {
+        var badge = activeCounts[b.userId] > 1 ? ' <span class="item-meta">(' + activeCounts[b.userId] + ' bets this round)</span>' : '';
+        return '<tr><td>' + playerCellHtml(b.user) + badge + '</td><td>' + b.betType + ': ' + escapeHtml(b.betValue) + '</td>' +
+          '<td>' + fmtMoney(b.amount) + '</td><td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
+      }).join('');
+      document.getElementById('cpActiveBets').innerHTML = activeBets.length
+        ? '<table><thead><tr><th>Player</th><th>Bet</th><th>Amount</th><th>Placed at</th></tr></thead><tbody>' + activeRows + '</tbody></table>'
+        : '<div class="empty">No one has bet in this round yet.</div>';
+
+      var rows = allBets.slice(0, 40).map(function (b) {
+        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + b.betType + ': ' + escapeHtml(b.betValue) + '</td>' +
+          '<td>' + fmtMoney(b.amount) + '</td><td>' + b.round.periodNumber + '</td>' +
+          '<td><span class="pill ' + (b.status === 'WON' ? 'approved' : b.status === 'LOST' ? 'rejected' : 'pending') + '">' + b.status + '</span></td>' +
+          '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
+      }).join('');
+      document.getElementById('cpBets').innerHTML = allBets.length
+        ? '<table><thead><tr><th>Player</th><th>Bet</th><th>Amount</th><th>Period</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<div class="empty">No bets yet.</div>';
     }).catch(function (err) { if (err.authError) doLogout(); });
 
     api('/admin/color-game/rounds?duration=' + duration + '&limit=15').then(function (rounds) {
@@ -1033,31 +1075,49 @@
       el.innerHTML = rounds.length ? '<table><thead><tr><th>Period</th><th>Result</th><th>Server seed (verify)</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="empty">No settled rounds yet.</div>';
       wireVerifyButtons(el);
     }).catch(function (err) { if (err.authError) doLogout(); });
-
-    api('/admin/color-game/bets?duration=' + duration + '&limit=40').then(function (bets) {
-      var rows = bets.map(function (b) {
-        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + b.betType + ': ' + escapeHtml(b.betValue) + '</td>' +
-          '<td>' + fmtMoney(b.amount) + '</td><td>' + b.round.periodNumber + '</td>' +
-          '<td><span class="pill ' + (b.status === 'WON' ? 'approved' : b.status === 'LOST' ? 'rejected' : 'pending') + '">' + b.status + '</span></td>' +
-          '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
-      }).join('');
-      document.getElementById('cpBets').innerHTML = bets.length
-        ? '<table><thead><tr><th>Player</th><th>Bet</th><th>Amount</th><th>Period</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
-        : '<div class="empty">No bets yet.</div>';
-    }).catch(function (err) { if (err.authError) doLogout(); });
   }
   document.getElementById('cpDuration').addEventListener('change', loadColorPredictPanel);
   document.getElementById('cpRefresh').addEventListener('click', loadColorPredictPanel);
 
   // --- Aviator ---
   function loadAviatorPanel() {
-    api('/admin/aviator/live').then(function (v) {
+    Promise.all([
+      api('/admin/aviator/live'),
+      api('/admin/aviator/bets?limit=100'),
+    ]).then(function (results) {
+      var v = results[0], allBets = results[1];
       var phasePill = v.phase === 'FLYING' ? 'active' : v.phase === 'CRASHED' ? 'banned' : 'pending';
       document.getElementById('avLive').innerHTML =
         '<div class="live-box">Period <b>' + v.periodNumber + '</b> &nbsp;·&nbsp; Phase: <span class="pill ' + phasePill + '">' + v.phase + '</span> ' +
         '&nbsp;·&nbsp; Multiplier: <b>' + Number(v.multiplier).toFixed(2) + 'x</b>' +
         (v.crashMultiplier != null ? ' &nbsp;·&nbsp; Crashed at <b>' + Number(v.crashMultiplier).toFixed(2) + 'x</b>' : '') +
         '<br/>Committed hash (fixed before the round started): <span class="seed-hash">' + v.serverSeedHash + '</span></div>';
+
+      var activeBets = allBets.filter(function (b) { return b.round.periodNumber === v.periodNumber; });
+      var activeCounts = perPlayerCounts(activeBets);
+      document.getElementById('avActiveCount').textContent = Object.keys(activeCounts).length;
+      var activeRows = activeBets.map(function (b) {
+        var badge = activeCounts[b.userId] > 1 ? ' <span class="item-meta">(' + activeCounts[b.userId] + ' bets this round)</span>' : '';
+        return '<tr><td>' + playerCellHtml(b.user) + badge + '</td><td>' + fmtMoney(b.amount) + '</td>' +
+          '<td>' + (b.autoCashoutAt ? Number(b.autoCashoutAt).toFixed(2) + 'x' : '—') + '</td>' +
+          '<td>' + (b.cashoutMultiplier ? Number(b.cashoutMultiplier).toFixed(2) + 'x' : 'Not yet') + '</td>' +
+          '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
+      }).join('');
+      document.getElementById('avActiveBets').innerHTML = activeBets.length
+        ? '<table><thead><tr><th>Player</th><th>Stake</th><th>Auto cashout</th><th>Cashed out</th><th>Placed at</th></tr></thead><tbody>' + activeRows + '</tbody></table>'
+        : '<div class="empty">No one has bet in this round yet.</div>';
+
+      var rows = allBets.slice(0, 40).map(function (b) {
+        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + fmtMoney(b.amount) + '</td>' +
+          '<td>' + (b.autoCashoutAt ? Number(b.autoCashoutAt).toFixed(2) + 'x' : '—') + '</td>' +
+          '<td>' + (b.cashoutMultiplier ? Number(b.cashoutMultiplier).toFixed(2) + 'x' : '—') + '</td>' +
+          '<td>' + fmtMoney(b.payout) + '</td>' +
+          '<td><span class="pill ' + (b.status === 'WON' ? 'approved' : b.status === 'LOST' ? 'rejected' : 'pending') + '">' + b.status + '</span></td>' +
+          '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
+      }).join('');
+      document.getElementById('avBets').innerHTML = allBets.length
+        ? '<table><thead><tr><th>Player</th><th>Stake</th><th>Auto cashout</th><th>Cashed out</th><th>Payout</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<div class="empty">No bets yet.</div>';
     }).catch(function (err) { if (err.authError) doLogout(); });
 
     api('/admin/aviator/rounds?limit=15').then(function (rounds) {
@@ -1068,20 +1128,6 @@
       var el = document.getElementById('avHistory');
       el.innerHTML = rounds.length ? '<table><thead><tr><th>Period</th><th>Crashed at</th><th>Server seed (verify)</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="empty">No settled rounds yet.</div>';
       wireVerifyButtons(el);
-    }).catch(function (err) { if (err.authError) doLogout(); });
-
-    api('/admin/aviator/bets?limit=40').then(function (bets) {
-      var rows = bets.map(function (b) {
-        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + fmtMoney(b.amount) + '</td>' +
-          '<td>' + (b.autoCashoutAt ? Number(b.autoCashoutAt).toFixed(2) + 'x' : '—') + '</td>' +
-          '<td>' + (b.cashoutMultiplier ? Number(b.cashoutMultiplier).toFixed(2) + 'x' : '—') + '</td>' +
-          '<td>' + fmtMoney(b.payout) + '</td>' +
-          '<td><span class="pill ' + (b.status === 'WON' ? 'approved' : b.status === 'LOST' ? 'rejected' : 'pending') + '">' + b.status + '</span></td>' +
-          '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
-      }).join('');
-      document.getElementById('avBets').innerHTML = bets.length
-        ? '<table><thead><tr><th>Player</th><th>Stake</th><th>Auto cashout</th><th>Cashed out</th><th>Payout</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
-        : '<div class="empty">No bets yet.</div>';
     }).catch(function (err) { if (err.authError) doLogout(); });
   }
 
