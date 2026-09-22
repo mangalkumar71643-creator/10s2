@@ -9,6 +9,8 @@ import {
   getHistory,
   getMyBets,
   getMyCurrentBet,
+  getRoundBets,
+  getTopBets,
   placeAviatorBet,
 } from "../services/aviatorService";
 
@@ -73,6 +75,25 @@ router.get(
   requireAuth,
   asyncHandler(async (req, res) => {
     res.json(await getMyBets(req.user!.userId));
+  })
+);
+
+router.get(
+  "/round-bets",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const periodNumber = z.string().min(1).parse(req.query.periodNumber);
+    const limit = Math.min(Number(req.query.limit) || 100, 200);
+    res.json(await getRoundBets(periodNumber, limit));
+  })
+);
+
+router.get(
+  "/top-bets",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    res.json(await getTopBets(limit));
   })
 );
 

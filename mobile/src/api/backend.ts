@@ -422,3 +422,25 @@ export interface AviatorMyBet extends AviatorBetResult {
 export function fetchAviatorMyBets() {
   return apiFetch<AviatorMyBet[]>('/aviator/my-bets');
 }
+
+// Every player's bet on a round, masked to just first+last letter of
+// their name (e.g. "m***l") — never phone/email/uid.
+export interface AviatorPublicBet {
+  id: string;
+  player: string;
+  amount: string;
+  cashoutMultiplier: string | null;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST';
+  createdAt: string;
+}
+
+export function fetchAviatorRoundBets(periodNumber: string, limit = 100) {
+  return apiFetch<AviatorPublicBet[]>(
+    `/aviator/round-bets?periodNumber=${encodeURIComponent(periodNumber)}&limit=${limit}`
+  );
+}
+
+export function fetchAviatorTopBets(limit = 50) {
+  return apiFetch<AviatorPublicBet[]>(`/aviator/top-bets?limit=${limit}`);
+}

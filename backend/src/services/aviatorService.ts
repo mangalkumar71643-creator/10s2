@@ -330,6 +330,56 @@ export async function getMyBets(userId: string, limit = 50) {
   });
 }
 
+/** Shows other players' activity without exposing who they are — just the
+ * first and last character of their first name, everything else starred
+ * out (e.g. "Mangal" -> "m***l"). Never sends phone/email/uid to other
+ * players. */
+function maskPlayerName(firstName: string): string {
+  const name = firstName.trim();
+  if (name.length <= 1) return `${name.toLowerCase()}***`;
+  return `${name[0].toLowerCase()}***${name[name.length - 1].toLowerCase()}`;
+}
+
+const publicBetSelect = {
+  id: true,
+  amount: true,
+  cashoutMultiplier: true,
+  payout: true,
+  status: true,
+  createdAt: true,
+  user: { select: { firstName: true } },
+} as const;
+
+function toPublicBet<T extends { user: { firstName: string } }>(bet: T) {
+  const { user, ...rest } = bet;
+  return { ...rest, player: maskPlayerName(user.firstName) };
+}
+
+/** Every bet placed on a given round (current or already-settled), most
+ * staked first — powers the "All Bets" / "Previous" public bet lists. */
+export async function getRoundBets(periodNumber: string, limit = 100) {
+  const round = await prisma.aviatorRound.findUnique({ where: { periodNumber }, select: { id: true } });
+  if (!round) return [];
+  const bets = await prisma.aviatorBet.findMany({
+    where: { roundId: round.id },
+    orderBy: { amount: "desc" },
+    take: limit,
+    select: publicBetSelect,
+  });
+  return bets.map(toPublicBet);
+}
+
+/** Biggest recent wins across all players, for the "Top" tab. */
+export async function getTopBets(limit = 50) {
+  const bets = await prisma.aviatorBet.findMany({
+    where: { status: "WON" },
+    orderBy: { payout: "desc" },
+    take: limit,
+    select: publicBetSelect,
+  });
+  return bets.map(toPublicBet);
+}
+
 export function getAviatorConfig() {
   return {
     minStake: env.games.minStake,

@@ -2,17 +2,20 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
 import {
+  AviatorPublicBet,
   AviatorRoundView,
   cashOutAviatorBet,
   fetchAviatorCurrentRound,
   fetchAviatorHistory,
   fetchAviatorMyBets,
+  fetchAviatorRoundBets,
+  fetchAviatorTopBets,
   placeAviatorBet,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
@@ -789,6 +792,140 @@ function AutoOptionsRow({
   );
 }
 
+// "All Bets / Previous / Top" panel shown below the bet buttons — every
+// player's activity on a round, masked to protect identity (see
+// maskPlayerName on the backend). Fully self-contained: fetches its own
+// data on a short poll while its tab is active, never touches `round`
+// state or FlightTrail.
+type BetsTab = 'all' | 'previous' | 'top';
+
+function avatarColorFor(name: string): string {
+  const palette = ['#4B7BEC', '#8854D0', '#20BF6B', '#EB5757', '#F0B93D', '#26C6DA'];
+  const code = name.charCodeAt(0) || 0;
+  return palette[code % palette.length];
+}
+
+function BetRow({ bet }: { bet: AviatorPublicBet }) {
+  return (
+    <View style={styles.betRow}>
+      <View style={styles.betRowPlayer}>
+        <View style={[styles.betAvatar, { backgroundColor: avatarColorFor(bet.player) }]}>
+          <Text style={styles.betAvatarText}>{bet.player[0]?.toUpperCase() ?? '?'}</Text>
+        </View>
+        <Text style={styles.betCellText} numberOfLines={1}>
+          {bet.player}
+        </Text>
+      </View>
+      <Text style={[styles.betCellText, styles.betCellNum]}>{Number(bet.amount).toFixed(2)}</Text>
+      <Text style={[styles.betCellText, styles.betCellNum]}>
+        {bet.cashoutMultiplier ? `${Number(bet.cashoutMultiplier).toFixed(2)}x` : '—'}
+      </Text>
+      <Text
+        style={[
+          styles.betCellText,
+          styles.betCellNum,
+          { color: bet.status === 'WON' ? '#3ECF8E' : '#8A8A8E' },
+        ]}
+      >
+        {Number(bet.payout).toFixed(2)}
+      </Text>
+    </View>
+  );
+}
+
+function AviatorBetsPanel({ currentPeriodNumber }: { currentPeriodNumber: string | null }) {
+  const [tab, setTab] = useState<BetsTab>('all');
+  const [bets, setBets] = useState<AviatorPublicBet[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let pollId: ReturnType<typeof setInterval> | null = null;
+
+    async function loadAll() {
+      if (!currentPeriodNumber) return;
+      try {
+        const result = await fetchAviatorRoundBets(currentPeriodNumber);
+        if (!cancelled) setBets(result);
+      } catch {
+        // Leave the previous list showing rather than clearing it on a
+        // transient network error.
+      }
+    }
+    async function loadPrevious() {
+      try {
+        const history = await fetchAviatorHistory();
+        const lastPeriod = history[0]?.periodNumber;
+        if (!lastPeriod) {
+          if (!cancelled) setBets([]);
+          return;
+        }
+        const result = await fetchAviatorRoundBets(lastPeriod);
+        if (!cancelled) setBets(result);
+      } catch {}
+    }
+    async function loadTop() {
+      try {
+        const result = await fetchAviatorTopBets();
+        if (!cancelled) setBets(result);
+      } catch {}
+    }
+
+    if (tab === 'all') {
+      loadAll();
+      pollId = setInterval(loadAll, 3000);
+    } else if (tab === 'previous') {
+      loadPrevious();
+    } else {
+      loadTop();
+      pollId = setInterval(loadTop, 15000);
+    }
+
+    return () => {
+      cancelled = true;
+      if (pollId) clearInterval(pollId);
+    };
+  }, [tab, currentPeriodNumber]);
+
+  const totalWin = bets.reduce((sum, b) => sum + (b.status === 'WON' ? Number(b.payout) : 0), 0);
+  const settledCount = bets.filter((b) => b.status !== 'PENDING').length;
+
+  return (
+    <View style={styles.betsPanel}>
+      <View style={styles.betsTabRow}>
+        {(['all', 'previous', 'top'] as BetsTab[]).map((t) => (
+          <Pressable key={t} style={[styles.betsTabBtn, tab === t && styles.betsTabBtnActive]} onPress={() => setTab(t)}>
+            <Text style={[styles.betsTabText, tab === t && styles.betsTabTextActive]}>
+              {t === 'all' ? 'All Bets' : t === 'previous' ? 'Previous' : 'Top'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <View style={styles.betsSummaryRow}>
+        <Text style={styles.betsSummaryText}>
+          {settledCount}/{bets.length} Bets
+        </Text>
+        <Text style={styles.betsSummaryText}>Total win ₹{totalWin.toFixed(2)}</Text>
+      </View>
+
+      <View style={styles.betsHeaderRow}>
+        <Text style={[styles.betsHeaderText, { flex: 1.4 }]}>Player</Text>
+        <Text style={styles.betsHeaderText}>Bet ₹</Text>
+        <Text style={styles.betsHeaderText}>X</Text>
+        <Text style={styles.betsHeaderText}>Win ₹</Text>
+      </View>
+
+      <FlatList
+        data={bets}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <BetRow bet={item} />}
+        style={styles.betsList}
+        ListEmptyComponent={<Text style={styles.betsEmptyText}>No bets yet.</Text>}
+      />
+    </View>
+  );
+}
+
 export default function AviatorScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -1111,6 +1248,8 @@ export default function AviatorScreen() {
           />
         )}
       </View>
+
+      <AviatorBetsPanel currentPeriodNumber={round?.periodNumber ?? null} />
     </View>
   );
 }
@@ -1288,5 +1427,103 @@ const styles = StyleSheet.create({
   miniToggleThumbOn: {
     backgroundColor: '#FFFFFF',
     alignSelf: 'flex-end',
+  },
+  betsPanel: {
+    flex: 1,
+    alignSelf: 'stretch',
+    marginTop: 14,
+    backgroundColor: '#1A1B1E',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  betsTabRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  betsTabBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: '#2C2D31',
+  },
+  betsTabBtnActive: {
+    backgroundColor: '#3ECF8E',
+  },
+  betsTabText: {
+    color: '#8A8A8E',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  betsTabTextActive: {
+    color: '#0A0A0D',
+  },
+  betsSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  betsSummaryText: {
+    color: '#8A8A8E',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  betsHeaderRow: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2C2D31',
+  },
+  betsHeaderText: {
+    flex: 1,
+    color: '#8A8A8E',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  betsList: {
+    flex: 1,
+  },
+  betsEmptyText: {
+    color: '#8A8A8E',
+    fontSize: 13,
+    textAlign: 'center',
+    paddingVertical: 24,
+  },
+  betRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222327',
+  },
+  betRowPlayer: {
+    flex: 1.4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  betAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  betAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  betCellText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  betCellNum: {
+    flex: 1,
+    textAlign: 'right',
   },
 });
