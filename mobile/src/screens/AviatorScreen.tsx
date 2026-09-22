@@ -92,7 +92,7 @@ const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
 // interfere with that animation above.
 const BG_STRIPE_TILE = PANEL_HEIGHT * 0.16;
 const BG_BAND_HEIGHT = BG_STRIPE_TILE / 2;
-const BG_SCROLL_PX_PER_SEC = BG_STRIPE_TILE / 5;
+const BG_SCROLL_PX_PER_SEC = BG_STRIPE_TILE / 2.5;
 const BG_STRIPE_DARK = '#0a0a0d';
 const BG_STRIPE_LIGHT = '#1c1c22';
 const BG_ANGLE_DEG = 20;
