@@ -184,12 +184,22 @@ export async function ensureCurrentRound(durationSeconds: number) {
   });
 
   const now = new Date();
-  while (!round || round.endTime <= now) {
-    if (round && !round.settled) {
-      await settleRound(round.id);
-    }
-    const startTime = round ? round.endTime : alignToBoundary(now, durationSeconds);
-    round = await createNextRound(durationSeconds, startTime);
+  if (round && !round.settled && round.endTime <= now) {
+    await settleRound(round.id);
+  }
+
+  // Jump straight to the round that should be live right now instead of
+  // materializing every round in between one at a time — if this track
+  // has sat unpolled for a while, nobody could have reached those
+  // in-between rounds to place a bet on them (this is the only place a
+  // round for this duration ever gets created), so there is nothing to
+  // settle for them and no need for their rows to exist at all.
+  // periodNumber is derived from `startTime` alone, not a running
+  // counter, so skipping ahead like this never collides with or repeats
+  // a period number.
+  const currentStart = alignToBoundary(now, durationSeconds);
+  if (!round || round.startTime.getTime() < currentStart.getTime()) {
+    round = await createNextRound(durationSeconds, currentStart);
   }
 
   return round;

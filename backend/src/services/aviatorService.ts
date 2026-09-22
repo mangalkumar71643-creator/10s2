@@ -151,15 +151,27 @@ async function settleRound(roundId: string) {
  * backend, so every read/write catches the chain up to "now" first.
  * Unlike ColorGame, rounds aren't aligned to wall-clock slots — each one
  * starts the instant the previous one's result-pause ends. */
+// No single round's flight can realistically take anywhere near this long
+// (even a rare huge crash multiplier resolves in well under a minute), so
+// a gap bigger than this can only mean the track sat unpolled — safe to
+// treat as "nobody was around to bet" rather than "still mid-round".
+const IDLE_GAP_MS = 5 * 60 * 1000;
+
 export async function ensureCurrentRound() {
   let round = await prisma.aviatorRound.findFirst({ orderBy: { bettingStartTime: "desc" } });
 
   const now = new Date();
-  while (!round || round.endTime <= now) {
-    if (round && !round.settled) {
-      await settleRound(round.id);
-    }
-    const bettingStartTime = round ? round.endTime : now;
+  if (round && !round.settled && round.endTime <= now) {
+    await settleRound(round.id);
+  }
+
+  if (!round || round.endTime <= now) {
+    // Chain straight off the previous round when we're only a beat
+    // behind (the normal case), or jump to `now` when the gap is large —
+    // no round in that gap could have had a bet placed on it (this is
+    // the only place a round ever gets created), so there's nothing to
+    // settle for them and no need for their rows to exist at all.
+    const bettingStartTime = round && now.getTime() - round.endTime.getTime() < IDLE_GAP_MS ? round.endTime : now;
     round = await createNextRound(bettingStartTime);
   }
 
