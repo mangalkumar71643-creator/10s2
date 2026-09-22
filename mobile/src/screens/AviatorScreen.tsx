@@ -88,7 +88,7 @@ const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
 // state) so it can never interfere with FlightTrail's animation above.
 const BG_STRIPE_TILE = PANEL_HEIGHT * 0.16;
 const BG_STRIPE_ANGLE = 22;
-const BG_SCROLL_PX_PER_SEC = BG_STRIPE_TILE / 1.6;
+const BG_SCROLL_PX_PER_SEC = BG_STRIPE_TILE / 5;
 const BG_STRIPE_DARK = '#0a0a0d';
 const BG_STRIPE_LIGHT = '#1c1c22';
 
