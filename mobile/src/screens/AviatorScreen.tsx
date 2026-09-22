@@ -81,58 +81,15 @@ const LOGO_ASPECT = 49 / 148;
 const LOGO_WIDTH = SCREEN_WIDTH * 0.32;
 const LOGO_HEIGHT = LOGO_WIDTH * LOGO_ASPECT;
 
-// The rays in aviator-panel-bg.png fan out from just past the panel's
-// bottom-left corner (where the plane takes off) — rotating slowly around
-// that point, rather than the image's own center, is what makes the whole
-// scene read as continuous forward motion instead of a static picture.
-// Fully self-contained (its own rAF loop, no shared state) so it can never
-// interfere with FlightTrail's animation above.
-const BG_ROTATE_DEGREES_PER_SEC = 6;
-const BG_PIVOT_X = -PANEL_WIDTH * 0.03;
-const BG_PIVOT_Y = PANEL_HEIGHT * 1.02;
-function RotatingBackground() {
-  const [angle, setAngle] = useState(0);
-  const rafRef = useRef<number | null>(null);
-  const startRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const tick = (now: number) => {
-      if (!mounted) return;
-      if (startRef.current == null) startRef.current = now;
-      setAngle(((now - startRef.current) / 1000) * BG_ROTATE_DEGREES_PER_SEC % 360);
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      mounted = false;
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
-  // RN only rotates around an element's own center, so rotating around the
-  // pivot instead means shifting the pivot to center, rotating, then
-  // shifting back by the same amount.
-  const offsetX = PANEL_WIDTH / 2 - BG_PIVOT_X;
-  const offsetY = PANEL_HEIGHT / 2 - BG_PIVOT_Y;
-
+// Confirmed against a real Aviator recording (compared frames 10+ seconds
+// apart, pixel-for-pixel — the ray pattern never shifts at all): the
+// background is static. Only the plane and the red trail actually move;
+// that alone is what reads as "flying". Kept as its own component (rather
+// than inlining the Image where it's used) purely so this note has
+// somewhere to live next to the thing it explains.
+function PanelBackground() {
   return (
-    <Image
-      source={require('../../assets/aviator-panel-bg.png')}
-      resizeMode="contain"
-      style={[
-        styles.panelBgImage,
-        {
-          transform: [
-            { translateX: offsetX },
-            { translateY: offsetY },
-            { rotate: `${angle}deg` },
-            { translateX: -offsetX },
-            { translateY: -offsetY },
-          ],
-        },
-      ]}
-    />
+    <Image source={require('../../assets/aviator-panel-bg.png')} resizeMode="contain" style={styles.panelBgImage} />
   );
 }
 
@@ -938,9 +895,7 @@ export default function AviatorScreen() {
       </View>
 
       <View style={[styles.panelWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
-        <View style={[styles.panelBgClip, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
-          <RotatingBackground />
-        </View>
+        <PanelBackground />
         <FlightTrail round={round} />
         <View style={styles.multiplierWrap} pointerEvents="none">
           {multiplierGlowColor && (
@@ -1080,13 +1035,6 @@ const styles = StyleSheet.create({
   },
   panelWrap: {
     marginTop: 14,
-  },
-  // Clips only the rotating background layer — the plane/trail render as
-  // separate siblings above this, so they're unaffected and can still fly
-  // past the panel's border during the crash burst as before.
-  panelBgClip: {
-    overflow: 'hidden',
-    backgroundColor: '#141414',
   },
   panelBgImage: {
     width: PANEL_WIDTH,
