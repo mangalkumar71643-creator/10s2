@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
@@ -915,13 +915,13 @@ function AviatorBetsPanel({ currentPeriodNumber }: { currentPeriodNumber: string
         <Text style={styles.betsHeaderText}>Win ₹</Text>
       </View>
 
-      <FlatList
-        data={bets}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <BetRow bet={item} />}
-        style={styles.betsList}
-        ListEmptyComponent={<Text style={styles.betsEmptyText}>No bets yet.</Text>}
-      />
+      <View style={styles.betsList}>
+        {bets.length === 0 ? (
+          <Text style={styles.betsEmptyText}>No bets yet.</Text>
+        ) : (
+          bets.map((item) => <BetRow key={item.id} bet={item} />)
+        )}
+      </View>
     </View>
   );
 }
@@ -1120,7 +1120,7 @@ export default function AviatorScreen() {
   const multiplierGlowColor = isCrashed ? null : historyColor(round?.multiplier ?? 1);
 
   return (
-    <View style={styles.root}>
+    <View style={styles.screenRoot}>
       <Pressable
         onPress={() => navigation.goBack()}
         hitSlop={10}
@@ -1131,6 +1131,11 @@ export default function AviatorScreen() {
 
       <Text style={[styles.balanceChip, { top: insets.top + 8 }]}>₹{coins.toFixed(2)}</Text>
 
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.root}
+        showsVerticalScrollIndicator={false}
+      >
       <Image
         source={require('../../assets/aviator-logo.png')}
         resizeMode="contain"
@@ -1250,12 +1255,15 @@ export default function AviatorScreen() {
       </View>
 
       <AviatorBetsPanel currentPeriodNumber={round?.periodNumber ?? null} />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000000', alignItems: 'center' },
+  screenRoot: { flex: 1, backgroundColor: '#000000' },
+  scrollArea: { flex: 1 },
+  root: { alignItems: 'center', paddingBottom: 24 },
   backBtn: {
     position: 'absolute',
     left: 8,
@@ -1429,7 +1437,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   betsPanel: {
-    flex: 1,
     alignSelf: 'stretch',
     marginTop: 14,
     backgroundColor: '#1A1B1E',
@@ -1484,7 +1491,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   betsList: {
-    flex: 1,
+    paddingBottom: 8,
   },
   betsEmptyText: {
     color: '#8A8A8E',
