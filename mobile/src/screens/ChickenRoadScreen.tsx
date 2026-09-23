@@ -21,13 +21,14 @@ import {
 import { useGameState } from '../state/GameStateContext';
 
 const MIN_STAKE = 10;
-const LANE_WIDTH = 64;
-const DIVIDER_WIDTH = 18;
-const COOP_WIDTH = 68;
+const LANE_WIDTH = 84;
+const DIVIDER_WIDTH = 22;
+const COOP_WIDTH = 92;
 const QUICK_STAKES = [10, 100, 500, 1000];
 const LANE_PITCH = LANE_WIDTH + DIVIDER_WIDTH;
 const ROAD_CONTENT_PADDING = 16;
-const CHICKEN_SIZE = 40;
+const CHICKEN_SIZE = 58;
+const LANE_BADGE_SIZE = 74;
 const WALK_DURATION_MS = 420;
 const LEG_TOGGLE_MS = 110;
 
@@ -376,7 +377,7 @@ export default function ChickenRoadScreen() {
 
       <View style={styles.roadWrap}>
         <View style={styles.coop}>
-          {!round && <ChickenSprite size={44} />}
+          {!round && <ChickenSprite size={62} />}
         </View>
         <ScrollView
           ref={roadScrollRef}
@@ -566,7 +567,7 @@ const styles = StyleSheet.create({
     backgroundColor: ROAD_BG,
     borderRadius: 16,
     overflow: 'hidden',
-    height: 140,
+    height: 190,
   },
   coop: {
     width: COOP_WIDTH,
@@ -577,28 +578,28 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 16,
   },
   roadContent: { alignItems: 'center', paddingHorizontal: 16 },
-  laneSlot: { width: LANE_WIDTH, height: 100, alignItems: 'center', justifyContent: 'flex-end' },
-  chickenOverlay: { position: 'absolute', top: 4, width: CHICKEN_SIZE, height: CHICKEN_SIZE },
+  laneSlot: { width: LANE_WIDTH, height: 130, alignItems: 'center', justifyContent: 'flex-end' },
+  chickenOverlay: { position: 'absolute', top: 6, width: CHICKEN_SIZE, height: CHICKEN_SIZE },
   laneBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: LANE_BADGE_SIZE,
+    height: LANE_BADGE_SIZE,
+    borderRadius: LANE_BADGE_SIZE / 2,
     backgroundColor: LANE_BADGE_BG,
-    borderWidth: 3,
+    borderWidth: 4,
     borderColor: LANE_BADGE_RING,
     alignItems: 'center',
     justifyContent: 'center',
   },
   laneBadgeCrossed: { backgroundColor: '#1F4A38', borderColor: '#3ECF8E' },
-  laneBadgeText: { color: '#C7CBEF', fontSize: 11, fontWeight: '700' },
+  laneBadgeText: { color: '#C7CBEF', fontSize: 14, fontWeight: '700' },
   laneBadgeTextCrossed: { color: '#3ECF8E' },
   laneDivider: {
     width: DIVIDER_WIDTH,
-    height: 90,
+    height: 118,
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  laneDividerDash: { width: 2, height: 6, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.3)' },
+  laneDividerDash: { width: 2, height: 7, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.3)' },
   banner: {
     marginHorizontal: 12,
     marginTop: 12,
