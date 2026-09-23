@@ -461,6 +461,7 @@ export interface ChickenRoadDifficultyConfig {
 export interface ChickenRoadConfig {
   minStake: number;
   maxStake: number;
+  maxPayout: number;
   difficulties: ChickenRoadDifficultyConfig[];
 }
 

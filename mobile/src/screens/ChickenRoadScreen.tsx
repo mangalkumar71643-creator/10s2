@@ -498,7 +498,8 @@ export default function ChickenRoadScreen() {
 
   const isPlaying = round?.status === 'PENDING';
   const currentMultiplier = round ? Number(round.multiplier) : 1;
-  const potentialPayout = round ? round2(Number(round.stake) * currentMultiplier) : 0;
+  const maxPayout = config?.maxPayout ?? Infinity;
+  const potentialPayout = round ? Math.min(round2(Number(round.stake) * currentMultiplier), maxPayout) : 0;
 
   return (
     <View style={styles.root}>
@@ -687,7 +688,11 @@ export default function ChickenRoadScreen() {
 
       {banner && (
         <View style={[styles.banner, styles.bannerWon]}>
-          <Text style={styles.bannerText}>Cashed out! Won ₹{banner.payout.toFixed(2)}</Text>
+          <Text style={styles.bannerText}>
+            {banner.payout >= maxPayout
+              ? `Max win reached! Won ₹${banner.payout.toFixed(2)}`
+              : `Cashed out! Won ₹${banner.payout.toFixed(2)}`}
+          </Text>
         </View>
       )}
 

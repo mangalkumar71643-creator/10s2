@@ -45,7 +45,16 @@ export function getChickenRoadConfig() {
     // player even starts, without duplicating the multiplier formula.
     multipliers: Array.from({ length: config.steps + 1 }, (_, step) => multiplierAt(config, step)),
   }));
-  return { minStake: env.games.minStake, maxStake: env.games.maxStake, difficulties };
+  return {
+    minStake: env.games.minStake,
+    maxStake: env.games.maxStake,
+    maxPayout: env.games.maxPayout,
+    difficulties,
+  };
+}
+
+function cappedPayout(stake: number, multiplier: number): number {
+  return Math.min(round2(stake * multiplier), env.games.maxPayout);
 }
 
 /** Per-lane provably-fair roll: the round's own serverSeed/clientSeed/nonce
@@ -129,10 +138,12 @@ export async function advanceChickenRoadStep(userId: string, roundId: string) {
   const nextStep = round.currentStep + 1;
   const multiplier = multiplierAt(config, nextStep);
 
-  // Final lane survived — nothing left to risk, so it auto-settles as a
-  // win instead of leaving the player stuck with no further action.
-  if (nextStep >= config.steps) {
-    const payout = round2(Number(round.stake) * multiplier);
+  // Final lane survived, or the payout has hit the max-payout cap — there's
+  // nothing left to gain by risking another lane, so it auto-settles as a
+  // win instead of letting the player keep risking the stake for nothing.
+  const reachedCap = Number(round.stake) * multiplier >= env.games.maxPayout;
+  if (nextStep >= config.steps || reachedCap) {
+    const payout = cappedPayout(Number(round.stake), multiplier);
     const [updated] = await prisma.$transaction([
       prisma.chickenRoadRound.update({
         where: { id: round.id },
@@ -159,7 +170,7 @@ export async function cashOutChickenRoadRound(userId: string, roundId: string) {
     throw new ApiError(400, "Cross at least one lane before cashing out.");
   }
 
-  const payout = round2(Number(round.stake) * Number(round.multiplier));
+  const payout = cappedPayout(Number(round.stake), Number(round.multiplier));
   const [updated] = await prisma.$transaction([
     prisma.chickenRoadRound.update({
       where: { id: round.id },

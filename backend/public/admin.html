@@ -732,7 +732,9 @@
         statCardHtml('users', 'Total Users', s.totalUsers.toLocaleString('en-IN'), '+' + s.newUsersLast7Days + ' this week') +
         statCardHtml('wallet', 'Total Deposit', fmtMoney(s.totalDeposit), fmtMoney(s.depositLast7Days) + ' this week') +
         statCardHtml('trendUp', 'Total Withdrawal', fmtMoney(s.totalWithdrawal), fmtMoney(s.withdrawalLast7Days) + ' this week') +
-        statCardHtml('games', 'Active Players', s.activePlayers.toLocaleString('en-IN'), 'staked in last 24h');
+        statCardHtml('games', 'Active Players', s.activePlayers.toLocaleString('en-IN'), 'staked in last 24h') +
+        statCardHtml('wallet', 'Owed to Players', fmtMoney(s.owedToPlayers),
+          fmtMoney(s.playerBalanceTotal) + ' in wallets + ' + fmtMoney(s.pendingWithdrawalTotal) + ' pending withdrawal');
     }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
 
     api('/admin/users').then(function (users) {

@@ -184,8 +184,17 @@ router.get(
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [totalUsers, newUsers7d, totalDeposit, deposit7d, totalWithdrawal, withdrawal7d, activePlayerRows] =
-      await Promise.all([
+    const [
+      totalUsers,
+      newUsers7d,
+      totalDeposit,
+      deposit7d,
+      totalWithdrawal,
+      withdrawal7d,
+      activePlayerRows,
+      playerBalances,
+      pendingWithdrawals,
+    ] = await Promise.all([
         prisma.user.count(),
         prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
         prisma.transaction.aggregate({ where: { type: "DEPOSIT", status: "COMPLETED" }, _sum: { amount: true } }),
@@ -204,7 +213,13 @@ router.get(
           distinct: ["userId"],
           select: { userId: true },
         }),
+        prisma.wallet.aggregate({ _sum: { balance: true } }),
+        // Already deducted from wallets when requested, but not paid out yet.
+        prisma.transaction.aggregate({ where: { type: "WITHDRAWAL", status: "PENDING" }, _sum: { amount: true } }),
       ]);
+
+    const playerBalanceTotal = Number(playerBalances._sum.balance ?? 0);
+    const pendingWithdrawalTotal = Number(pendingWithdrawals._sum.amount ?? 0);
 
     res.json({
       totalUsers,
@@ -214,6 +229,10 @@ router.get(
       totalWithdrawal: totalWithdrawal._sum.amount ?? 0,
       withdrawalLast7Days: withdrawal7d._sum.amount ?? 0,
       activePlayers: activePlayerRows.length,
+      playerBalanceTotal,
+      pendingWithdrawalTotal,
+      // What the house would have to pay if every player cashed out now.
+      owedToPlayers: playerBalanceTotal + pendingWithdrawalTotal,
     });
   })
 );
