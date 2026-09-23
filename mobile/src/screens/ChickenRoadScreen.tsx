@@ -88,6 +88,13 @@ const CAR_APPROACH_DISTANCE = LANE_PITCH * 2.2;
 const CAR_DRIVE_MS = 420;
 const CAR_HIT_HOLD_MS = 1500;
 
+// Ambient background traffic — independent of round state, always driving
+// across the visible panel so the road feels alive, separate from the
+// fairness-driven car that hits the chicken on an actual bust.
+const AMBIENT_DRIVE_MS = 2600;
+const AMBIENT_GAP_MIN_MS = 500;
+const AMBIENT_GAP_JITTER_MS = 1800;
+
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
   EASY: 'Easy',
   MEDIUM: 'Medium',
@@ -105,6 +112,66 @@ function quickStakeLabel(amount: number): string {
 }
 
 type ResultBanner = { kind: 'won'; payout: number } | { kind: 'busted' };
+
+// Loops forever, independent of any round: drives a car across the fixed
+// visible panel, pauses off-screen for a random gap, then does it again.
+function AmbientTraffic() {
+  const [x, setX] = useState<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const startX = PANEL_WIDTH + CAR_LENGTH;
+    const endX = -CAR_LENGTH;
+
+    const drive = () => {
+      if (cancelled) return;
+      const start = Date.now();
+      const tick = () => {
+        if (cancelled) return;
+        const t = Math.min(1, (Date.now() - start) / AMBIENT_DRIVE_MS);
+        setX(startX + (endX - startX) * t);
+        if (t < 1) {
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
+        setX(null);
+        timeoutRef.current = setTimeout(drive, AMBIENT_GAP_MIN_MS + Math.random() * AMBIENT_GAP_JITTER_MS);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    timeoutRef.current = setTimeout(drive, Math.random() * AMBIENT_GAP_JITTER_MS);
+    return () => {
+      cancelled = true;
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  if (x === null) return null;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: x - CAR_LENGTH / 2,
+        top: LANE_Y - CAR_THICKNESS / 2,
+        width: CAR_LENGTH,
+        height: CAR_THICKNESS,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Image
+        source={require('../../assets/chicken-road-car.png')}
+        style={{ width: CAR_THICKNESS, height: CAR_LENGTH, transform: [{ rotate: '-90deg' }] }}
+        resizeMode="contain"
+      />
+    </View>
+  );
+}
 
 const DASH_COUNT = Math.ceil(PANEL_HEIGHT / (DASH_LEN + GAP_LEN)) + 1;
 
@@ -397,11 +464,12 @@ export default function ChickenRoadScreen() {
         )}
       </ScrollView>
 
+      <View style={[styles.roadWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
       <ScrollView
         ref={roadScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={[styles.roadWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}
+        style={{ width: PANEL_WIDTH, height: PANEL_HEIGHT }}
         contentContainerStyle={{ width: totalRoadWidth, height: PANEL_HEIGHT }}
       >
         <Image
@@ -518,6 +586,8 @@ export default function ChickenRoadScreen() {
           </View>
         )}
       </ScrollView>
+      <AmbientTraffic />
+      </View>
 
       {banner && (
         <View style={[styles.banner, banner.kind === 'won' ? styles.bannerWon : styles.bannerLost]}>
