@@ -22,12 +22,13 @@ import { useGameState } from '../state/GameStateContext';
 const MIN_STAKE = 10;
 const QUICK_STAKES = [10, 100, 500, 1000];
 
-// The extracted road-panel art (tree/lamp/sidewalk/manhole covers) — shown
-// at its own aspect ratio scaled to fit the screen width, never stretched
-// bigger than that. It's a fixed image (not a scrolling multi-lane strip
-// like the first version), so the game only ever shows the CURRENT lane's
-// multiplier on the near manhole cover and the NEXT lane's on the far one,
-// with the chicken standing on the near one once a round is active.
+// The extracted road-panel art (tree/lamp/sidewalk/2 manhole covers) is the
+// first, fixed-size segment of a horizontally scrollable road — it already
+// bakes in real manhole art for lanes 0 and 1. Every lane beyond that is
+// drawn in code as a plain strip of the same road color with the same
+// dashed white divider style repeating, so a round with many steps can be
+// scrolled through. Round manhole-cover art for those later lanes will be
+// dropped in later — for now they only show the multiplier text.
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const PANEL_SOURCE_WIDTH = 1216;
 const PANEL_SOURCE_HEIGHT = 1294;
@@ -35,11 +36,26 @@ const PANEL_ASPECT = PANEL_SOURCE_HEIGHT / PANEL_SOURCE_WIDTH;
 const PANEL_WIDTH = SCREEN_WIDTH * 0.94;
 const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 
-// Fractional hotspot positions measured off the source image — see the
-// comment above on why only two lanes are shown at once.
+// Fractional hotspot positions measured off the source image.
 const NEAR_MANHOLE = { xFrac: 0.59, yFrac: 0.62 };
 const FAR_MANHOLE = { xFrac: 0.93, yFrac: 0.62 };
 const CHICKEN_IDLE_SPOT = { xFrac: 0.3, yFrac: 0.62 };
+
+// Spacing between consecutive lane markers, derived from the two manholes
+// already baked into the source art — every later lane repeats this pitch.
+const LANE_PITCH = (FAR_MANHOLE.xFrac - NEAR_MANHOLE.xFrac) * PANEL_WIDTH;
+const ROAD_COLOR = '#696666';
+
+// Dash/gap run lengths measured off the source image's own divider line
+// (~69px dash / ~70px gap out of a 1294px-tall, 1216px-wide source),
+// scaled onto the panel's rendered height so the code-drawn dividers match.
+const DASH_LEN = PANEL_HEIGHT * (69 / PANEL_SOURCE_HEIGHT);
+const GAP_LEN = PANEL_HEIGHT * (70 / PANEL_SOURCE_HEIGHT);
+const DASH_WIDTH = 3;
+
+function laneX(step: number): number {
+  return NEAR_MANHOLE.xFrac * PANEL_WIDTH + step * LANE_PITCH;
+}
 
 const CHICKEN_ASPECT = 650 / 562;
 const CHICKEN_WIDTH = 60;
@@ -63,6 +79,28 @@ function quickStakeLabel(amount: number): string {
 }
 
 type ResultBanner = { kind: 'won'; payout: number } | { kind: 'busted' };
+
+const DASH_COUNT = Math.ceil(PANEL_HEIGHT / (DASH_LEN + GAP_LEN)) + 1;
+
+function DashedDivider({ left }: { left: number }) {
+  return (
+    <View style={{ position: 'absolute', left, top: 0, width: DASH_WIDTH, height: PANEL_HEIGHT }} pointerEvents="none">
+      {Array.from({ length: DASH_COUNT }).map((_, i) => (
+        <View
+          key={i}
+          style={{
+            position: 'absolute',
+            top: i * (DASH_LEN + GAP_LEN),
+            width: DASH_WIDTH,
+            height: DASH_LEN,
+            backgroundColor: '#FFFFFF',
+            opacity: 0.85,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
 
 function HistoryChip({ round }: { round: ChickenRoadRound }) {
   const won = round.status === 'WON';
@@ -92,6 +130,7 @@ export default function ChickenRoadScreen() {
   const [hopOffset, setHopOffset] = useState(0);
   const [shakeX, setShakeX] = useState(0);
   const hopRafRef = useRef<number | null>(null);
+  const roadScrollRef = useRef<ScrollView | null>(null);
 
   const loadHistory = useCallback(() => {
     fetchChickenRoadHistory(20)
@@ -116,16 +155,31 @@ export default function ChickenRoadScreen() {
     [config, difficulty, round]
   );
 
-  const nextMultiplier = useMemo(() => {
-    if (!activeConfig || !round) return null;
-    return activeConfig.multipliers[round.currentStep + 1] ?? null;
-  }, [activeConfig, round]);
+  // Lanes 0 and 1 sit on the real manhole art baked into the background
+  // image; every lane after that is a code-drawn extension of the same
+  // road color, repeating the pitch measured between those two manholes.
+  const maxSteps = activeConfig?.steps ?? 1;
+  const extraLaneCount = Math.max(0, maxSteps - 1);
+  const extraWidth = extraLaneCount * LANE_PITCH;
+  const totalRoadWidth = PANEL_WIDTH + extraWidth;
+  const extraLaneSteps = useMemo(
+    () => Array.from({ length: extraLaneCount }, (_, i) => i + 2),
+    [extraLaneCount]
+  );
 
   useEffect(() => {
     return () => {
       if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
     };
   }, []);
+
+  // Keep the chicken's current lane comfortably in view as the round
+  // advances, without blocking the player from scrolling ahead manually.
+  useEffect(() => {
+    if (!round) return;
+    const targetX = Math.max(0, laneX(round.currentStep) - PANEL_WIDTH * 0.35);
+    roadScrollRef.current?.scrollTo({ x: targetX, animated: true });
+  }, [round?.currentStep, round]);
 
   // A quick in-place hop each time the chicken survives a lane — there's
   // nowhere further to walk to on this fixed image, so "moving forward"
@@ -264,7 +318,13 @@ export default function ChickenRoadScreen() {
         )}
       </ScrollView>
 
-      <View style={[styles.roadWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}>
+      <ScrollView
+        ref={roadScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.roadWrap, { width: PANEL_WIDTH, height: PANEL_HEIGHT }]}
+        contentContainerStyle={{ width: totalRoadWidth, height: PANEL_HEIGHT }}
+      >
         <Image
           source={require('../../assets/chicken-road-panel-bg.png')}
           style={{ width: PANEL_WIDTH, height: PANEL_HEIGHT }}
@@ -281,7 +341,7 @@ export default function ChickenRoadScreen() {
           <Text style={styles.manholeLabelText}>{currentMultiplier.toFixed(2)}x</Text>
         </View>
 
-        {nextMultiplier !== null && (
+        {activeConfig?.multipliers[1] !== undefined && (
           <View
             style={[
               styles.manholeLabel,
@@ -289,7 +349,40 @@ export default function ChickenRoadScreen() {
             ]}
             pointerEvents="none"
           >
-            <Text style={styles.manholeLabelText}>{nextMultiplier.toFixed(2)}x</Text>
+            <Text style={styles.manholeLabelText}>{activeConfig.multipliers[1].toFixed(2)}x</Text>
+          </View>
+        )}
+
+        {extraLaneCount > 0 && (
+          <View
+            style={{
+              position: 'absolute',
+              left: PANEL_WIDTH,
+              top: 0,
+              width: extraWidth,
+              height: PANEL_HEIGHT,
+              backgroundColor: ROAD_COLOR,
+            }}
+          >
+            {extraLaneSteps.map((step) => (
+              <DashedDivider key={`d-${step}`} left={laneX(step) - LANE_PITCH / 2 - PANEL_WIDTH} />
+            ))}
+            {extraLaneSteps.map((step) => {
+              const mult = activeConfig?.multipliers[step];
+              if (mult === undefined) return null;
+              return (
+                <View
+                  key={`m-${step}`}
+                  style={[
+                    styles.manholeLabel,
+                    { left: laneX(step) - PANEL_WIDTH - 40, top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - 12 },
+                  ]}
+                  pointerEvents="none"
+                >
+                  <Text style={styles.manholeLabelText}>{mult.toFixed(2)}x</Text>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -299,8 +392,11 @@ export default function ChickenRoadScreen() {
             {
               width: CHICKEN_WIDTH,
               height: CHICKEN_HEIGHT,
-              left: (round ? NEAR_MANHOLE.xFrac : CHICKEN_IDLE_SPOT.xFrac) * PANEL_WIDTH - CHICKEN_WIDTH / 2 + shakeX,
-              top: (round ? NEAR_MANHOLE.yFrac : CHICKEN_IDLE_SPOT.yFrac) * PANEL_HEIGHT - CHICKEN_HEIGHT + hopOffset,
+              left:
+                (round ? laneX(round.currentStep) : CHICKEN_IDLE_SPOT.xFrac * PANEL_WIDTH) -
+                CHICKEN_WIDTH / 2 +
+                shakeX,
+              top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - CHICKEN_HEIGHT + hopOffset,
             },
           ]}
           pointerEvents="none"
@@ -311,7 +407,7 @@ export default function ChickenRoadScreen() {
             resizeMode="contain"
           />
         </View>
-      </View>
+      </ScrollView>
 
       {banner && (
         <View style={[styles.banner, banner.kind === 'won' ? styles.bannerWon : styles.bannerLost]}>
