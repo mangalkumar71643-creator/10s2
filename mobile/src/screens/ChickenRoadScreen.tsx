@@ -1,7 +1,7 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
@@ -39,6 +39,12 @@ const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 // comment above on why only two lanes are shown at once.
 const NEAR_MANHOLE = { xFrac: 0.59, yFrac: 0.62 };
 const FAR_MANHOLE = { xFrac: 0.93, yFrac: 0.62 };
+const CHICKEN_IDLE_SPOT = { xFrac: 0.3, yFrac: 0.62 };
+
+const CHICKEN_ASPECT = 650 / 562;
+const CHICKEN_WIDTH = 60;
+const CHICKEN_HEIGHT = CHICKEN_WIDTH * CHICKEN_ASPECT;
+const HOP_DURATION_MS = 380;
 
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
   EASY: 'Easy',
@@ -83,6 +89,9 @@ export default function ChickenRoadScreen() {
   const [history, setHistory] = useState<ChickenRoadRound[]>([]);
   const [banner, setBanner] = useState<ResultBanner | null>(null);
   const [busy, setBusy] = useState(false);
+  const [hopOffset, setHopOffset] = useState(0);
+  const [shakeX, setShakeX] = useState(0);
+  const hopRafRef = useRef<number | null>(null);
 
   const loadHistory = useCallback(() => {
     fetchChickenRoadHistory(20)
@@ -111,6 +120,38 @@ export default function ChickenRoadScreen() {
     if (!activeConfig || !round) return null;
     return activeConfig.multipliers[round.currentStep + 1] ?? null;
   }, [activeConfig, round]);
+
+  useEffect(() => {
+    return () => {
+      if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
+    };
+  }, []);
+
+  // A quick in-place hop each time the chicken survives a lane — there's
+  // nowhere further to walk to on this fixed image, so "moving forward"
+  // reads as a little jump rather than a horizontal slide.
+  const hop = useCallback(() => {
+    if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
+    const start = Date.now();
+    const step = () => {
+      const t = Math.min(1, (Date.now() - start) / HOP_DURATION_MS);
+      setHopOffset(-Math.sin(t * Math.PI) * (CHICKEN_HEIGHT * 0.22));
+      if (t < 1) {
+        hopRafRef.current = requestAnimationFrame(step);
+      } else {
+        hopRafRef.current = null;
+        setHopOffset(0);
+      }
+    };
+    hopRafRef.current = requestAnimationFrame(step);
+  }, []);
+
+  const shakeInPlace = useCallback(() => {
+    const offsets = [-6, 6, -4, 4, 0];
+    offsets.forEach((offset, i) => {
+      setTimeout(() => setShakeX(offset), i * 80);
+    });
+  }, []);
 
   const setStakeValue = (value: number) => {
     setStake(value);
@@ -145,13 +186,17 @@ export default function ChickenRoadScreen() {
       const result = await advanceChickenRoadStep(round.id);
       setRound(result.round);
       if (result.busted) {
+        shakeInPlace();
         setBanner({ kind: 'busted' });
         refreshWallet();
         loadHistory();
-      } else if (result.round.status === 'WON') {
-        setBanner({ kind: 'won', payout: Number(result.round.payout) });
-        refreshWallet();
-        loadHistory();
+      } else {
+        hop();
+        if (result.round.status === 'WON') {
+          setBanner({ kind: 'won', payout: Number(result.round.payout) });
+          refreshWallet();
+          loadHistory();
+        }
       }
     } catch (err) {
       Alert.alert('Could not advance', err instanceof ApiClientError ? err.message : 'Please try again.');
@@ -179,6 +224,8 @@ export default function ChickenRoadScreen() {
   const playAgain = () => {
     setRound(null);
     setBanner(null);
+    setHopOffset(0);
+    setShakeX(0);
   };
 
   const isPlaying = round?.status === 'PENDING';
@@ -245,6 +292,25 @@ export default function ChickenRoadScreen() {
             <Text style={styles.manholeLabelText}>{nextMultiplier.toFixed(2)}x</Text>
           </View>
         )}
+
+        <View
+          style={[
+            styles.chickenOverlay,
+            {
+              width: CHICKEN_WIDTH,
+              height: CHICKEN_HEIGHT,
+              left: (round ? NEAR_MANHOLE.xFrac : CHICKEN_IDLE_SPOT.xFrac) * PANEL_WIDTH - CHICKEN_WIDTH / 2 + shakeX,
+              top: (round ? NEAR_MANHOLE.yFrac : CHICKEN_IDLE_SPOT.yFrac) * PANEL_HEIGHT - CHICKEN_HEIGHT + hopOffset,
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Image
+            source={require('../../assets/chicken-road-chicken.png')}
+            style={{ width: CHICKEN_WIDTH, height: CHICKEN_HEIGHT }}
+            resizeMode="contain"
+          />
+        </View>
       </View>
 
       {banner && (
@@ -424,6 +490,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
+  chickenOverlay: { position: 'absolute' },
   banner: {
     marginHorizontal: 12,
     marginTop: 12,
