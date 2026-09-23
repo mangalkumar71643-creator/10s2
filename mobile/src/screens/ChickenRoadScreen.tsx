@@ -101,13 +101,24 @@ function randomCarSource() {
 const CAR_HEIGHT = MANHOLE_DIAM * 1.4;
 const CAR_WIDTH = CAR_HEIGHT * (267 / 429);
 
-const CAR_DRIVE_MS = 420;
+// Doubled speed (half the travel time) for every car, ambient and bust-hit
+// alike.
+const CAR_DRIVE_MS = 210;
 const CAR_HIT_HOLD_MS = 1500;
 
 // Ambient background traffic — independent of round state. Every lane runs
 // its own nonstop stream of cars: as soon as one clears the panel, a new
 // (randomly different) one starts down the same lane after a short gap.
-const AMBIENT_DRIVE_MS = 2600;
+// The chicken's own current lane is excluded (see the stop-barrier below).
+const AMBIENT_DRIVE_MS = 1300;
+
+// A stop barrier sits just ahead of the chicken on its current lane —
+// blocking that lane's traffic — for as long as the round is waiting there.
+// It disappears the instant a bust sends the dedicated hit-car through.
+const BARRIER_SOURCE_ASPECT = 824 / 1660; // height / width
+const BARRIER_WIDTH = LANE_PITCH * 0.55;
+const BARRIER_HEIGHT = BARRIER_WIDTH * BARRIER_SOURCE_ASPECT;
+const BARRIER_Y_OFFSET = CAR_HEIGHT * 1.2;
 const AMBIENT_GAP_MS = 50;
 
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
@@ -187,14 +198,16 @@ function LaneTraffic({ x }: { x: number }) {
   );
 }
 
-// Every lane gets its own perpetual traffic stream.
-function AmbientTraffic({ maxSteps }: { maxSteps: number }) {
+// Every lane gets its own perpetual traffic stream, except the chicken's
+// own current lane — that one is held by the stop barrier (or the
+// dedicated bust-hit car) instead.
+function AmbientTraffic({ maxSteps, blockedStep }: { maxSteps: number; blockedStep: number | null }) {
   const steps = useMemo(() => Array.from({ length: maxSteps + 1 }, (_, i) => i), [maxSteps]);
   return (
     <>
-      {steps.map((step) => (
-        <LaneTraffic key={step} x={laneX(step)} />
-      ))}
+      {steps.map((step) =>
+        step === blockedStep ? null : <LaneTraffic key={step} x={laneX(step)} />
+      )}
     </>
   );
 }
@@ -569,7 +582,29 @@ export default function ChickenRoadScreen() {
           );
         })}
 
-        <AmbientTraffic maxSteps={maxSteps} />
+        <AmbientTraffic
+          maxSteps={maxSteps}
+          blockedStep={isPlaying && round ? round.currentStep : null}
+        />
+
+        {isPlaying && round && carPhase === 'none' && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: laneX(round.currentStep) - BARRIER_WIDTH / 2,
+              top: LANE_Y - BARRIER_Y_OFFSET - BARRIER_HEIGHT / 2,
+              width: BARRIER_WIDTH,
+              height: BARRIER_HEIGHT,
+            }}
+          >
+            <Image
+              source={require('../../assets/chicken-road-barrier.png')}
+              style={{ width: BARRIER_WIDTH, height: BARRIER_HEIGHT }}
+              resizeMode="contain"
+            />
+          </View>
+        )}
 
         <View
           style={[
