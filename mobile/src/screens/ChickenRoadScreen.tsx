@@ -198,15 +198,18 @@ function LaneTraffic({ x }: { x: number }) {
   );
 }
 
-// Every lane gets its own perpetual traffic stream, except the chicken's
-// own current lane — that one is held by the stop barrier (or the
-// dedicated bust-hit car) instead.
-function AmbientTraffic({ maxSteps, blockedStep }: { maxSteps: number; blockedStep: number | null }) {
+// Every lane ahead of the chicken gets its own perpetual traffic stream.
+// Its current lane and every lane it has already crossed are held by stop
+// barriers instead (see below) — no ambient car ever runs there, so
+// there's no coincidental collision with a lane that's already decided.
+function AmbientTraffic({ maxSteps, blockedUpToStep }: { maxSteps: number; blockedUpToStep: number | null }) {
   const steps = useMemo(() => Array.from({ length: maxSteps + 1 }, (_, i) => i), [maxSteps]);
   return (
     <>
       {steps.map((step) =>
-        step === blockedStep ? null : <LaneTraffic key={step} x={laneX(step)} />
+        blockedUpToStep !== null && step <= blockedUpToStep ? null : (
+          <LaneTraffic key={step} x={laneX(step)} />
+        )
       )}
     </>
   );
@@ -584,27 +587,37 @@ export default function ChickenRoadScreen() {
 
         <AmbientTraffic
           maxSteps={maxSteps}
-          blockedStep={isPlaying && round ? round.currentStep : null}
+          blockedUpToStep={isPlaying && round ? round.currentStep : null}
         />
 
-        {isPlaying && round && carPhase === 'none' && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: laneX(round.currentStep) - BARRIER_WIDTH / 2,
-              top: LANE_Y - BARRIER_Y_OFFSET - BARRIER_HEIGHT / 2,
-              width: BARRIER_WIDTH,
-              height: BARRIER_HEIGHT,
-            }}
-          >
-            <Image
-              source={require('../../assets/chicken-road-barrier.png')}
-              style={{ width: BARRIER_WIDTH, height: BARRIER_HEIGHT }}
-              resizeMode="contain"
-            />
-          </View>
-        )}
+        {isPlaying &&
+          round &&
+          Array.from({ length: round.currentStep + 1 }, (_, step) => step).map((step) => {
+            // Every already-crossed lane keeps its barrier permanently; the
+            // current lane's barrier drops only while the bust-hit car is
+            // actually driving through (so it can reach the chicken).
+            const visible = step < round.currentStep || carPhase === 'none';
+            if (!visible) return null;
+            return (
+              <View
+                key={`barrier-${step}`}
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: laneX(step) - BARRIER_WIDTH / 2,
+                  top: LANE_Y - BARRIER_Y_OFFSET - BARRIER_HEIGHT / 2,
+                  width: BARRIER_WIDTH,
+                  height: BARRIER_HEIGHT,
+                }}
+              >
+                <Image
+                  source={require('../../assets/chicken-road-barrier.png')}
+                  style={{ width: BARRIER_WIDTH, height: BARRIER_HEIGHT }}
+                  resizeMode="contain"
+                />
+              </View>
+            );
+          })}
 
         <View
           style={[
