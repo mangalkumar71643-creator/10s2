@@ -57,16 +57,20 @@ function laneX(step: number): number {
   return NEAR_MANHOLE.xFrac * PANEL_WIDTH + step * LANE_PITCH;
 }
 
-// The far manhole cover baked into the source art is cropped by the
-// image's own right edge (only its left ~60% is actually drawn, x:1038-1216
-// of a ~300px circle in the 1216-wide source) — it reads as a broken half
-// plate now that the scrollable extension sits right next to it. Painted
-// over with the same road color until a real plate asset replaces it.
-const FAR_MANHOLE_PATCH = {
-  leftFrac: 1020 / PANEL_SOURCE_WIDTH,
-  topFrac: 630 / PANEL_SOURCE_HEIGHT,
-  bottomFrac: 972 / PANEL_SOURCE_HEIGHT,
-};
+// The real manhole-cover plate the user supplied, cropped to its own content
+// bounds (source canvas had transparent padding). Its diameter is scaled to
+// match the manhole already baked into the near lane of the source art
+// (measured ~299px circle out of the 1216-wide background), so every lane
+// — the two baked into the background image and every code-drawn one after
+// it — uses this same plate at the same size on the same line.
+const PLATE_SOURCE_WIDTH = 1137;
+const PLATE_SOURCE_HEIGHT = 1190;
+const PLATE_ASPECT = PLATE_SOURCE_HEIGHT / PLATE_SOURCE_WIDTH;
+const MANHOLE_DIAM = (299 / PANEL_SOURCE_WIDTH) * PANEL_WIDTH;
+const PLATE_WIDTH = MANHOLE_DIAM;
+const PLATE_HEIGHT = PLATE_WIDTH * PLATE_ASPECT;
+const PLATE_PATCH_SIZE = MANHOLE_DIAM * 1.2;
+const LANE_Y = NEAR_MANHOLE.yFrac * PANEL_HEIGHT;
 
 const CHICKEN_ASPECT = 650 / 562;
 const CHICKEN_WIDTH = 60;
@@ -176,9 +180,10 @@ export default function ChickenRoadScreen() {
     [config, difficulty, round]
   );
 
-  // Lanes 0 and 1 sit on the real manhole art baked into the background
-  // image; every lane after that is a code-drawn extension of the same
-  // road color, repeating the pitch measured between those two manholes.
+  // Lanes 0 and 1 sit over the real background art; every lane after that
+  // is a code-drawn extension of the same road color, repeating the pitch
+  // measured between those two spots. Every lane, including 0 and 1, now
+  // gets the same real plate image at the same size.
   const maxSteps = activeConfig?.steps ?? 1;
   const extraLaneCount = Math.max(0, maxSteps - 1);
   const extraWidth = extraLaneCount * LANE_PITCH;
@@ -187,6 +192,7 @@ export default function ChickenRoadScreen() {
     () => Array.from({ length: extraLaneCount }, (_, i) => i + 2),
     [extraLaneCount]
   );
+  const allLaneSteps = useMemo(() => Array.from({ length: maxSteps + 1 }, (_, i) => i), [maxSteps]);
 
   useEffect(() => {
     return () => {
@@ -352,40 +358,6 @@ export default function ChickenRoadScreen() {
           resizeMode="contain"
         />
 
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            left: FAR_MANHOLE_PATCH.leftFrac * PANEL_WIDTH,
-            top: FAR_MANHOLE_PATCH.topFrac * PANEL_HEIGHT,
-            width: PANEL_WIDTH - FAR_MANHOLE_PATCH.leftFrac * PANEL_WIDTH,
-            height: (FAR_MANHOLE_PATCH.bottomFrac - FAR_MANHOLE_PATCH.topFrac) * PANEL_HEIGHT,
-            backgroundColor: ROAD_COLOR,
-          }}
-        />
-
-        <View
-          style={[
-            styles.manholeLabel,
-            { left: NEAR_MANHOLE.xFrac * PANEL_WIDTH - 40, top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - 12 },
-          ]}
-          pointerEvents="none"
-        >
-          <Text style={styles.manholeLabelText}>{currentMultiplier.toFixed(2)}x</Text>
-        </View>
-
-        {activeConfig?.multipliers[1] !== undefined && (
-          <View
-            style={[
-              styles.manholeLabel,
-              { left: FAR_MANHOLE.xFrac * PANEL_WIDTH - 40, top: FAR_MANHOLE.yFrac * PANEL_HEIGHT - 12 },
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={styles.manholeLabelText}>{activeConfig.multipliers[1].toFixed(2)}x</Text>
-          </View>
-        )}
-
         {extraLaneCount > 0 && (
           <View
             style={{
@@ -401,24 +373,51 @@ export default function ChickenRoadScreen() {
             {extraLaneSteps.map((step) => (
               <DashedDivider key={`d-${step}`} left={laneX(step) - LANE_PITCH / 2 - PANEL_WIDTH} />
             ))}
-            {extraLaneSteps.map((step) => {
-              const mult = activeConfig?.multipliers[step];
-              if (mult === undefined) return null;
-              return (
-                <View
-                  key={`m-${step}`}
-                  style={[
-                    styles.manholeLabel,
-                    { left: laneX(step) - PANEL_WIDTH - 40, top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - 12 },
-                  ]}
-                  pointerEvents="none"
-                >
-                  <Text style={styles.manholeLabelText}>{mult.toFixed(2)}x</Text>
-                </View>
-              );
-            })}
           </View>
         )}
+
+        {allLaneSteps.map((step) => {
+          const mult = activeConfig?.multipliers[step];
+          if (mult === undefined) return null;
+          const x = laneX(step);
+          return (
+            <React.Fragment key={`lane-${step}`}>
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: x - PLATE_PATCH_SIZE / 2,
+                  top: LANE_Y - PLATE_PATCH_SIZE / 2,
+                  width: PLATE_PATCH_SIZE,
+                  height: PLATE_PATCH_SIZE,
+                  backgroundColor: ROAD_COLOR,
+                }}
+              />
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: x - PLATE_WIDTH / 2,
+                  top: LANE_Y - PLATE_HEIGHT / 2,
+                  width: PLATE_WIDTH,
+                  height: PLATE_HEIGHT,
+                }}
+              >
+                <Image
+                  source={require('../../assets/chicken-road-manhole.png')}
+                  style={{ width: PLATE_WIDTH, height: PLATE_HEIGHT }}
+                  resizeMode="contain"
+                />
+              </View>
+              <View
+                style={[styles.manholeLabel, { left: x - 40, top: LANE_Y - 12 }]}
+                pointerEvents="none"
+              >
+                <Text style={styles.manholeLabelText}>{mult.toFixed(2)}x</Text>
+              </View>
+            </React.Fragment>
+          );
+        })}
 
         <View
           style={[
