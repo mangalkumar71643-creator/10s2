@@ -77,6 +77,25 @@ const CHICKEN_WIDTH = 60;
 const CHICKEN_HEIGHT = CHICKEN_WIDTH * CHICKEN_ASPECT;
 const HOP_DURATION_MS = 380;
 
+// The car sprite is a top-down (bird's-eye) car, front pointing "up" in its
+// own image — rotated -90deg so it faces left and drives right-to-left
+// along the horizontal road, oncoming toward the chicken.
+const CAR_SOURCE_ASPECT = 267 / 429;
+const CAR_LENGTH = MANHOLE_DIAM * 1.4;
+const CAR_THICKNESS = CAR_LENGTH * CAR_SOURCE_ASPECT;
+
+// The barrier is already a horizontal bar — no rotation needed. It marks
+// where an oncoming car gets stopped short of the chicken on a lane the
+// round didn't bust on.
+const BARRIER_SOURCE_ASPECT = 824 / 1660;
+const BARRIER_WIDTH = LANE_PITCH * 0.55;
+const BARRIER_HEIGHT = BARRIER_WIDTH * BARRIER_SOURCE_ASPECT;
+const BARRIER_OFFSET = LANE_PITCH * 0.5;
+const CAR_APPROACH_DISTANCE = LANE_PITCH * 2.2;
+const CAR_DRIVE_MS = 420;
+const CAR_HIT_HOLD_MS = 1500;
+const CAR_BLOCKED_HOLD_MS = 650;
+
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
   EASY: 'Easy',
   MEDIUM: 'Medium',
@@ -154,7 +173,11 @@ export default function ChickenRoadScreen() {
   const [busy, setBusy] = useState(false);
   const [hopOffset, setHopOffset] = useState(0);
   const [shakeX, setShakeX] = useState(0);
+  const [carX, setCarX] = useState<number | null>(null);
+  const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'blocked' | 'hit'>('none');
+  const [isChickenHit, setIsChickenHit] = useState(false);
   const hopRafRef = useRef<number | null>(null);
+  const carRafRef = useRef<number | null>(null);
   const roadScrollRef = useRef<ScrollView | null>(null);
 
   const loadHistory = useCallback(() => {
@@ -197,6 +220,7 @@ export default function ChickenRoadScreen() {
   useEffect(() => {
     return () => {
       if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
+      if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
     };
   }, []);
 
@@ -234,6 +258,48 @@ export default function ChickenRoadScreen() {
     });
   }, []);
 
+  // An oncoming car drives in from ahead of the chicken's new lane. On a
+  // bust it drives all the way in and "hits" the chicken (swaps to the
+  // dazed sprite for a couple seconds); on a safe lane it gets stopped
+  // short by a barrier instead, so it never actually reaches the chicken.
+  const runCarSequence = useCallback((toStep: number, busted: boolean, onComplete: () => void) => {
+    if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
+    const targetX = laneX(toStep) + (busted ? 0 : BARRIER_OFFSET);
+    const startX = targetX + CAR_APPROACH_DISTANCE;
+    setCarPhase('driving');
+    setCarX(startX);
+    const start = Date.now();
+    const step = () => {
+      const t = Math.min(1, (Date.now() - start) / CAR_DRIVE_MS);
+      const eased = 1 - (1 - t) * (1 - t);
+      setCarX(startX + (targetX - startX) * eased);
+      if (t < 1) {
+        carRafRef.current = requestAnimationFrame(step);
+        return;
+      }
+      carRafRef.current = null;
+      if (busted) {
+        setCarPhase('hit');
+        setIsChickenHit(true);
+        setTimeout(() => {
+          setIsChickenHit(false);
+          setCarPhase('none');
+          setCarX(null);
+          onComplete();
+        }, CAR_HIT_HOLD_MS);
+      } else {
+        setCarPhase('blocked');
+        setTimeout(() => {
+          setCarPhase('none');
+          setCarX(null);
+          hop();
+          onComplete();
+        }, CAR_BLOCKED_HOLD_MS);
+      }
+    };
+    carRafRef.current = requestAnimationFrame(step);
+  }, [hop]);
+
   const setStakeValue = (value: number) => {
     setStake(value);
     setStakeText(String(value));
@@ -268,11 +334,12 @@ export default function ChickenRoadScreen() {
       setRound(result.round);
       if (result.busted) {
         shakeInPlace();
+        runCarSequence(result.round.currentStep, true, () => setBusy(false));
         setBanner({ kind: 'busted' });
         refreshWallet();
         loadHistory();
       } else {
-        hop();
+        runCarSequence(result.round.currentStep, false, () => setBusy(false));
         if (result.round.status === 'WON') {
           setBanner({ kind: 'won', payout: Number(result.round.payout) });
           refreshWallet();
@@ -281,7 +348,6 @@ export default function ChickenRoadScreen() {
       }
     } catch (err) {
       Alert.alert('Could not advance', err instanceof ApiClientError ? err.message : 'Please try again.');
-    } finally {
       setBusy(false);
     }
   };
@@ -307,6 +373,9 @@ export default function ChickenRoadScreen() {
     setBanner(null);
     setHopOffset(0);
     setShakeX(0);
+    setCarX(null);
+    setCarPhase('none');
+    setIsChickenHit(false);
   };
 
   const isPlaying = round?.status === 'PENDING';
@@ -435,11 +504,55 @@ export default function ChickenRoadScreen() {
           pointerEvents="none"
         >
           <Image
-            source={require('../../assets/chicken-road-chicken.png')}
+            source={
+              isChickenHit
+                ? require('../../assets/chicken-road-chicken-hit.png')
+                : require('../../assets/chicken-road-chicken.png')
+            }
             style={{ width: CHICKEN_WIDTH, height: CHICKEN_HEIGHT }}
             resizeMode="contain"
           />
         </View>
+
+        {carX !== null && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: carX - CAR_LENGTH / 2,
+              top: LANE_Y - CAR_THICKNESS / 2,
+              width: CAR_LENGTH,
+              height: CAR_THICKNESS,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Image
+              source={require('../../assets/chicken-road-car.png')}
+              style={{ width: CAR_THICKNESS, height: CAR_LENGTH, transform: [{ rotate: '-90deg' }] }}
+              resizeMode="contain"
+            />
+          </View>
+        )}
+
+        {carPhase === 'blocked' && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: laneX(round?.currentStep ?? 0) + BARRIER_OFFSET - BARRIER_WIDTH / 2,
+              top: LANE_Y - BARRIER_HEIGHT / 2,
+              width: BARRIER_WIDTH,
+              height: BARRIER_HEIGHT,
+            }}
+          >
+            <Image
+              source={require('../../assets/chicken-road-barrier.png')}
+              style={{ width: BARRIER_WIDTH, height: BARRIER_HEIGHT }}
+              resizeMode="contain"
+            />
+          </View>
+        )}
       </ScrollView>
 
       {banner && (
