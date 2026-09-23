@@ -515,8 +515,6 @@ export default function ChickenRoadScreen() {
           </View>
         )}
 
-        <AmbientTraffic maxSteps={maxSteps} />
-
         {allLaneSteps.map((step) => {
           const mult = activeConfig?.multipliers[step];
           if (mult === undefined) return null;
@@ -559,6 +557,8 @@ export default function ChickenRoadScreen() {
             </React.Fragment>
           );
         })}
+
+        <AmbientTraffic maxSteps={maxSteps} />
 
         <View
           style={[
