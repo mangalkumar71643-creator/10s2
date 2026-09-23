@@ -53,6 +53,17 @@ export function getChickenRoadConfig() {
   };
 }
 
+type ChickenRoadRoundRow = Awaited<ReturnType<typeof prisma.chickenRoadRound.findUniqueOrThrow>>;
+
+/** Strips the round's serverSeed before it leaves the server. It is the
+ * player's live fairness seed — shared by every round until they rotate it
+ * — so exposing it would let them compute where every lane busts ahead of
+ * time. It's only ever revealed via rotateServerSeed. */
+function toPublicRound(round: ChickenRoadRoundRow) {
+  const { serverSeed: _hidden, ...rest } = round;
+  return rest;
+}
+
 function cappedPayout(stake: number, multiplier: number): number {
   return Math.min(round2(stake * multiplier), env.games.maxPayout);
 }
@@ -109,7 +120,7 @@ export async function startChickenRoadRound(userId: string, stake: number, diffi
     }),
   ]);
 
-  return round;
+  return toPublicRound(round);
 }
 
 async function loadActiveRound(userId: string, roundId: string) {
@@ -132,7 +143,7 @@ export async function advanceChickenRoadStep(userId: string, roundId: string) {
       where: { id: round.id },
       data: { status: "LOST", multiplier: 0, payout: 0, settledAt: new Date() },
     });
-    return { round: updated, busted: true };
+    return { round: toPublicRound(updated), busted: true };
   }
 
   const nextStep = round.currentStep + 1;
@@ -154,14 +165,14 @@ export async function advanceChickenRoadStep(userId: string, roundId: string) {
         data: { userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" },
       }),
     ]);
-    return { round: updated, busted: false };
+    return { round: toPublicRound(updated), busted: false };
   }
 
   const updated = await prisma.chickenRoadRound.update({
     where: { id: round.id },
     data: { currentStep: nextStep, multiplier },
   });
-  return { round: updated, busted: false };
+  return { round: toPublicRound(updated), busted: false };
 }
 
 export async function cashOutChickenRoadRound(userId: string, roundId: string) {
@@ -182,17 +193,19 @@ export async function cashOutChickenRoadRound(userId: string, roundId: string) {
     }),
   ]);
 
-  return updated;
+  return toPublicRound(updated);
 }
 
-export function getMyCurrentChickenRoadRound(userId: string) {
-  return prisma.chickenRoadRound.findFirst({ where: { userId, status: "PENDING" } });
+export async function getMyCurrentChickenRoadRound(userId: string) {
+  const round = await prisma.chickenRoadRound.findFirst({ where: { userId, status: "PENDING" } });
+  return round ? toPublicRound(round) : null;
 }
 
-export function getMyChickenRoadHistory(userId: string, limit = 30) {
-  return prisma.chickenRoadRound.findMany({
+export async function getMyChickenRoadHistory(userId: string, limit = 30) {
+  const rounds = await prisma.chickenRoadRound.findMany({
     where: { userId, status: { not: "PENDING" } },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
+  return rounds.map(toPublicRound);
 }
