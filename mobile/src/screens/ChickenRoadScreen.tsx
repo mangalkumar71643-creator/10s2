@@ -1,9 +1,8 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -40,8 +39,6 @@ const PANEL_HEIGHT = PANEL_WIDTH * PANEL_ASPECT;
 // comment above on why only two lanes are shown at once.
 const NEAR_MANHOLE = { xFrac: 0.59, yFrac: 0.62 };
 const FAR_MANHOLE = { xFrac: 0.93, yFrac: 0.62 };
-const CHICKEN_IDLE_SPOT = { xFrac: 0.3, yFrac: 0.62 };
-const CHICKEN_SIZE = 46;
 
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
   EASY: 'Easy',
@@ -72,74 +69,6 @@ function HistoryChip({ round }: { round: ChickenRoadRound }) {
   );
 }
 
-// Drawn instead of using the 🐔 emoji glyph — different Android fonts render
-// that inconsistently. A bold dark outline on every shape, folded wings, a
-// scalloped comb + wattle, and glossy highlight patches for a toy-like 3D
-// look; `legPhase` swaps which foot is planted vs. lifted, and `bounce`
-// (0-1) lifts the whole sprite slightly for an in-place hop.
-function ChickenSprite({
-  size,
-  legPhase = 0,
-  hit = false,
-  bounce = 0,
-}: {
-  size: number;
-  legPhase?: 0 | 1;
-  hit?: boolean;
-  bounce?: number;
-}) {
-  const shadeColor = hit ? '#F0B0AE' : '#DDE1EC';
-  const outline = '#3B2A1F';
-  const frontLegUp = legPhase === 1;
-  return (
-    <Svg width={size} height={size * (1 + bounce * 0.12)} viewBox="0 0 100 100">
-      <Defs>
-        <RadialGradient id="bodyGrad" cx="35%" cy="28%" r="80%">
-          <Stop offset="0%" stopColor="#FFFFFF" />
-          <Stop offset="100%" stopColor={shadeColor} />
-        </RadialGradient>
-        <RadialGradient id="headGrad" cx="35%" cy="28%" r="80%">
-          <Stop offset="0%" stopColor="#FFFFFF" />
-          <Stop offset="100%" stopColor={shadeColor} />
-        </RadialGradient>
-        <RadialGradient id="beakGrad" cx="35%" cy="20%" r="90%">
-          <Stop offset="0%" stopColor="#FFD166" />
-          <Stop offset="100%" stopColor="#F5A623" />
-        </RadialGradient>
-      </Defs>
-
-      <Ellipse cx={50} cy={95} rx={22} ry={3.5} fill="rgba(0,0,0,0.25)" />
-
-      <Rect x={38} y={76} width={8} height={frontLegUp ? 9 : 14} rx={4} fill="#F5A623" stroke={outline} strokeWidth={2} />
-      <Rect x={54} y={76} width={8} height={frontLegUp ? 14 : 9} rx={4} fill="#F5A623" stroke={outline} strokeWidth={2} />
-      <Ellipse cx={42} cy={frontLegUp ? 85 : 90} rx={6} ry={2.5} fill="#F5A623" stroke={outline} strokeWidth={1.5} />
-      <Ellipse cx={58} cy={frontLegUp ? 90 : 85} rx={6} ry={2.5} fill="#F5A623" stroke={outline} strokeWidth={1.5} />
-
-      <Ellipse cx={25} cy={56} rx={9} ry={15} fill="#ECEAE4" stroke={outline} strokeWidth={2.5} />
-      <Ellipse cx={75} cy={56} rx={9} ry={15} fill="#ECEAE4" stroke={outline} strokeWidth={2.5} />
-
-      <Ellipse cx={50} cy={55} rx={27} ry={27} fill="url(#bodyGrad)" stroke={outline} strokeWidth={3} />
-      <Ellipse cx={39} cy={44} rx={9} ry={11} fill="rgba(255,255,255,0.55)" />
-
-      <Circle cx={50} cy={24} r={17} fill="url(#headGrad)" stroke={outline} strokeWidth={3} />
-      <Ellipse cx={43} cy={17} rx={5} ry={6} fill="rgba(255,255,255,0.55)" />
-
-      <Circle cx={37} cy={10} r={5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
-      <Circle cx={50} cy={6} r={5.5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
-      <Circle cx={63} cy={10} r={5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
-
-      <Ellipse cx={50} cy={40} rx={3.5} ry={4.5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
-
-      <Path d="M 44 33 L 56 33 L 50 41 Z" fill="url(#beakGrad)" stroke={outline} strokeWidth={2} />
-
-      <Circle cx={41} cy={21} r={4} fill={outline} />
-      <Circle cx={59} cy={21} r={4} fill={outline} />
-      <Circle cx={39.5} cy={19.5} r={1.2} fill="#FFFFFF" />
-      <Circle cx={57.5} cy={19.5} r={1.2} fill="#FFFFFF" />
-    </Svg>
-  );
-}
-
 export default function ChickenRoadScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
@@ -154,11 +83,6 @@ export default function ChickenRoadScreen() {
   const [history, setHistory] = useState<ChickenRoadRound[]>([]);
   const [banner, setBanner] = useState<ResultBanner | null>(null);
   const [busy, setBusy] = useState(false);
-  const [legPhase, setLegPhase] = useState<0 | 1>(0);
-  const [bounce, setBounce] = useState(0);
-  const [shakeX, setShakeX] = useState(0);
-  const [hitFlash, setHitFlash] = useState(false);
-  const hopRafRef = useRef<number | null>(null);
 
   const loadHistory = useCallback(() => {
     fetchChickenRoadHistory(20)
@@ -178,12 +102,6 @@ export default function ChickenRoadScreen() {
     loadHistory();
   }, [loadHistory]);
 
-  useEffect(() => {
-    return () => {
-      if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
-    };
-  }, []);
-
   const activeConfig = useMemo(
     () => config?.difficulties.find((d) => d.difficulty === (round?.difficulty ?? difficulty)) ?? null,
     [config, difficulty, round]
@@ -193,37 +111,6 @@ export default function ChickenRoadScreen() {
     if (!activeConfig || !round) return null;
     return activeConfig.multipliers[round.currentStep + 1] ?? null;
   }, [activeConfig, round]);
-
-  // A quick in-place hop (vertical bounce + leg swap) each time the chicken
-  // survives a lane — there's nowhere further to walk to on this fixed
-  // image, so "advancing" reads as a hop rather than a horizontal slide.
-  const hop = useCallback(() => {
-    if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
-    const start = Date.now();
-    const duration = 380;
-    const step = () => {
-      const t = Math.min(1, (Date.now() - start) / duration);
-      setBounce(Math.sin(t * Math.PI));
-      setLegPhase(t < 0.5 ? 1 : 0);
-      if (t < 1) {
-        hopRafRef.current = requestAnimationFrame(step);
-      } else {
-        hopRafRef.current = null;
-        setBounce(0);
-        setLegPhase(0);
-      }
-    };
-    hopRafRef.current = requestAnimationFrame(step);
-  }, []);
-
-  const shakeInPlace = useCallback(() => {
-    setHitFlash(true);
-    const offsets = [-6, 6, -4, 4, 0];
-    offsets.forEach((offset, i) => {
-      setTimeout(() => setShakeX(offset), i * 80);
-    });
-    setTimeout(() => setHitFlash(false), offsets.length * 80);
-  }, []);
 
   const setStakeValue = (value: number) => {
     setStake(value);
@@ -258,17 +145,13 @@ export default function ChickenRoadScreen() {
       const result = await advanceChickenRoadStep(round.id);
       setRound(result.round);
       if (result.busted) {
-        shakeInPlace();
         setBanner({ kind: 'busted' });
         refreshWallet();
         loadHistory();
-      } else {
-        hop();
-        if (result.round.status === 'WON') {
-          setBanner({ kind: 'won', payout: Number(result.round.payout) });
-          refreshWallet();
-          loadHistory();
-        }
+      } else if (result.round.status === 'WON') {
+        setBanner({ kind: 'won', payout: Number(result.round.payout) });
+        refreshWallet();
+        loadHistory();
       }
     } catch (err) {
       Alert.alert('Could not advance', err instanceof ApiClientError ? err.message : 'Please try again.');
@@ -296,16 +179,12 @@ export default function ChickenRoadScreen() {
   const playAgain = () => {
     setRound(null);
     setBanner(null);
-    setShakeX(0);
-    setHitFlash(false);
   };
 
   const isPlaying = round?.status === 'PENDING';
   const isSettled = round && round.status !== 'PENDING';
   const currentMultiplier = round ? Number(round.multiplier) : 1;
   const potentialPayout = round ? round2(Number(round.stake) * currentMultiplier) : 0;
-
-  const chickenSpot = round ? NEAR_MANHOLE : CHICKEN_IDLE_SPOT;
 
   return (
     <View style={styles.root}>
@@ -366,19 +245,6 @@ export default function ChickenRoadScreen() {
             <Text style={styles.manholeLabelText}>{nextMultiplier.toFixed(2)}x</Text>
           </View>
         )}
-
-        <View
-          style={[
-            styles.chickenOverlay,
-            {
-              left: chickenSpot.xFrac * PANEL_WIDTH - CHICKEN_SIZE / 2 + shakeX,
-              top: chickenSpot.yFrac * PANEL_HEIGHT - CHICKEN_SIZE,
-            },
-          ]}
-          pointerEvents="none"
-        >
-          <ChickenSprite size={CHICKEN_SIZE} legPhase={legPhase} hit={hitFlash} bounce={bounce} />
-        </View>
       </View>
 
       {banner && (
@@ -558,7 +424,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  chickenOverlay: { position: 'absolute' },
   banner: {
     marginHorizontal: 12,
     marginTop: 12,
