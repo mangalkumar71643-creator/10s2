@@ -399,9 +399,12 @@ export default function ChickenRoadScreen() {
         hitTriggered = true;
         setCarPhase('hit');
         setIsChickenHit(true);
+        // Play stays locked until the chicken is back at its start spot, so
+        // a new round can't begin while this reset is still pending.
         setTimeout(() => {
           setIsChickenHit(false);
           setChickenAtIdle(true);
+          onComplete();
         }, CAR_HIT_HOLD_MS);
       }
       if (t < 1) {
@@ -411,7 +414,6 @@ export default function ChickenRoadScreen() {
       carRafRef.current = null;
       setCarPhase('none');
       setCarY(null);
-      onComplete();
     };
     carRafRef.current = requestAnimationFrame(step);
   }, []);
@@ -430,10 +432,15 @@ export default function ChickenRoadScreen() {
   const start = async () => {
     if (busy) return;
     setBusy(true);
+    setPickerOpen(false);
     try {
       const created = await startChickenRoadRound(stake, difficulty);
       setRound(created);
       setBanner(null);
+      setHopOffset(0);
+      setCarY(null);
+      setCarPhase('none');
+      setIsChickenHit(false);
       setChickenAtIdle(false);
       setBustStep(null);
       refreshWallet();
@@ -490,19 +497,7 @@ export default function ChickenRoadScreen() {
     }
   };
 
-  const playAgain = () => {
-    setRound(null);
-    setBanner(null);
-    setHopOffset(0);
-    setCarY(null);
-    setCarPhase('none');
-    setIsChickenHit(false);
-    setChickenAtIdle(false);
-    setBustStep(null);
-  };
-
   const isPlaying = round?.status === 'PENDING';
-  const isSettled = round && round.status !== 'PENDING';
   const currentMultiplier = round ? Number(round.multiplier) : 1;
   const potentialPayout = round ? round2(Number(round.stake) * currentMultiplier) : 0;
 
@@ -699,102 +694,107 @@ export default function ChickenRoadScreen() {
         </View>
       )}
 
-      {!round && (
-        <View style={styles.controls}>
-          <View style={styles.stakeRow}>
-            <Pressable onPress={() => setStakeValue(config?.minStake ?? MIN_STAKE)} style={styles.stakeMinMaxBtn}>
-              <Text style={styles.stakeMinMaxText}>MIN</Text>
-            </Pressable>
-            <TextInput
-              style={styles.stakeInput}
-              value={stakeText}
-              onChangeText={setStakeText}
-              onBlur={commitStakeText}
-              onSubmitEditing={commitStakeText}
-              keyboardType="number-pad"
-              returnKeyType="done"
-              selectTextOnFocus
-              textAlign="center"
-            />
-            <Pressable onPress={() => setStakeValue(config?.maxStake ?? 500)} style={styles.stakeMinMaxBtn}>
-              <Text style={styles.stakeMinMaxText}>MAX</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.presetRow}>
-            {QUICK_STAKES.map((amount) => (
-              <Pressable key={amount} onPress={() => setStakeValue(amount)} style={styles.presetBtn}>
-                <Text style={styles.presetText}>
-                  {quickStakeLabel(amount)} <Text style={styles.presetRupee}>₹</Text>
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <View>
-            <Pressable onPress={() => setPickerOpen((v) => !v)} style={styles.difficultyDropdown}>
-              <Text style={styles.difficultyDropdownText}>{DIFFICULTY_LABELS[difficulty]}</Text>
-              <MaterialCommunityIcons
-                name={pickerOpen ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color="#B8B8BE"
-              />
-            </Pressable>
-            {pickerOpen && (
-              <View style={styles.difficultyMenu}>
-                {DIFFICULTY_ORDER.map((d) => (
-                  <Pressable
-                    key={d}
-                    onPress={() => {
-                      setDifficulty(d);
-                      setPickerOpen(false);
-                    }}
-                    style={styles.difficultyMenuItem}
-                  >
-                    <Text
-                      style={[styles.difficultyMenuItemText, d === difficulty && styles.difficultyMenuItemTextActive]}
-                    >
-                      {DIFFICULTY_LABELS[d]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </View>
-
-          <Pressable onPress={start} disabled={busy} style={styles.playBtn}>
-            <Text style={styles.playBtnText}>Play</Text>
+      <View style={styles.controls}>
+        <View style={styles.stakeRow}>
+          <Pressable
+            onPress={() => setStakeValue(config?.minStake ?? MIN_STAKE)}
+            disabled={isPlaying}
+            style={styles.stakeMinMaxBtn}
+          >
+            <Text style={styles.stakeMinMaxText}>MIN</Text>
+          </Pressable>
+          <TextInput
+            style={styles.stakeInput}
+            value={isPlaying && round ? String(Number(round.stake)) : stakeText}
+            onChangeText={setStakeText}
+            onBlur={commitStakeText}
+            onSubmitEditing={commitStakeText}
+            editable={!isPlaying}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            selectTextOnFocus
+            textAlign="center"
+          />
+          <Pressable
+            onPress={() => setStakeValue(config?.maxStake ?? 500)}
+            disabled={isPlaying}
+            style={styles.stakeMinMaxBtn}
+          >
+            <Text style={styles.stakeMinMaxText}>MAX</Text>
           </Pressable>
         </View>
-      )}
 
-      {isPlaying && round && (
-        <View style={styles.controls}>
-          <Text style={styles.potentialPayoutText}>
-            {currentMultiplier.toFixed(2)}x · ₹{potentialPayout.toFixed(2)}
-          </Text>
-          <View style={styles.actionRow}>
-            <Pressable onPress={advance} disabled={busy} style={styles.advanceBtn}>
-              <Text style={styles.advanceBtnText}>Next Lane</Text>
+        <View style={styles.presetRow}>
+          {QUICK_STAKES.map((amount) => (
+            <Pressable
+              key={amount}
+              onPress={() => setStakeValue(amount)}
+              disabled={isPlaying}
+              style={styles.presetBtn}
+            >
+              <Text style={styles.presetText}>
+                {quickStakeLabel(amount)} <Text style={styles.presetRupee}>₹</Text>
+              </Text>
             </Pressable>
+          ))}
+        </View>
+
+        <View>
+          <Pressable
+            onPress={() => setPickerOpen((v) => !v)}
+            disabled={isPlaying}
+            style={styles.difficultyDropdown}
+          >
+            <Text style={styles.difficultyDropdownText}>
+              {DIFFICULTY_LABELS[isPlaying && round ? round.difficulty : difficulty]}
+            </Text>
+            <MaterialCommunityIcons
+              name={pickerOpen ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#B8B8BE"
+            />
+          </Pressable>
+          {pickerOpen && (
+            <View style={styles.difficultyMenu}>
+              {DIFFICULTY_ORDER.map((d) => (
+                <Pressable
+                  key={d}
+                  onPress={() => {
+                    setDifficulty(d);
+                    setPickerOpen(false);
+                  }}
+                  style={styles.difficultyMenuItem}
+                >
+                  <Text
+                    style={[styles.difficultyMenuItemText, d === difficulty && styles.difficultyMenuItemTextActive]}
+                  >
+                    {DIFFICULTY_LABELS[d]}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {isPlaying && round ? (
+          <View style={styles.actionRow}>
             <Pressable
               onPress={cashOut}
               disabled={busy || round.currentStep === 0}
               style={[styles.cashOutBtn, round.currentStep === 0 && styles.cashOutBtnDisabled]}
             >
-              <Text style={styles.cashOutBtnText}>Cash Out</Text>
+              <Text style={styles.cashOutBtnText}>Cash Out ₹{potentialPayout.toFixed(2)}</Text>
+            </Pressable>
+            <Pressable onPress={advance} disabled={busy} style={styles.goBtn}>
+              <Text style={styles.goBtnText}>GO</Text>
             </Pressable>
           </View>
-        </View>
-      )}
-
-      {isSettled && (
-        <View style={styles.controls}>
-          <Pressable onPress={playAgain} style={styles.playBtn}>
-            <Text style={styles.playBtnText}>Play Again</Text>
+        ) : (
+          <Pressable onPress={start} disabled={busy} style={styles.playBtn}>
+            <Text style={styles.playBtnText}>Play</Text>
           </Pressable>
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -938,23 +938,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   playBtnText: { color: '#0A0A0D', fontSize: 16, fontWeight: '800' },
-  potentialPayoutText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', textAlign: 'center' },
   actionRow: { flexDirection: 'row', gap: 12 },
-  advanceBtn: {
-    flex: 1,
-    backgroundColor: '#4B7BEC',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  advanceBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
   cashOutBtn: {
     flex: 1,
-    backgroundColor: '#3ECF8E',
+    backgroundColor: '#F5C518',
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
   },
   cashOutBtnDisabled: { opacity: 0.4 },
   cashOutBtnText: { color: '#0A0A0D', fontSize: 16, fontWeight: '800' },
+  goBtn: {
+    flex: 1,
+    backgroundColor: '#3ECF8E',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  goBtnText: { color: '#0A0A0D', fontSize: 16, fontWeight: '800' },
 });
