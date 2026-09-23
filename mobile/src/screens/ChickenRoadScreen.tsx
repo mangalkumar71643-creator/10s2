@@ -3,6 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -51,6 +52,26 @@ function HistoryChip({ round }: { round: ChickenRoadRound }) {
         {won ? `${Number(round.multiplier).toFixed(2)}x` : 'BUST'}
       </Text>
     </View>
+  );
+}
+
+// Drawn instead of using the 🐔 emoji glyph — different Android fonts render
+// that inconsistently (some show only a rotated head), so a plain
+// front-facing, upright vector bird guarantees the same look everywhere.
+function ChickenSprite({ size }: { size: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Ellipse cx={50} cy={64} rx={28} ry={30} fill="#FFFFFF" />
+      <Circle cx={50} cy={30} r={19} fill="#FFFFFF" />
+      <Circle cx={38} cy={12} r={5} fill="#E8102F" />
+      <Circle cx={50} cy={8} r={6} fill="#E8102F" />
+      <Circle cx={62} cy={12} r={5} fill="#E8102F" />
+      <Path d="M 45 40 L 55 40 L 50 48 Z" fill="#F5A623" />
+      <Circle cx={42} cy={28} r={3} fill="#1A1B1E" />
+      <Circle cx={58} cy={28} r={3} fill="#1A1B1E" />
+      <Rect x={36} y={90} width={7} height={9} rx={2} fill="#F5A623" />
+      <Rect x={57} y={90} width={7} height={9} rx={2} fill="#F5A623" />
+    </Svg>
   );
 }
 
@@ -218,7 +239,7 @@ export default function ChickenRoadScreen() {
 
       <View style={styles.roadWrap}>
         <View style={styles.coop}>
-          <Text style={styles.coopChicken}>{!round ? '🐔' : ''}</Text>
+          {!round && <ChickenSprite size={44} />}
         </View>
         <ScrollView
           ref={roadScrollRef}
@@ -234,7 +255,11 @@ export default function ChickenRoadScreen() {
               <React.Fragment key={step}>
                 {step > 1 && <LaneDivider />}
                 <View style={styles.laneSlot}>
-                  {isCurrent && <Text style={styles.chickenOnLane}>🐔</Text>}
+                  {isCurrent && (
+                    <View style={styles.chickenOnLane}>
+                      <ChickenSprite size={36} />
+                    </View>
+                  )}
                   <View style={[styles.laneBadge, crossed && styles.laneBadgeCrossed]}>
                     <Text style={[styles.laneBadgeText, crossed && styles.laneBadgeTextCrossed]}>
                       {mult.toFixed(2)}x
@@ -415,10 +440,9 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderBottomLeftRadius: 16,
   },
-  coopChicken: { fontSize: 34 },
   roadContent: { alignItems: 'center', paddingHorizontal: 16 },
   laneSlot: { width: LANE_WIDTH, height: 100, alignItems: 'center', justifyContent: 'flex-end' },
-  chickenOnLane: { fontSize: 28, position: 'absolute', top: 4 },
+  chickenOnLane: { position: 'absolute', top: 4 },
   laneBadge: {
     width: 56,
     height: 56,
