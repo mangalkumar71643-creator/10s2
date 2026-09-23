@@ -112,10 +112,15 @@ function quickStakeLabel(amount: number): string {
 
 type ResultBanner = { kind: 'won'; payout: number } | { kind: 'busted' };
 
-// Loops forever, independent of any round: drives a car top-to-bottom down
-// the fixed visible panel at a random horizontal spot, pauses off-screen
-// for a random gap, then picks a new spot and does it again.
-function AmbientTraffic() {
+const AMBIENT_CAR_SLOTS = 3;
+const AMBIENT_SLOT_STAGGER_MS = 900;
+
+// One looping traffic slot: picks a random lane, drives a car straight
+// down through it (in the same content coordinate space as the lane
+// markers, so it always tracks its own lane column between the dashed
+// dividers rather than drifting sideways across them), waits off-screen
+// for a random gap, then picks a new random lane and repeats.
+function AmbientCarSlot({ maxSteps, initialDelayMs }: { maxSteps: number; initialDelayMs: number }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const rafRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -127,12 +132,13 @@ function AmbientTraffic() {
 
     const drive = () => {
       if (cancelled) return;
-      const spawnX = CAR_WIDTH / 2 + Math.random() * (PANEL_WIDTH - CAR_WIDTH);
+      const step = Math.floor(Math.random() * (maxSteps + 1));
+      const laneCenterX = laneX(step);
       const start = Date.now();
       const tick = () => {
         if (cancelled) return;
         const t = Math.min(1, (Date.now() - start) / AMBIENT_DRIVE_MS);
-        setPos({ x: spawnX, y: startY + (endY - startY) * t });
+        setPos({ x: laneCenterX, y: startY + (endY - startY) * t });
         if (t < 1) {
           rafRef.current = requestAnimationFrame(tick);
           return;
@@ -143,13 +149,13 @@ function AmbientTraffic() {
       rafRef.current = requestAnimationFrame(tick);
     };
 
-    timeoutRef.current = setTimeout(drive, Math.random() * AMBIENT_GAP_JITTER_MS);
+    timeoutRef.current = setTimeout(drive, initialDelayMs + Math.random() * AMBIENT_GAP_JITTER_MS);
     return () => {
       cancelled = true;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
     };
-  }, []);
+  }, [maxSteps, initialDelayMs]);
 
   if (pos === null) return null;
   return (
@@ -169,6 +175,18 @@ function AmbientTraffic() {
         resizeMode="contain"
       />
     </View>
+  );
+}
+
+// A handful of independent slots so several lanes can have traffic at
+// once, each one confined to its own lane the whole time it's on screen.
+function AmbientTraffic({ maxSteps }: { maxSteps: number }) {
+  return (
+    <>
+      {Array.from({ length: AMBIENT_CAR_SLOTS }).map((_, i) => (
+        <AmbientCarSlot key={i} maxSteps={maxSteps} initialDelayMs={i * AMBIENT_SLOT_STAGGER_MS} />
+      ))}
+    </>
   );
 }
 
@@ -497,6 +515,8 @@ export default function ChickenRoadScreen() {
           </View>
         )}
 
+        <AmbientTraffic maxSteps={maxSteps} />
+
         {allLaneSteps.map((step) => {
           const mult = activeConfig?.multipliers[step];
           if (mult === undefined) return null;
@@ -585,7 +605,6 @@ export default function ChickenRoadScreen() {
           </View>
         )}
       </ScrollView>
-      <AmbientTraffic />
       </View>
 
       {banner && (
