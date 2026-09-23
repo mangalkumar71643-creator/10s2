@@ -610,7 +610,10 @@ export default function ChickenRoadScreen() {
 
         <AmbientTraffic
           maxSteps={maxSteps}
-          blockedUpToStep={isPlaying && round ? round.currentStep : null}
+          // Stays blocked through a bust/cash-out too (not just while
+          // PENDING) — the lane the chicken died on shouldn't reopen to
+          // traffic until the player actually starts a new round.
+          blockedUpToStep={round ? round.currentStep : null}
         />
 
         {isPlaying &&
