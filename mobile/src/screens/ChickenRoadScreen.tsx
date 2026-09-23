@@ -273,13 +273,15 @@ export default function ChickenRoadScreen() {
   const [banner, setBanner] = useState<ResultBanner | null>(null);
   const [busy, setBusy] = useState(false);
   const [hopOffset, setHopOffset] = useState(0);
-  const [shakeX, setShakeX] = useState(0);
   const [carY, setCarY] = useState<number | null>(null);
   const [carLaneX, setCarLaneX] = useState(0);
   const [carSource, setCarSource] = useState(CAR_SOURCES[0]);
   const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'hit'>('none');
   const [isChickenHit, setIsChickenHit] = useState(false);
   const [chickenAtIdle, setChickenAtIdle] = useState(false);
+  // The backend doesn't advance currentStep on a bust, so the lane the
+  // chicken was stepping into (where it actually gets hit) is tracked here.
+  const [bustStep, setBustStep] = useState<number | null>(null);
   const hopRafRef = useRef<number | null>(null);
   const carRafRef = useRef<number | null>(null);
   const roadScrollRef = useRef<ScrollView | null>(null);
@@ -332,9 +334,9 @@ export default function ChickenRoadScreen() {
   // advances, without blocking the player from scrolling ahead manually.
   useEffect(() => {
     if (!round || chickenAtIdle) return;
-    const targetX = Math.max(0, laneX(round.currentStep) - PANEL_WIDTH * 0.35);
+    const targetX = Math.max(0, laneX(bustStep ?? round.currentStep) - PANEL_WIDTH * 0.35);
     roadScrollRef.current?.scrollTo({ x: targetX, animated: true });
-  }, [round?.currentStep, round, chickenAtIdle]);
+  }, [round?.currentStep, round, chickenAtIdle, bustStep]);
 
   // Once the chicken has snapped back to its starting spot after a bust,
   // scroll the road back to the start too so it's actually visible there.
@@ -363,12 +365,6 @@ export default function ChickenRoadScreen() {
     hopRafRef.current = requestAnimationFrame(step);
   }, []);
 
-  const shakeInPlace = useCallback(() => {
-    const offsets = [-6, 6, -4, 4, 0];
-    offsets.forEach((offset, i) => {
-      setTimeout(() => setShakeX(offset), i * 80);
-    });
-  }, []);
 
   // A car drives straight down from above onto the chicken's bust lane and
   // "hits" it — swaps to the dazed sprite for a couple seconds, then
@@ -439,6 +435,7 @@ export default function ChickenRoadScreen() {
       setRound(created);
       setBanner(null);
       setChickenAtIdle(false);
+      setBustStep(null);
       refreshWallet();
     } catch (err) {
       Alert.alert('Could not start', err instanceof ApiClientError ? err.message : 'Please try again.');
@@ -454,8 +451,11 @@ export default function ChickenRoadScreen() {
       const result = await advanceChickenRoadStep(round.id);
       setRound(result.round);
       if (result.busted) {
-        shakeInPlace();
-        runCarHit(result.round.currentStep, () => setBusy(false));
+        // Step into the next lane first, then the car hits it right there.
+        const hitStep = result.round.currentStep + 1;
+        setBustStep(hitStep);
+        hop();
+        runCarHit(hitStep, () => setBusy(false));
         setBanner({ kind: 'busted' });
         refreshWallet();
         loadHistory();
@@ -494,11 +494,11 @@ export default function ChickenRoadScreen() {
     setRound(null);
     setBanner(null);
     setHopOffset(0);
-    setShakeX(0);
     setCarY(null);
     setCarPhase('none');
     setIsChickenHit(false);
     setChickenAtIdle(false);
+    setBustStep(null);
   };
 
   const isPlaying = round?.status === 'PENDING';
@@ -617,7 +617,7 @@ export default function ChickenRoadScreen() {
           // Stays blocked through a bust/cash-out too (not just while
           // PENDING) — the lane the chicken died on shouldn't reopen to
           // traffic until the player actually starts a new round.
-          blockedUpToStep={round ? round.currentStep : null}
+          blockedUpToStep={round ? bustStep ?? round.currentStep : null}
         />
 
         {isPlaying &&
@@ -656,9 +656,8 @@ export default function ChickenRoadScreen() {
               width: CHICKEN_WIDTH,
               height: CHICKEN_HEIGHT,
               left:
-                (round && !chickenAtIdle ? laneX(round.currentStep) : CHICKEN_IDLE_SPOT.xFrac * PANEL_WIDTH) -
-                CHICKEN_WIDTH / 2 +
-                shakeX,
+                (round && !chickenAtIdle ? laneX(bustStep ?? round.currentStep) : CHICKEN_IDLE_SPOT.xFrac * PANEL_WIDTH) -
+                CHICKEN_WIDTH / 2,
               top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - CHICKEN_HEIGHT + hopOffset,
             },
           ]}
