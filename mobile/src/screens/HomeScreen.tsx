@@ -67,8 +67,6 @@ export default function HomeScreen() {
   const winGoTileLeft = GAME_GRID_LEFT;
   const aviatorTileTop = gameGridTop;
   const aviatorTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const chickenRoadTileTop = gameGridTop;
-  const chickenRoadTileLeft = GAME_GRID_LEFT + 2 * GAME_GRID_CELL;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -200,25 +198,6 @@ export default function HomeScreen() {
           style={{ width: '100%', height: '100%' }}
           resizeMode="contain"
         />
-      </Pressable>
-      {/* No dedicated art yet (unlike the other two tiles, which use their
-          own home-icon.png) — a plain rounded tile with an emoji until one
-          is provided. */}
-      <Pressable
-        onPress={() => (navigation as any).navigate('ChickenRoad')}
-        style={{
-          position: 'absolute',
-          top: chickenRoadTileTop,
-          left: chickenRoadTileLeft,
-          width: GAME_ICON_SIZE,
-          height: GAME_ICON_SIZE,
-          borderRadius: 20,
-          backgroundColor: '#1A1B1E',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Text style={{ fontSize: GAME_ICON_SIZE * 0.5 }}>🐔</Text>
       </Pressable>
     </ScreenContainer>
   );

@@ -5,7 +5,6 @@ import BottomTabs from './BottomTabs';
 import { AuthStackParamList, RootStackParamList } from './types';
 import AviatorScreen from '../screens/AviatorScreen';
 import BalanceRecordsScreen from '../screens/BalanceRecordsScreen';
-import ChickenRoadScreen from '../screens/ChickenRoadScreen';
 import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
@@ -60,7 +59,6 @@ function MainNavigator() {
       <Stack.Screen name="Withdraw" component={WithdrawScreen} />
       <Stack.Screen name="ColorPredict" component={ColorPredictScreen} />
       <Stack.Screen name="Aviator" component={AviatorScreen} />
-      <Stack.Screen name="ChickenRoad" component={ChickenRoadScreen} />
     </Stack.Navigator>
   );
 }
