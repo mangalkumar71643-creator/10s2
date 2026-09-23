@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
 import { env } from "../config/env";
@@ -86,114 +87,127 @@ export async function startChickenRoadRound(userId: string, stake: number, diffi
 
   await assertCanTransact(userId);
 
-  const existing = await prisma.chickenRoadRound.findFirst({ where: { userId, status: "PENDING" } });
-  if (existing) throw new ApiError(400, "Finish your current round before starting a new one.");
-
-  const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId } });
-  if (Number(wallet.balance) < stake) {
-    throw new ApiError(400, "Insufficient balance");
-  }
-
   const { serverSeed, serverSeedHash, clientSeed, nonce } = await nextRoundSeedMaterial(userId);
 
-  // Same locked-bonus wagering-progress mechanic as the other games.
-  const lockedBonus = Number(wallet.lockedBonus);
-  const walletUpdateData: Record<string, unknown> = { balance: { decrement: stake } };
-  if (lockedBonus > 0) {
-    const newProgress = Number(wallet.wageringProgress) + stake;
-    if (newProgress >= Number(wallet.wageringRequired)) {
-      walletUpdateData.lockedBonus = 0;
-      walletUpdateData.wageringRequired = 0;
-      walletUpdateData.wageringProgress = 0;
-    } else {
-      walletUpdateData.wageringProgress = { increment: stake };
-    }
-  }
+  const round = await prisma.$transaction(async (tx) => {
+    const existing = await tx.chickenRoadRound.findFirst({ where: { userId, status: "PENDING" } });
+    if (existing) throw new ApiError(400, "Finish your current round before starting a new one.");
 
-  const [round] = await prisma.$transaction([
-    prisma.chickenRoadRound.create({
+    const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId } });
+    // Conditional debit so two simultaneous starts can't overdraw the wallet.
+    const debited = await tx.wallet.updateMany({
+      where: { userId, balance: { gte: stake } },
+      data: { balance: { decrement: stake } },
+    });
+    if (debited.count === 0) throw new ApiError(400, "Insufficient balance");
+
+    // Same locked-bonus wagering-progress mechanic as the other games.
+    if (Number(wallet.lockedBonus) > 0) {
+      const newProgress = Number(wallet.wageringProgress) + stake;
+      await tx.wallet.update({
+        where: { userId },
+        data:
+          newProgress >= Number(wallet.wageringRequired)
+            ? { lockedBonus: 0, wageringRequired: 0, wageringProgress: 0 }
+            : { wageringProgress: { increment: stake } },
+      });
+    }
+
+    await tx.transaction.create({ data: { userId, type: "GAME_STAKE", amount: stake, status: "COMPLETED" } });
+    return tx.chickenRoadRound.create({
       data: { userId, difficulty, stake, serverSeed, serverSeedHash, clientSeed, nonce },
-    }),
-    prisma.wallet.update({ where: { userId }, data: walletUpdateData }),
-    prisma.transaction.create({
-      data: { userId, type: "GAME_STAKE", amount: stake, status: "COMPLETED" },
-    }),
-  ]);
+    });
+  });
 
   return toPublicRound(round);
 }
 
-async function loadActiveRound(userId: string, roundId: string) {
-  const round = await prisma.chickenRoadRound.findUnique({ where: { id: roundId } });
+async function loadActiveRound(tx: Prisma.TransactionClient, userId: string, roundId: string) {
+  const round = await tx.chickenRoadRound.findUnique({ where: { id: roundId } });
   if (!round) throw new ApiError(404, "Round not found.");
   if (round.userId !== userId) throw new ApiError(403, "Not your round.");
   if (round.status !== "PENDING") throw new ApiError(400, "This round has already ended.");
   return round;
 }
 
-export async function advanceChickenRoadStep(userId: string, roundId: string) {
-  const round = await loadActiveRound(userId, roundId);
-  const config = DIFFICULTY_CONFIG[round.difficulty as ChickenRoadDifficultyKey];
+const ROUND_CHANGED = "This round was updated by another request. Please refresh and try again.";
 
-  const roll = stepRoll(round.serverSeed, round.clientSeed, round.nonce, round.currentStep);
-  const busted = roll >= config.surviveProb;
-
-  if (busted) {
-    const updated = await prisma.chickenRoadRound.update({
-      where: { id: round.id },
-      data: { status: "LOST", multiplier: 0, payout: 0, settledAt: new Date() },
-    });
-    return { round: toPublicRound(updated), busted: true };
-  }
-
-  const nextStep = round.currentStep + 1;
-  const multiplier = multiplierAt(config, nextStep);
-
-  // Final lane survived, or the payout has hit the max-payout cap — there's
-  // nothing left to gain by risking another lane, so it auto-settles as a
-  // win instead of letting the player keep risking the stake for nothing.
-  const reachedCap = Number(round.stake) * multiplier >= env.games.maxPayout;
-  if (nextStep >= config.steps || reachedCap) {
-    const payout = cappedPayout(Number(round.stake), multiplier);
-    const [updated] = await prisma.$transaction([
-      prisma.chickenRoadRound.update({
-        where: { id: round.id },
-        data: { currentStep: nextStep, multiplier, payout, status: "WON", settledAt: new Date() },
-      }),
-      prisma.wallet.update({ where: { userId }, data: { balance: { increment: payout } } }),
-      prisma.transaction.create({
-        data: { userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" },
-      }),
-    ]);
-    return { round: toPublicRound(updated), busted: false };
-  }
-
-  const updated = await prisma.chickenRoadRound.update({
-    where: { id: round.id },
-    data: { currentStep: nextStep, multiplier },
+/** Updates the round only if it is still exactly as it was read (PENDING,
+ * same lane), so parallel requests can't both act on it — without this,
+ * two simultaneous cash-outs each paid out in full. */
+async function claimRound(
+  tx: Prisma.TransactionClient,
+  round: ChickenRoadRoundRow,
+  data: Prisma.ChickenRoadRoundUpdateManyMutationInput
+) {
+  const claimed = await tx.chickenRoadRound.updateMany({
+    where: { id: round.id, status: "PENDING", currentStep: round.currentStep },
+    data,
   });
-  return { round: toPublicRound(updated), busted: false };
+  if (claimed.count === 0) throw new ApiError(409, ROUND_CHANGED);
+  return tx.chickenRoadRound.findUniqueOrThrow({ where: { id: round.id } });
+}
+
+async function creditPayout(tx: Prisma.TransactionClient, userId: string, payout: number) {
+  await tx.wallet.update({ where: { userId }, data: { balance: { increment: payout } } });
+  await tx.transaction.create({ data: { userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" } });
+}
+
+export async function advanceChickenRoadStep(userId: string, roundId: string) {
+  return prisma.$transaction(async (tx) => {
+    const round = await loadActiveRound(tx, userId, roundId);
+    const config = DIFFICULTY_CONFIG[round.difficulty as ChickenRoadDifficultyKey];
+
+    const roll = stepRoll(round.serverSeed, round.clientSeed, round.nonce, round.currentStep);
+    const busted = roll >= config.surviveProb;
+
+    if (busted) {
+      const updated = await claimRound(tx, round, {
+        status: "LOST",
+        multiplier: 0,
+        payout: 0,
+        settledAt: new Date(),
+      });
+      return { round: toPublicRound(updated), busted: true };
+    }
+
+    const nextStep = round.currentStep + 1;
+    const multiplier = multiplierAt(config, nextStep);
+
+    // Final lane survived, or the payout has hit the max-payout cap — there's
+    // nothing left to gain by risking another lane, so it auto-settles as a
+    // win instead of letting the player keep risking the stake for nothing.
+    const reachedCap = Number(round.stake) * multiplier >= env.games.maxPayout;
+    if (nextStep >= config.steps || reachedCap) {
+      const payout = cappedPayout(Number(round.stake), multiplier);
+      const updated = await claimRound(tx, round, {
+        currentStep: nextStep,
+        multiplier,
+        payout,
+        status: "WON",
+        settledAt: new Date(),
+      });
+      await creditPayout(tx, userId, payout);
+      return { round: toPublicRound(updated), busted: false };
+    }
+
+    const updated = await claimRound(tx, round, { currentStep: nextStep, multiplier });
+    return { round: toPublicRound(updated), busted: false };
+  });
 }
 
 export async function cashOutChickenRoadRound(userId: string, roundId: string) {
-  const round = await loadActiveRound(userId, roundId);
-  if (round.currentStep <= 0) {
-    throw new ApiError(400, "Cross at least one lane before cashing out.");
-  }
+  return prisma.$transaction(async (tx) => {
+    const round = await loadActiveRound(tx, userId, roundId);
+    if (round.currentStep <= 0) {
+      throw new ApiError(400, "Cross at least one lane before cashing out.");
+    }
 
-  const payout = cappedPayout(Number(round.stake), Number(round.multiplier));
-  const [updated] = await prisma.$transaction([
-    prisma.chickenRoadRound.update({
-      where: { id: round.id },
-      data: { payout, status: "WON", settledAt: new Date() },
-    }),
-    prisma.wallet.update({ where: { userId }, data: { balance: { increment: payout } } }),
-    prisma.transaction.create({
-      data: { userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" },
-    }),
-  ]);
-
-  return toPublicRound(updated);
+    const payout = cappedPayout(Number(round.stake), Number(round.multiplier));
+    const updated = await claimRound(tx, round, { payout, status: "WON", settledAt: new Date() });
+    await creditPayout(tx, userId, payout);
+    return toPublicRound(updated);
+  });
 }
 
 export async function getMyCurrentChickenRoadRound(userId: string) {
