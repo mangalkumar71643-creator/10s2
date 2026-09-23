@@ -375,16 +375,20 @@ export default function ChickenRoadScreen() {
   // reverts. The stop-obstacle for safe lanes comes later; for now a safe
   // advance is just the plain hop, no car.
   // The car never stops at the chicken — it drives straight through and
-  // off the bottom of the panel at the same constant speed. The "hit"
-  // (dazed sprite) triggers the instant it passes the chicken's row, and a
-  // second later the chicken snaps back to its own starting spot on its
-  // own, independent of the car (which keeps going either way).
+  // off the bottom of the panel at the same constant speed. It only
+  // spawns a short swoop above the chicken's row (not from the very top
+  // of the panel), so the hit registers almost the instant "Next Lane" is
+  // tapped instead of the player watching a long approach first. The
+  // "hit" (dazed sprite) triggers the instant it passes the chicken's
+  // row, and a second later the chicken snaps back to its own starting
+  // spot on its own, independent of the car (which keeps going either way).
   const runCarHit = useCallback((toStep: number, onComplete: () => void) => {
     if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
-    const startY = -CAR_HEIGHT;
+    const carSpeed = (LANE_Y + CAR_HEIGHT) / CAR_DRIVE_MS; // px/ms, same pace as ambient traffic
     const hitY = LANE_Y;
+    const startY = hitY - CAR_HEIGHT * 1.5;
     const endY = PANEL_HEIGHT + CAR_HEIGHT;
-    const totalMs = CAR_DRIVE_MS * ((endY - startY) / (hitY - startY));
+    const totalMs = (endY - startY) / carSpeed;
     setCarLaneX(laneX(toStep));
     setCarSource(randomCarSource());
     setCarPhase('driving');
