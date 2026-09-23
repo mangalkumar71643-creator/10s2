@@ -77,14 +77,13 @@ const CHICKEN_WIDTH = 60;
 const CHICKEN_HEIGHT = CHICKEN_WIDTH * CHICKEN_ASPECT;
 const HOP_DURATION_MS = 380;
 
-// The car sprite is a top-down (bird's-eye) car, front pointing "up" in its
-// own image — rotated -90deg so it faces left and drives right-to-left
-// along the horizontal road, oncoming toward the chicken.
-const CAR_SOURCE_ASPECT = 267 / 429;
-const CAR_LENGTH = MANHOLE_DIAM * 1.4;
-const CAR_THICKNESS = CAR_LENGTH * CAR_SOURCE_ASPECT;
+// The car sprite is a top-down (bird's-eye) car, front already pointing
+// "up" — no rotation needed, it drives straight down the screen (top to
+// bottom) onto the road, same orientation as the reference footage.
+const CAR_SOURCE_ASPECT = 267 / 429; // width / height
+const CAR_HEIGHT = MANHOLE_DIAM * 1.4;
+const CAR_WIDTH = CAR_HEIGHT * CAR_SOURCE_ASPECT;
 
-const CAR_APPROACH_DISTANCE = LANE_PITCH * 2.2;
 const CAR_DRIVE_MS = 420;
 const CAR_HIT_HOLD_MS = 1500;
 
@@ -113,30 +112,32 @@ function quickStakeLabel(amount: number): string {
 
 type ResultBanner = { kind: 'won'; payout: number } | { kind: 'busted' };
 
-// Loops forever, independent of any round: drives a car across the fixed
-// visible panel, pauses off-screen for a random gap, then does it again.
+// Loops forever, independent of any round: drives a car top-to-bottom down
+// the fixed visible panel at a random horizontal spot, pauses off-screen
+// for a random gap, then picks a new spot and does it again.
 function AmbientTraffic() {
-  const [x, setX] = useState<number | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const rafRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const startX = PANEL_WIDTH + CAR_LENGTH;
-    const endX = -CAR_LENGTH;
+    const startY = -CAR_HEIGHT;
+    const endY = PANEL_HEIGHT + CAR_HEIGHT;
 
     const drive = () => {
       if (cancelled) return;
+      const spawnX = CAR_WIDTH / 2 + Math.random() * (PANEL_WIDTH - CAR_WIDTH);
       const start = Date.now();
       const tick = () => {
         if (cancelled) return;
         const t = Math.min(1, (Date.now() - start) / AMBIENT_DRIVE_MS);
-        setX(startX + (endX - startX) * t);
+        setPos({ x: spawnX, y: startY + (endY - startY) * t });
         if (t < 1) {
           rafRef.current = requestAnimationFrame(tick);
           return;
         }
-        setX(null);
+        setPos(null);
         timeoutRef.current = setTimeout(drive, AMBIENT_GAP_MIN_MS + Math.random() * AMBIENT_GAP_JITTER_MS);
       };
       rafRef.current = requestAnimationFrame(tick);
@@ -150,23 +151,21 @@ function AmbientTraffic() {
     };
   }, []);
 
-  if (x === null) return null;
+  if (pos === null) return null;
   return (
     <View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: x - CAR_LENGTH / 2,
-        top: LANE_Y - CAR_THICKNESS / 2,
-        width: CAR_LENGTH,
-        height: CAR_THICKNESS,
-        alignItems: 'center',
-        justifyContent: 'center',
+        left: pos.x - CAR_WIDTH / 2,
+        top: pos.y - CAR_HEIGHT / 2,
+        width: CAR_WIDTH,
+        height: CAR_HEIGHT,
       }}
     >
       <Image
         source={require('../../assets/chicken-road-car.png')}
-        style={{ width: CAR_THICKNESS, height: CAR_LENGTH, transform: [{ rotate: '-90deg' }] }}
+        style={{ width: CAR_WIDTH, height: CAR_HEIGHT }}
         resizeMode="contain"
       />
     </View>
@@ -232,7 +231,8 @@ export default function ChickenRoadScreen() {
   const [busy, setBusy] = useState(false);
   const [hopOffset, setHopOffset] = useState(0);
   const [shakeX, setShakeX] = useState(0);
-  const [carX, setCarX] = useState<number | null>(null);
+  const [carY, setCarY] = useState<number | null>(null);
+  const [carLaneX, setCarLaneX] = useState(0);
   const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'hit'>('none');
   const [isChickenHit, setIsChickenHit] = useState(false);
   const hopRafRef = useRef<number | null>(null);
@@ -317,21 +317,22 @@ export default function ChickenRoadScreen() {
     });
   }, []);
 
-  // An oncoming car drives in from ahead of the chicken's bust lane and
+  // A car drives straight down from above onto the chicken's bust lane and
   // "hits" it — swaps to the dazed sprite for a couple seconds, then
   // reverts. The stop-obstacle for safe lanes comes later; for now a safe
   // advance is just the plain hop, no car.
   const runCarHit = useCallback((toStep: number, onComplete: () => void) => {
     if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
-    const targetX = laneX(toStep);
-    const startX = targetX + CAR_APPROACH_DISTANCE;
+    const startY = -CAR_HEIGHT;
+    const targetY = LANE_Y;
+    setCarLaneX(laneX(toStep));
     setCarPhase('driving');
-    setCarX(startX);
+    setCarY(startY);
     const start = Date.now();
     const step = () => {
       const t = Math.min(1, (Date.now() - start) / CAR_DRIVE_MS);
       const eased = 1 - (1 - t) * (1 - t);
-      setCarX(startX + (targetX - startX) * eased);
+      setCarY(startY + (targetY - startY) * eased);
       if (t < 1) {
         carRafRef.current = requestAnimationFrame(step);
         return;
@@ -342,7 +343,7 @@ export default function ChickenRoadScreen() {
       setTimeout(() => {
         setIsChickenHit(false);
         setCarPhase('none');
-        setCarX(null);
+        setCarY(null);
         onComplete();
       }, CAR_HIT_HOLD_MS);
     };
@@ -423,7 +424,7 @@ export default function ChickenRoadScreen() {
     setBanner(null);
     setHopOffset(0);
     setShakeX(0);
-    setCarX(null);
+    setCarY(null);
     setCarPhase('none');
     setIsChickenHit(false);
   };
@@ -565,22 +566,20 @@ export default function ChickenRoadScreen() {
           />
         </View>
 
-        {carX !== null && (
+        {carY !== null && (
           <View
             pointerEvents="none"
             style={{
               position: 'absolute',
-              left: carX - CAR_LENGTH / 2,
-              top: LANE_Y - CAR_THICKNESS / 2,
-              width: CAR_LENGTH,
-              height: CAR_THICKNESS,
-              alignItems: 'center',
-              justifyContent: 'center',
+              left: carLaneX - CAR_WIDTH / 2,
+              top: carY - CAR_HEIGHT / 2,
+              width: CAR_WIDTH,
+              height: CAR_HEIGHT,
             }}
           >
             <Image
               source={require('../../assets/chicken-road-car.png')}
-              style={{ width: CAR_THICKNESS, height: CAR_LENGTH, transform: [{ rotate: '-90deg' }] }}
+              style={{ width: CAR_WIDTH, height: CAR_HEIGHT }}
               resizeMode="contain"
             />
           </View>
