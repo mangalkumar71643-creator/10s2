@@ -69,36 +69,88 @@ function HistoryChip({ round }: { round: ChickenRoadRound }) {
 
 // Drawn instead of using the 🐔 emoji glyph — different Android fonts render
 // that inconsistently (some show only a rotated head), so a plain vector
-// bird guarantees the same look everywhere. Radial gradients on the body/
-// head fake volume (a flat SVG shape read as "3D"), and `legPhase` swaps
-// which foot is planted vs. lifted so toggling it every ~110ms during a
-// walk reads as a stride instead of a static pose.
+// bird guarantees the same look everywhere. Styled after the reference
+// screenshot's mascot: a bold dark outline on every shape (what actually
+// reads as a "real" game asset rather than a placeholder), a chubby
+// rounded body with folded wings, a scalloped comb + wattle, glossy
+// highlight patches for a toy-like 3D look, and `legPhase` swapping which
+// foot is planted vs. lifted so toggling it every ~110ms during a walk
+// reads as a stride instead of a static pose.
 function ChickenSprite({ size, legPhase = 0, hit = false }: { size: number; legPhase?: 0 | 1; hit?: boolean }) {
-  const shadeColor = hit ? '#F2B8B8' : '#D8DCE8';
+  const shadeColor = hit ? '#F0B0AE' : '#DDE1EC';
+  const outline = '#3B2A1F';
   const frontLegUp = legPhase === 1;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
-        <RadialGradient id="bodyGrad" cx="35%" cy="30%" r="75%">
+        <RadialGradient id="bodyGrad" cx="35%" cy="28%" r="80%">
           <Stop offset="0%" stopColor="#FFFFFF" />
           <Stop offset="100%" stopColor={shadeColor} />
         </RadialGradient>
-        <RadialGradient id="headGrad" cx="35%" cy="30%" r="75%">
+        <RadialGradient id="headGrad" cx="35%" cy="28%" r="80%">
           <Stop offset="0%" stopColor="#FFFFFF" />
           <Stop offset="100%" stopColor={shadeColor} />
+        </RadialGradient>
+        <RadialGradient id="beakGrad" cx="35%" cy="20%" r="90%">
+          <Stop offset="0%" stopColor="#FFD166" />
+          <Stop offset="100%" stopColor="#F5A623" />
         </RadialGradient>
       </Defs>
-      <Ellipse cx={50} cy={97} rx={22} ry={4} fill="rgba(0,0,0,0.25)" />
-      <Ellipse cx={50} cy={64} rx={28} ry={30} fill="url(#bodyGrad)" />
-      <Circle cx={50} cy={30} r={19} fill="url(#headGrad)" />
-      <Circle cx={38} cy={12} r={5} fill="#E8102F" />
-      <Circle cx={50} cy={8} r={6} fill="#E8102F" />
-      <Circle cx={62} cy={12} r={5} fill="#E8102F" />
-      <Path d="M 45 40 L 55 40 L 50 48 Z" fill="#F5A623" />
-      <Circle cx={42} cy={28} r={3} fill="#1A1B1E" />
-      <Circle cx={58} cy={28} r={3} fill="#1A1B1E" />
-      <Rect x={36} y={frontLegUp ? 86 : 90} width={7} height={frontLegUp ? 7 : 9} rx={2} fill="#F5A623" />
-      <Rect x={57} y={frontLegUp ? 90 : 86} width={7} height={frontLegUp ? 9 : 7} rx={2} fill="#F5A623" />
+
+      <Ellipse cx={50} cy={95} rx={22} ry={3.5} fill="rgba(0,0,0,0.25)" />
+
+      {/* legs (drawn first so the body overlaps their hip joint) */}
+      <Rect
+        x={38}
+        y={76}
+        width={8}
+        height={frontLegUp ? 9 : 14}
+        rx={4}
+        fill="#F5A623"
+        stroke={outline}
+        strokeWidth={2}
+      />
+      <Rect
+        x={54}
+        y={76}
+        width={8}
+        height={frontLegUp ? 14 : 9}
+        rx={4}
+        fill="#F5A623"
+        stroke={outline}
+        strokeWidth={2}
+      />
+      <Ellipse cx={42} cy={frontLegUp ? 85 : 90} rx={6} ry={2.5} fill="#F5A623" stroke={outline} strokeWidth={1.5} />
+      <Ellipse cx={58} cy={frontLegUp ? 90 : 85} rx={6} ry={2.5} fill="#F5A623" stroke={outline} strokeWidth={1.5} />
+
+      {/* folded wings, tucked behind the body's silhouette */}
+      <Ellipse cx={25} cy={56} rx={9} ry={15} fill="#ECEAE4" stroke={outline} strokeWidth={2.5} />
+      <Ellipse cx={75} cy={56} rx={9} ry={15} fill="#ECEAE4" stroke={outline} strokeWidth={2.5} />
+
+      {/* body */}
+      <Ellipse cx={50} cy={55} rx={27} ry={27} fill="url(#bodyGrad)" stroke={outline} strokeWidth={3} />
+      <Ellipse cx={39} cy={44} rx={9} ry={11} fill="rgba(255,255,255,0.55)" />
+
+      {/* head */}
+      <Circle cx={50} cy={24} r={17} fill="url(#headGrad)" stroke={outline} strokeWidth={3} />
+      <Ellipse cx={43} cy={17} rx={5} ry={6} fill="rgba(255,255,255,0.55)" />
+
+      {/* scalloped comb */}
+      <Circle cx={37} cy={10} r={5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
+      <Circle cx={50} cy={6} r={5.5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
+      <Circle cx={63} cy={10} r={5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
+
+      {/* wattle, peeking out just under the beak */}
+      <Ellipse cx={50} cy={40} rx={3.5} ry={4.5} fill="#FF4D4D" stroke={outline} strokeWidth={2} />
+
+      {/* beak */}
+      <Path d="M 44 33 L 56 33 L 50 41 Z" fill="url(#beakGrad)" stroke={outline} strokeWidth={2} />
+
+      {/* eyes, with a small shine dot each */}
+      <Circle cx={41} cy={21} r={4} fill={outline} />
+      <Circle cx={59} cy={21} r={4} fill={outline} />
+      <Circle cx={39.5} cy={19.5} r={1.2} fill="#FFFFFF" />
+      <Circle cx={57.5} cy={19.5} r={1.2} fill="#FFFFFF" />
     </Svg>
   );
 }
