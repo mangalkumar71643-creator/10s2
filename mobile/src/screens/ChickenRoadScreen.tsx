@@ -77,22 +77,38 @@ const CHICKEN_WIDTH = 60;
 const CHICKEN_HEIGHT = CHICKEN_WIDTH * CHICKEN_ASPECT;
 const HOP_DURATION_MS = 380;
 
-// The car sprite is a top-down (bird's-eye) car, front already pointing
-// "up" — no rotation needed, it drives straight down the screen (top to
-// bottom) onto the road, same orientation as the reference footage.
-const CAR_SOURCE_ASPECT = 267 / 429; // width / height
+// The car sprites are top-down (bird's-eye), front already pointing "up"
+// — no rotation needed, they drive straight down the screen (top to
+// bottom) onto the road, same orientation as the reference footage. Ten
+// different vehicles (cropped from one reference sheet) so back-to-back
+// traffic on the same lane doesn't look like the same car repeating.
+const CAR_SOURCES = [
+  require('../../assets/chicken-road-car-1.png'),
+  require('../../assets/chicken-road-car-2.png'),
+  require('../../assets/chicken-road-car-3.png'),
+  require('../../assets/chicken-road-car-4.png'),
+  require('../../assets/chicken-road-car-5.png'),
+  require('../../assets/chicken-road-car-6.png'),
+  require('../../assets/chicken-road-car-7.png'),
+  require('../../assets/chicken-road-car-8.png'),
+  require('../../assets/chicken-road-car-9.png'),
+  require('../../assets/chicken-road-car-10.png'),
+];
+function randomCarSource() {
+  return CAR_SOURCES[Math.floor(Math.random() * CAR_SOURCES.length)];
+}
+
 const CAR_HEIGHT = MANHOLE_DIAM * 1.4;
-const CAR_WIDTH = CAR_HEIGHT * CAR_SOURCE_ASPECT;
+const CAR_WIDTH = CAR_HEIGHT * (267 / 429);
 
 const CAR_DRIVE_MS = 420;
 const CAR_HIT_HOLD_MS = 1500;
 
-// Ambient background traffic — independent of round state, always driving
-// across the visible panel so the road feels alive, separate from the
-// fairness-driven car that hits the chicken on an actual bust.
+// Ambient background traffic — independent of round state. Every lane runs
+// its own nonstop stream of cars: as soon as one clears the panel, a new
+// (randomly different) one starts down the same lane after a short gap.
 const AMBIENT_DRIVE_MS = 2600;
-const AMBIENT_GAP_MIN_MS = 500;
-const AMBIENT_GAP_JITTER_MS = 1800;
+const AMBIENT_GAP_MS = 50;
 
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
   EASY: 'Easy',
@@ -112,16 +128,13 @@ function quickStakeLabel(amount: number): string {
 
 type ResultBanner = { kind: 'won'; payout: number } | { kind: 'busted' };
 
-const AMBIENT_CAR_SLOTS = 3;
-const AMBIENT_SLOT_STAGGER_MS = 900;
-
-// One looping traffic slot: picks a random lane, drives a car straight
-// down through it (in the same content coordinate space as the lane
-// markers, so it always tracks its own lane column between the dashed
-// dividers rather than drifting sideways across them), waits off-screen
-// for a random gap, then picks a new random lane and repeats.
-function AmbientCarSlot({ maxSteps, initialDelayMs }: { maxSteps: number; initialDelayMs: number }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+// One lane's own nonstop traffic: drives a car straight down this lane's
+// fixed x (content-space, same as the lane markers, so it never drifts
+// into a neighbouring column), and the moment it clears the panel a new,
+// randomly different car starts down the same lane after a short gap —
+// so every lane always has something driving through it.
+function LaneTraffic({ x }: { x: number }) {
+  const [state, setState] = useState<{ y: number; source: number } | null>(null);
   const rafRef = useRef<number | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -132,59 +145,55 @@ function AmbientCarSlot({ maxSteps, initialDelayMs }: { maxSteps: number; initia
 
     const drive = () => {
       if (cancelled) return;
-      const step = Math.floor(Math.random() * (maxSteps + 1));
-      const laneCenterX = laneX(step);
+      const source = randomCarSource();
       const start = Date.now();
       const tick = () => {
         if (cancelled) return;
         const t = Math.min(1, (Date.now() - start) / AMBIENT_DRIVE_MS);
-        setPos({ x: laneCenterX, y: startY + (endY - startY) * t });
+        setState({ y: startY + (endY - startY) * t, source });
         if (t < 1) {
           rafRef.current = requestAnimationFrame(tick);
           return;
         }
-        setPos(null);
-        timeoutRef.current = setTimeout(drive, AMBIENT_GAP_MIN_MS + Math.random() * AMBIENT_GAP_JITTER_MS);
+        timeoutRef.current = setTimeout(drive, AMBIENT_GAP_MS);
       };
       rafRef.current = requestAnimationFrame(tick);
     };
 
-    timeoutRef.current = setTimeout(drive, initialDelayMs + Math.random() * AMBIENT_GAP_JITTER_MS);
+    // Stagger each lane's first car by a random amount so all lanes don't
+    // spawn in lockstep, while still running nonstop afterwards.
+    timeoutRef.current = setTimeout(drive, Math.random() * AMBIENT_DRIVE_MS);
     return () => {
       cancelled = true;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
     };
-  }, [maxSteps, initialDelayMs]);
+  }, [x]);
 
-  if (pos === null) return null;
+  if (state === null) return null;
   return (
     <View
       pointerEvents="none"
       style={{
         position: 'absolute',
-        left: pos.x - CAR_WIDTH / 2,
-        top: pos.y - CAR_HEIGHT / 2,
+        left: x - CAR_WIDTH / 2,
+        top: state.y - CAR_HEIGHT / 2,
         width: CAR_WIDTH,
         height: CAR_HEIGHT,
       }}
     >
-      <Image
-        source={require('../../assets/chicken-road-car.png')}
-        style={{ width: CAR_WIDTH, height: CAR_HEIGHT }}
-        resizeMode="contain"
-      />
+      <Image source={state.source} style={{ width: CAR_WIDTH, height: CAR_HEIGHT }} resizeMode="contain" />
     </View>
   );
 }
 
-// A handful of independent slots so several lanes can have traffic at
-// once, each one confined to its own lane the whole time it's on screen.
+// Every lane gets its own perpetual traffic stream.
 function AmbientTraffic({ maxSteps }: { maxSteps: number }) {
+  const steps = useMemo(() => Array.from({ length: maxSteps + 1 }, (_, i) => i), [maxSteps]);
   return (
     <>
-      {Array.from({ length: AMBIENT_CAR_SLOTS }).map((_, i) => (
-        <AmbientCarSlot key={i} maxSteps={maxSteps} initialDelayMs={i * AMBIENT_SLOT_STAGGER_MS} />
+      {steps.map((step) => (
+        <LaneTraffic key={step} x={laneX(step)} />
       ))}
     </>
   );
@@ -251,6 +260,7 @@ export default function ChickenRoadScreen() {
   const [shakeX, setShakeX] = useState(0);
   const [carY, setCarY] = useState<number | null>(null);
   const [carLaneX, setCarLaneX] = useState(0);
+  const [carSource, setCarSource] = useState(CAR_SOURCES[0]);
   const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'hit'>('none');
   const [isChickenHit, setIsChickenHit] = useState(false);
   const hopRafRef = useRef<number | null>(null);
@@ -344,6 +354,7 @@ export default function ChickenRoadScreen() {
     const startY = -CAR_HEIGHT;
     const targetY = LANE_Y;
     setCarLaneX(laneX(toStep));
+    setCarSource(randomCarSource());
     setCarPhase('driving');
     setCarY(startY);
     const start = Date.now();
@@ -597,11 +608,7 @@ export default function ChickenRoadScreen() {
               height: CAR_HEIGHT,
             }}
           >
-            <Image
-              source={require('../../assets/chicken-road-car.png')}
-              style={{ width: CAR_WIDTH, height: CAR_HEIGHT }}
-              resizeMode="contain"
-            />
+            <Image source={carSource} style={{ width: CAR_WIDTH, height: CAR_HEIGHT }} resizeMode="contain" />
           </View>
         )}
       </ScrollView>
