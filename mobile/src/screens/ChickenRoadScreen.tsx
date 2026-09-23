@@ -3,7 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Circle, Ellipse, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -25,6 +25,18 @@ const LANE_WIDTH = 64;
 const DIVIDER_WIDTH = 18;
 const COOP_WIDTH = 68;
 const QUICK_STAKES = [10, 100, 500, 1000];
+const LANE_PITCH = LANE_WIDTH + DIVIDER_WIDTH;
+const ROAD_CONTENT_PADDING = 16;
+const CHICKEN_SIZE = 40;
+const WALK_DURATION_MS = 420;
+const LEG_TOGGLE_MS = 110;
+
+/** Center-x (in the road ScrollView's own content coordinates) of the
+ * chicken's resting spot at a given step — step 0 is just before lane 1,
+ * so starting a round visibly walks it in from behind the coop. */
+function laneCenterX(step: number): number {
+  return ROAD_CONTENT_PADDING + (step - 1) * LANE_PITCH + LANE_WIDTH / 2;
+}
 
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
   EASY: 'Easy',
@@ -56,21 +68,37 @@ function HistoryChip({ round }: { round: ChickenRoadRound }) {
 }
 
 // Drawn instead of using the 🐔 emoji glyph — different Android fonts render
-// that inconsistently (some show only a rotated head), so a plain
-// front-facing, upright vector bird guarantees the same look everywhere.
-function ChickenSprite({ size }: { size: number }) {
+// that inconsistently (some show only a rotated head), so a plain vector
+// bird guarantees the same look everywhere. Radial gradients on the body/
+// head fake volume (a flat SVG shape read as "3D"), and `legPhase` swaps
+// which foot is planted vs. lifted so toggling it every ~110ms during a
+// walk reads as a stride instead of a static pose.
+function ChickenSprite({ size, legPhase = 0, hit = false }: { size: number; legPhase?: 0 | 1; hit?: boolean }) {
+  const shadeColor = hit ? '#F2B8B8' : '#D8DCE8';
+  const frontLegUp = legPhase === 1;
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
-      <Ellipse cx={50} cy={64} rx={28} ry={30} fill="#FFFFFF" />
-      <Circle cx={50} cy={30} r={19} fill="#FFFFFF" />
+      <Defs>
+        <RadialGradient id="bodyGrad" cx="35%" cy="30%" r="75%">
+          <Stop offset="0%" stopColor="#FFFFFF" />
+          <Stop offset="100%" stopColor={shadeColor} />
+        </RadialGradient>
+        <RadialGradient id="headGrad" cx="35%" cy="30%" r="75%">
+          <Stop offset="0%" stopColor="#FFFFFF" />
+          <Stop offset="100%" stopColor={shadeColor} />
+        </RadialGradient>
+      </Defs>
+      <Ellipse cx={50} cy={97} rx={22} ry={4} fill="rgba(0,0,0,0.25)" />
+      <Ellipse cx={50} cy={64} rx={28} ry={30} fill="url(#bodyGrad)" />
+      <Circle cx={50} cy={30} r={19} fill="url(#headGrad)" />
       <Circle cx={38} cy={12} r={5} fill="#E8102F" />
       <Circle cx={50} cy={8} r={6} fill="#E8102F" />
       <Circle cx={62} cy={12} r={5} fill="#E8102F" />
       <Path d="M 45 40 L 55 40 L 50 48 Z" fill="#F5A623" />
       <Circle cx={42} cy={28} r={3} fill="#1A1B1E" />
       <Circle cx={58} cy={28} r={3} fill="#1A1B1E" />
-      <Rect x={36} y={90} width={7} height={9} rx={2} fill="#F5A623" />
-      <Rect x={57} y={90} width={7} height={9} rx={2} fill="#F5A623" />
+      <Rect x={36} y={frontLegUp ? 86 : 90} width={7} height={frontLegUp ? 7 : 9} rx={2} fill="#F5A623" />
+      <Rect x={57} y={frontLegUp ? 90 : 86} width={7} height={frontLegUp ? 9 : 7} rx={2} fill="#F5A623" />
     </Svg>
   );
 }
@@ -99,6 +127,11 @@ export default function ChickenRoadScreen() {
   const [history, setHistory] = useState<ChickenRoadRound[]>([]);
   const [banner, setBanner] = useState<ResultBanner | null>(null);
   const [busy, setBusy] = useState(false);
+  const [chickenX, setChickenX] = useState(laneCenterX(0));
+  const [legPhase, setLegPhase] = useState<0 | 1>(0);
+  const [hitFlash, setHitFlash] = useState(false);
+  const chickenXRef = useRef(chickenX);
+  const walkRafRef = useRef<number | null>(null);
   const roadScrollRef = useRef<ScrollView>(null);
 
   const loadHistory = useCallback(() => {
@@ -113,7 +146,12 @@ export default function ChickenRoadScreen() {
       .catch(() => {});
     fetchChickenRoadCurrent()
       .then((current) => {
-        if (current) setRound(current);
+        if (current) {
+          setRound(current);
+          const x = laneCenterX(current.currentStep);
+          chickenXRef.current = x;
+          setChickenX(x);
+        }
       })
       .catch(() => {});
     loadHistory();
@@ -124,13 +162,47 @@ export default function ChickenRoadScreen() {
     [config, difficulty, round]
   );
 
-  useEffect(() => {
-    if (!round) return;
-    roadScrollRef.current?.scrollTo({
-      x: Math.max(0, round.currentStep * (LANE_WIDTH + DIVIDER_WIDTH) - LANE_WIDTH),
-      animated: true,
+  // Slides the chicken from its current spot to a target lane over
+  // WALK_DURATION_MS, toggling legPhase every LEG_TOGGLE_MS so it reads
+  // as a walking stride rather than a teleport.
+  const walkTo = useCallback((targetX: number) => {
+    if (walkRafRef.current !== null) cancelAnimationFrame(walkRafRef.current);
+    const startX = chickenXRef.current;
+    const startTime = Date.now();
+    const step = () => {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(1, elapsed / WALK_DURATION_MS);
+      const x = startX + (targetX - startX) * t;
+      chickenXRef.current = x;
+      setChickenX(x);
+      setLegPhase(Math.floor(elapsed / LEG_TOGGLE_MS) % 2 === 0 ? 0 : 1);
+      if (t < 1) {
+        walkRafRef.current = requestAnimationFrame(step);
+      } else {
+        walkRafRef.current = null;
+        setLegPhase(0);
+      }
+    };
+    walkRafRef.current = requestAnimationFrame(step);
+    roadScrollRef.current?.scrollTo({ x: Math.max(0, targetX - LANE_WIDTH), animated: true });
+  }, []);
+
+  // No forward movement on a bust — a quick shake in place instead.
+  const shakeInPlace = useCallback(() => {
+    setHitFlash(true);
+    const baseX = chickenXRef.current;
+    const offsets = [-6, 6, -4, 4, 0];
+    offsets.forEach((offset, i) => {
+      setTimeout(() => setChickenX(baseX + offset), i * 80);
     });
-  }, [round?.currentStep]);
+    setTimeout(() => setHitFlash(false), offsets.length * 80);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (walkRafRef.current !== null) cancelAnimationFrame(walkRafRef.current);
+    };
+  }, []);
 
   const setStakeValue = (value: number) => {
     setStake(value);
@@ -150,6 +222,10 @@ export default function ChickenRoadScreen() {
       const created = await startChickenRoadRound(stake, difficulty);
       setRound(created);
       setBanner(null);
+      const x = laneCenterX(0);
+      chickenXRef.current = x;
+      setChickenX(x);
+      roadScrollRef.current?.scrollTo({ x: 0, animated: false });
       refreshWallet();
     } catch (err) {
       Alert.alert('Could not start', err instanceof ApiClientError ? err.message : 'Please try again.');
@@ -165,13 +241,17 @@ export default function ChickenRoadScreen() {
       const result = await advanceChickenRoadStep(round.id);
       setRound(result.round);
       if (result.busted) {
+        shakeInPlace();
         setBanner({ kind: 'busted' });
         refreshWallet();
         loadHistory();
-      } else if (result.round.status === 'WON') {
-        setBanner({ kind: 'won', payout: Number(result.round.payout) });
-        refreshWallet();
-        loadHistory();
+      } else {
+        walkTo(laneCenterX(result.round.currentStep));
+        if (result.round.status === 'WON') {
+          setBanner({ kind: 'won', payout: Number(result.round.payout) });
+          refreshWallet();
+          loadHistory();
+        }
       }
     } catch (err) {
       Alert.alert('Could not advance', err instanceof ApiClientError ? err.message : 'Please try again.');
@@ -199,6 +279,11 @@ export default function ChickenRoadScreen() {
   const playAgain = () => {
     setRound(null);
     setBanner(null);
+    const x = laneCenterX(0);
+    chickenXRef.current = x;
+    setChickenX(x);
+    setLegPhase(0);
+    setHitFlash(false);
   };
 
   const isPlaying = round?.status === 'PENDING';
@@ -250,16 +335,10 @@ export default function ChickenRoadScreen() {
           {(activeConfig?.multipliers ?? []).map((mult, step) => {
             if (step === 0) return null;
             const crossed = round ? step <= round.currentStep : false;
-            const isCurrent = round ? step === round.currentStep + 1 && isPlaying : false;
             return (
               <React.Fragment key={step}>
                 {step > 1 && <LaneDivider />}
                 <View style={styles.laneSlot}>
-                  {isCurrent && (
-                    <View style={styles.chickenOnLane}>
-                      <ChickenSprite size={36} />
-                    </View>
-                  )}
                   <View style={[styles.laneBadge, crossed && styles.laneBadgeCrossed]}>
                     <Text style={[styles.laneBadgeText, crossed && styles.laneBadgeTextCrossed]}>
                       {mult.toFixed(2)}x
@@ -269,6 +348,11 @@ export default function ChickenRoadScreen() {
               </React.Fragment>
             );
           })}
+          {round && (
+            <View style={[styles.chickenOverlay, { left: chickenX - CHICKEN_SIZE / 2 }]}>
+              <ChickenSprite size={CHICKEN_SIZE} legPhase={legPhase} hit={hitFlash} />
+            </View>
+          )}
         </ScrollView>
       </View>
 
@@ -442,7 +526,7 @@ const styles = StyleSheet.create({
   },
   roadContent: { alignItems: 'center', paddingHorizontal: 16 },
   laneSlot: { width: LANE_WIDTH, height: 100, alignItems: 'center', justifyContent: 'flex-end' },
-  chickenOnLane: { position: 'absolute', top: 4 },
+  chickenOverlay: { position: 'absolute', top: 4, width: CHICKEN_SIZE, height: CHICKEN_SIZE },
   laneBadge: {
     width: 56,
     height: 56,
