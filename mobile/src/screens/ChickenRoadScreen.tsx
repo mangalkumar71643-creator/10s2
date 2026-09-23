@@ -104,7 +104,7 @@ const CAR_WIDTH = CAR_HEIGHT * (267 / 429);
 // Doubled speed (half the travel time) for every car, ambient and bust-hit
 // alike.
 const CAR_DRIVE_MS = 210;
-const CAR_HIT_HOLD_MS = 1500;
+const CAR_HIT_HOLD_MS = 1000;
 
 // Ambient background traffic — independent of round state. Every lane runs
 // its own nonstop stream of cars: as soon as one clears the panel, a new
@@ -279,6 +279,7 @@ export default function ChickenRoadScreen() {
   const [carSource, setCarSource] = useState(CAR_SOURCES[0]);
   const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'hit'>('none');
   const [isChickenHit, setIsChickenHit] = useState(false);
+  const [chickenAtIdle, setChickenAtIdle] = useState(false);
   const hopRafRef = useRef<number | null>(null);
   const carRafRef = useRef<number | null>(null);
   const roadScrollRef = useRef<ScrollView | null>(null);
@@ -330,10 +331,18 @@ export default function ChickenRoadScreen() {
   // Keep the chicken's current lane comfortably in view as the round
   // advances, without blocking the player from scrolling ahead manually.
   useEffect(() => {
-    if (!round) return;
+    if (!round || chickenAtIdle) return;
     const targetX = Math.max(0, laneX(round.currentStep) - PANEL_WIDTH * 0.35);
     roadScrollRef.current?.scrollTo({ x: targetX, animated: true });
-  }, [round?.currentStep, round]);
+  }, [round?.currentStep, round, chickenAtIdle]);
+
+  // Once the chicken has snapped back to its starting spot after a bust,
+  // scroll the road back to the start too so it's actually visible there.
+  useEffect(() => {
+    if (chickenAtIdle) {
+      roadScrollRef.current?.scrollTo({ x: 0, animated: true });
+    }
+  }, [chickenAtIdle]);
 
   // A quick in-place hop each time the chicken survives a lane — there's
   // nowhere further to walk to on this fixed image, so "moving forward"
@@ -365,32 +374,44 @@ export default function ChickenRoadScreen() {
   // "hits" it — swaps to the dazed sprite for a couple seconds, then
   // reverts. The stop-obstacle for safe lanes comes later; for now a safe
   // advance is just the plain hop, no car.
+  // The car never stops at the chicken — it drives straight through and
+  // off the bottom of the panel at the same constant speed. The "hit"
+  // (dazed sprite) triggers the instant it passes the chicken's row, and a
+  // second later the chicken snaps back to its own starting spot on its
+  // own, independent of the car (which keeps going either way).
   const runCarHit = useCallback((toStep: number, onComplete: () => void) => {
     if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
     const startY = -CAR_HEIGHT;
-    const targetY = LANE_Y;
+    const hitY = LANE_Y;
+    const endY = PANEL_HEIGHT + CAR_HEIGHT;
+    const totalMs = CAR_DRIVE_MS * ((endY - startY) / (hitY - startY));
     setCarLaneX(laneX(toStep));
     setCarSource(randomCarSource());
     setCarPhase('driving');
     setCarY(startY);
+    let hitTriggered = false;
     const start = Date.now();
     const step = () => {
-      const t = Math.min(1, (Date.now() - start) / CAR_DRIVE_MS);
-      const eased = 1 - (1 - t) * (1 - t);
-      setCarY(startY + (targetY - startY) * eased);
+      const t = Math.min(1, (Date.now() - start) / totalMs);
+      const y = startY + (endY - startY) * t;
+      setCarY(y);
+      if (!hitTriggered && y >= hitY) {
+        hitTriggered = true;
+        setCarPhase('hit');
+        setIsChickenHit(true);
+        setTimeout(() => {
+          setIsChickenHit(false);
+          setChickenAtIdle(true);
+        }, CAR_HIT_HOLD_MS);
+      }
       if (t < 1) {
         carRafRef.current = requestAnimationFrame(step);
         return;
       }
       carRafRef.current = null;
-      setCarPhase('hit');
-      setIsChickenHit(true);
-      setTimeout(() => {
-        setIsChickenHit(false);
-        setCarPhase('none');
-        setCarY(null);
-        onComplete();
-      }, CAR_HIT_HOLD_MS);
+      setCarPhase('none');
+      setCarY(null);
+      onComplete();
     };
     carRafRef.current = requestAnimationFrame(step);
   }, []);
@@ -413,6 +434,7 @@ export default function ChickenRoadScreen() {
       const created = await startChickenRoadRound(stake, difficulty);
       setRound(created);
       setBanner(null);
+      setChickenAtIdle(false);
       refreshWallet();
     } catch (err) {
       Alert.alert('Could not start', err instanceof ApiClientError ? err.message : 'Please try again.');
@@ -472,6 +494,7 @@ export default function ChickenRoadScreen() {
     setCarY(null);
     setCarPhase('none');
     setIsChickenHit(false);
+    setChickenAtIdle(false);
   };
 
   const isPlaying = round?.status === 'PENDING';
@@ -626,7 +649,7 @@ export default function ChickenRoadScreen() {
               width: CHICKEN_WIDTH,
               height: CHICKEN_HEIGHT,
               left:
-                (round ? laneX(round.currentStep) : CHICKEN_IDLE_SPOT.xFrac * PANEL_WIDTH) -
+                (round && !chickenAtIdle ? laneX(round.currentStep) : CHICKEN_IDLE_SPOT.xFrac * PANEL_WIDTH) -
                 CHICKEN_WIDTH / 2 +
                 shakeX,
               top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - CHICKEN_HEIGHT + hopOffset,
