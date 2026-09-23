@@ -137,7 +137,7 @@ function quickStakeLabel(amount: number): string {
   return amount >= 1000 ? `${amount / 1000}K` : String(amount);
 }
 
-type ResultBanner = { kind: 'won'; payout: number } | { kind: 'busted' };
+type ResultBanner = { kind: 'won'; payout: number };
 
 // One lane's own nonstop traffic: drives a car straight down this lane's
 // fixed x (content-space, same as the lane markers, so it never drifts
@@ -463,7 +463,6 @@ export default function ChickenRoadScreen() {
         setBustStep(hitStep);
         hop();
         runCarHit(hitStep, () => setBusy(false));
-        setBanner({ kind: 'busted' });
         refreshWallet();
         loadHistory();
       } else {
@@ -687,10 +686,8 @@ export default function ChickenRoadScreen() {
       </View>
 
       {banner && (
-        <View style={[styles.banner, banner.kind === 'won' ? styles.bannerWon : styles.bannerLost]}>
-          <Text style={styles.bannerText}>
-            {banner.kind === 'won' ? `Cashed out! Won ₹${banner.payout.toFixed(2)}` : 'The chicken got hit — round lost.'}
-          </Text>
+        <View style={[styles.banner, styles.bannerWon]}>
+          <Text style={styles.bannerText}>Cashed out! Won ₹{banner.payout.toFixed(2)}</Text>
         </View>
       )}
 
@@ -877,7 +874,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bannerWon: { backgroundColor: 'rgba(62,207,142,0.15)' },
-  bannerLost: { backgroundColor: 'rgba(255,59,78,0.15)' },
   bannerText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   controls: { marginTop: 16, paddingHorizontal: 12, gap: 12 },
   stakeRow: {
