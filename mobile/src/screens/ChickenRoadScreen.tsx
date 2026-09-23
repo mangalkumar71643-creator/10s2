@@ -84,17 +84,9 @@ const CAR_SOURCE_ASPECT = 267 / 429;
 const CAR_LENGTH = MANHOLE_DIAM * 1.4;
 const CAR_THICKNESS = CAR_LENGTH * CAR_SOURCE_ASPECT;
 
-// The barrier is already a horizontal bar — no rotation needed. It marks
-// where an oncoming car gets stopped short of the chicken on a lane the
-// round didn't bust on.
-const BARRIER_SOURCE_ASPECT = 824 / 1660;
-const BARRIER_WIDTH = LANE_PITCH * 0.55;
-const BARRIER_HEIGHT = BARRIER_WIDTH * BARRIER_SOURCE_ASPECT;
-const BARRIER_OFFSET = LANE_PITCH * 0.5;
 const CAR_APPROACH_DISTANCE = LANE_PITCH * 2.2;
 const CAR_DRIVE_MS = 420;
 const CAR_HIT_HOLD_MS = 1500;
-const CAR_BLOCKED_HOLD_MS = 650;
 
 const DIFFICULTY_LABELS: Record<ChickenRoadDifficulty, string> = {
   EASY: 'Easy',
@@ -174,7 +166,7 @@ export default function ChickenRoadScreen() {
   const [hopOffset, setHopOffset] = useState(0);
   const [shakeX, setShakeX] = useState(0);
   const [carX, setCarX] = useState<number | null>(null);
-  const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'blocked' | 'hit'>('none');
+  const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'hit'>('none');
   const [isChickenHit, setIsChickenHit] = useState(false);
   const hopRafRef = useRef<number | null>(null);
   const carRafRef = useRef<number | null>(null);
@@ -258,13 +250,13 @@ export default function ChickenRoadScreen() {
     });
   }, []);
 
-  // An oncoming car drives in from ahead of the chicken's new lane. On a
-  // bust it drives all the way in and "hits" the chicken (swaps to the
-  // dazed sprite for a couple seconds); on a safe lane it gets stopped
-  // short by a barrier instead, so it never actually reaches the chicken.
-  const runCarSequence = useCallback((toStep: number, busted: boolean, onComplete: () => void) => {
+  // An oncoming car drives in from ahead of the chicken's bust lane and
+  // "hits" it — swaps to the dazed sprite for a couple seconds, then
+  // reverts. The stop-obstacle for safe lanes comes later; for now a safe
+  // advance is just the plain hop, no car.
+  const runCarHit = useCallback((toStep: number, onComplete: () => void) => {
     if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
-    const targetX = laneX(toStep) + (busted ? 0 : BARRIER_OFFSET);
+    const targetX = laneX(toStep);
     const startX = targetX + CAR_APPROACH_DISTANCE;
     setCarPhase('driving');
     setCarX(startX);
@@ -278,27 +270,17 @@ export default function ChickenRoadScreen() {
         return;
       }
       carRafRef.current = null;
-      if (busted) {
-        setCarPhase('hit');
-        setIsChickenHit(true);
-        setTimeout(() => {
-          setIsChickenHit(false);
-          setCarPhase('none');
-          setCarX(null);
-          onComplete();
-        }, CAR_HIT_HOLD_MS);
-      } else {
-        setCarPhase('blocked');
-        setTimeout(() => {
-          setCarPhase('none');
-          setCarX(null);
-          hop();
-          onComplete();
-        }, CAR_BLOCKED_HOLD_MS);
-      }
+      setCarPhase('hit');
+      setIsChickenHit(true);
+      setTimeout(() => {
+        setIsChickenHit(false);
+        setCarPhase('none');
+        setCarX(null);
+        onComplete();
+      }, CAR_HIT_HOLD_MS);
     };
     carRafRef.current = requestAnimationFrame(step);
-  }, [hop]);
+  }, []);
 
   const setStakeValue = (value: number) => {
     setStake(value);
@@ -334,12 +316,13 @@ export default function ChickenRoadScreen() {
       setRound(result.round);
       if (result.busted) {
         shakeInPlace();
-        runCarSequence(result.round.currentStep, true, () => setBusy(false));
+        runCarHit(result.round.currentStep, () => setBusy(false));
         setBanner({ kind: 'busted' });
         refreshWallet();
         loadHistory();
       } else {
-        runCarSequence(result.round.currentStep, false, () => setBusy(false));
+        hop();
+        setBusy(false);
         if (result.round.status === 'WON') {
           setBanner({ kind: 'won', payout: Number(result.round.payout) });
           refreshWallet();
@@ -530,25 +513,6 @@ export default function ChickenRoadScreen() {
             <Image
               source={require('../../assets/chicken-road-car.png')}
               style={{ width: CAR_THICKNESS, height: CAR_LENGTH, transform: [{ rotate: '-90deg' }] }}
-              resizeMode="contain"
-            />
-          </View>
-        )}
-
-        {carPhase === 'blocked' && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: laneX(round?.currentStep ?? 0) + BARRIER_OFFSET - BARRIER_WIDTH / 2,
-              top: LANE_Y - BARRIER_HEIGHT / 2,
-              width: BARRIER_WIDTH,
-              height: BARRIER_HEIGHT,
-            }}
-          >
-            <Image
-              source={require('../../assets/chicken-road-barrier.png')}
-              style={{ width: BARRIER_WIDTH, height: BARRIER_HEIGHT }}
               resizeMode="contain"
             />
           </View>
