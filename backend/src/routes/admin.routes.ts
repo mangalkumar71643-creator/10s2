@@ -8,6 +8,7 @@ import { paymentProvider } from "../services/paymentService";
 import * as colorGameService from "../services/colorGameService";
 import * as aviatorService from "../services/aviatorService";
 import { getChickenRoadConfig } from "../services/chickenRoadService";
+import { getMinesConfig } from "../services/minesService";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -487,6 +488,23 @@ router.get(
   asyncHandler(async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const rounds = await prisma.chickenRoadRound.findMany({
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: { user: { select: userSummarySelect } },
+    });
+    res.json(rounds);
+  })
+);
+
+router.get("/mines/config", (_req, res) => {
+  res.json(getMinesConfig());
+});
+
+router.get(
+  "/mines/rounds",
+  asyncHandler(async (req, res) => {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const rounds = await prisma.minesRound.findMany({
       orderBy: { createdAt: "desc" },
       take: limit,
       include: { user: { select: userSummarySelect } },

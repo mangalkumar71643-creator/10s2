@@ -175,6 +175,7 @@ model User {
   colorGameBets        ColorGameBet[]
   aviatorBets          AviatorBet[]
   chickenRoadRounds    ChickenRoadRound[]
+  minesRounds          MinesRound[]
 }
 
 model KycVerification {
@@ -449,6 +450,32 @@ model ChickenRoadRound {
   clientSeed     String
   nonce          Int
   createdAt      DateTime              @default(now())
+  settledAt      DateTime?
+
+  @@index([userId])
+}
+
+// One private Mines round: a 5x5 board with `mineCount` hidden mines. The
+// player reveals tiles one at a time; every safe tile raises the multiplier
+// until they cash out or hit a mine. Mine positions are derived from the
+// round's provably-fair seeds at start and stored here, but never sent to
+// the client until the round has ended.
+model MinesRound {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  stake          Decimal   @db.Decimal(12, 2)
+  mineCount      Int
+  minePositions  Int[]
+  revealed       Int[]     @default([])
+  multiplier     Decimal   @db.Decimal(14, 2) @default(1)
+  payout         Decimal   @db.Decimal(12, 2) @default(0)
+  status         BetStatus @default(PENDING)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime  @default(now())
   settledAt      DateTime?
 
   @@index([userId])
