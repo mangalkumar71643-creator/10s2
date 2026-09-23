@@ -29,6 +29,11 @@ const LANE_PITCH = LANE_WIDTH + DIVIDER_WIDTH;
 const ROAD_CONTENT_PADDING = 16;
 const CHICKEN_SIZE = 58;
 const LANE_BADGE_SIZE = 74;
+const LANE_SLOT_HEIGHT = 130;
+// The badge sits flush with the bottom of the lane slot (see laneSlot's
+// justifyContent: 'flex-end') — center the chicken on that same badge
+// instead of floating near the top of the slot.
+const CHICKEN_TOP = LANE_SLOT_HEIGHT - LANE_BADGE_SIZE / 2 - CHICKEN_SIZE / 2;
 const WALK_DURATION_MS = 420;
 const LEG_TOGGLE_MS = 110;
 
@@ -578,8 +583,8 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 16,
   },
   roadContent: { alignItems: 'center', paddingHorizontal: 16 },
-  laneSlot: { width: LANE_WIDTH, height: 130, alignItems: 'center', justifyContent: 'flex-end' },
-  chickenOverlay: { position: 'absolute', top: 6, width: CHICKEN_SIZE, height: CHICKEN_SIZE },
+  laneSlot: { width: LANE_WIDTH, height: LANE_SLOT_HEIGHT, alignItems: 'center', justifyContent: 'flex-end' },
+  chickenOverlay: { position: 'absolute', top: CHICKEN_TOP, width: CHICKEN_SIZE, height: CHICKEN_SIZE },
   laneBadge: {
     width: LANE_BADGE_SIZE,
     height: LANE_BADGE_SIZE,
