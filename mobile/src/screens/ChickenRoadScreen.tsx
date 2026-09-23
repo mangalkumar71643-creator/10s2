@@ -57,6 +57,17 @@ function laneX(step: number): number {
   return NEAR_MANHOLE.xFrac * PANEL_WIDTH + step * LANE_PITCH;
 }
 
+// The far manhole cover baked into the source art is cropped by the
+// image's own right edge (only its left ~60% is actually drawn, x:1038-1216
+// of a ~300px circle in the 1216-wide source) — it reads as a broken half
+// plate now that the scrollable extension sits right next to it. Painted
+// over with the same road color until a real plate asset replaces it.
+const FAR_MANHOLE_PATCH = {
+  leftFrac: 1020 / PANEL_SOURCE_WIDTH,
+  topFrac: 630 / PANEL_SOURCE_HEIGHT,
+  bottomFrac: 972 / PANEL_SOURCE_HEIGHT,
+};
+
 const CHICKEN_ASPECT = 650 / 562;
 const CHICKEN_WIDTH = 60;
 const CHICKEN_HEIGHT = CHICKEN_WIDTH * CHICKEN_ASPECT;
@@ -84,20 +95,30 @@ const DASH_COUNT = Math.ceil(PANEL_HEIGHT / (DASH_LEN + GAP_LEN)) + 1;
 
 function DashedDivider({ left }: { left: number }) {
   return (
-    <View style={{ position: 'absolute', left, top: 0, width: DASH_WIDTH, height: PANEL_HEIGHT }} pointerEvents="none">
-      {Array.from({ length: DASH_COUNT }).map((_, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            top: i * (DASH_LEN + GAP_LEN),
-            width: DASH_WIDTH,
-            height: DASH_LEN,
-            backgroundColor: '#FFFFFF',
-            opacity: 0.85,
-          }}
-        />
-      ))}
+    <View
+      style={{ position: 'absolute', left, top: 0, width: DASH_WIDTH, height: PANEL_HEIGHT, overflow: 'hidden' }}
+      pointerEvents="none"
+    >
+      {Array.from({ length: DASH_COUNT }).map((_, i) => {
+        const top = i * (DASH_LEN + GAP_LEN);
+        // Clip the last tile so it never renders past the panel's own
+        // height instead of spilling below it.
+        const height = Math.max(0, Math.min(DASH_LEN, PANEL_HEIGHT - top));
+        if (height <= 0) return null;
+        return (
+          <View
+            key={i}
+            style={{
+              position: 'absolute',
+              top,
+              width: DASH_WIDTH,
+              height,
+              backgroundColor: '#FFFFFF',
+              opacity: 0.85,
+            }}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -332,6 +353,18 @@ export default function ChickenRoadScreen() {
         />
 
         <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: FAR_MANHOLE_PATCH.leftFrac * PANEL_WIDTH,
+            top: FAR_MANHOLE_PATCH.topFrac * PANEL_HEIGHT,
+            width: PANEL_WIDTH - FAR_MANHOLE_PATCH.leftFrac * PANEL_WIDTH,
+            height: (FAR_MANHOLE_PATCH.bottomFrac - FAR_MANHOLE_PATCH.topFrac) * PANEL_HEIGHT,
+            backgroundColor: ROAD_COLOR,
+          }}
+        />
+
+        <View
           style={[
             styles.manholeLabel,
             { left: NEAR_MANHOLE.xFrac * PANEL_WIDTH - 40, top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - 12 },
@@ -362,6 +395,7 @@ export default function ChickenRoadScreen() {
               width: extraWidth,
               height: PANEL_HEIGHT,
               backgroundColor: ROAD_COLOR,
+              overflow: 'hidden',
             }}
           >
             {extraLaneSteps.map((step) => (
