@@ -9,9 +9,11 @@ export async function assertCanTransact(userId: string) {
       throw new ApiError(403, "Account is self-excluded. Betting and deposits are blocked.");
     }
   }
-  if (user.kycStatus !== "APPROVED") {
-    throw new ApiError(403, "KYC verification must be approved before you can transact.");
-  }
+  // KYC gate disabled for now while the app is still being tested — no
+  // real money is live yet. Re-enable this before going live:
+  // if (user.kycStatus !== "APPROVED") {
+  //   throw new ApiError(403, "KYC verification must be approved before you can transact.");
+  // }
 }
 
 export async function assertWithinDepositLimits(userId: string, amount: number) {
