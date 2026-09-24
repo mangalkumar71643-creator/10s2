@@ -103,8 +103,8 @@ const DIE_SIZE = CUP_W * 0.22;
 const DIE3D_BOX = DIE_SIZE * 1.3 + DIE_SIZE * 0.14;
 const FELT_CY = CUP_H - BASE_H + BASE_H * 0.46;
 const DIE_REST = [
-  { x: -DIE_SIZE * 0.72, y: -DIE_SIZE * 0.05, tilt: '-9deg' },
-  { x: DIE_SIZE * 0.72, y: DIE_SIZE * 0.12, tilt: '7deg' },
+  { x: -DIE_SIZE * 0.72, y: -DIE_SIZE * 0.05, tilt: '-4deg' },
+  { x: DIE_SIZE * 0.72, y: DIE_SIZE * 0.12, tilt: '3deg' },
 ];
 const ORBIT_RX = CUP_W * 0.17;
 const ORBIT_RY = BASE_H * 0.16;
@@ -205,80 +205,103 @@ const PIP_UV: Record<number, [number, number][]> = {
   6: [[0.27, 0.25], [0.73, 0.25], [0.27, 0.5], [0.73, 0.5], [0.27, 0.75], [0.73, 0.75]],
 };
 
-/** A die drawn as a cube with its front, top and right faces showing —
- * each face's pips are projected onto that face, so it reads as 3D. */
+type Pt = [number, number];
+
+/** Closed path through `pts` with every corner rounded off by up to `r`
+ * (quadratic curve through the corner), so faces meet cleanly. */
+function roundedPoly(pts: Pt[], r: number): string {
+  const n = pts.length;
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i + n - 1) % n];
+    const cur = pts[i];
+    const next = pts[(i + 1) % n];
+    const toPrev = [prev[0] - cur[0], prev[1] - cur[1]];
+    const toNext = [next[0] - cur[0], next[1] - cur[1]];
+    const lp = Math.hypot(toPrev[0], toPrev[1]);
+    const ln = Math.hypot(toNext[0], toNext[1]);
+    const rp = Math.min(r, lp / 2);
+    const rn = Math.min(r, ln / 2);
+    const a: Pt = [cur[0] + (toPrev[0] / lp) * rp, cur[1] + (toPrev[1] / lp) * rp];
+    const b: Pt = [cur[0] + (toNext[0] / ln) * rn, cur[1] + (toNext[1] / ln) * rn];
+    d += `${i === 0 ? 'M' : 'L'} ${a[0].toFixed(2)} ${a[1].toFixed(2)} Q ${cur[0].toFixed(2)} ${cur[1].toFixed(2)} ${b[0].toFixed(2)} ${b[1].toFixed(2)} `;
+  }
+  return `${d}Z`;
+}
+
+/** A die drawn as one rounded block: a bevelled silhouette with the front,
+ * top and right faces inset on it, each face's pips projected onto it. */
 const Die3D = memo(function Die3D({ value, size }: { value: number; size: number }) {
   const a = size;
-  const d = a * 0.3;
+  const dx = a * 0.3; // depth, going back-right...
+  const dy = a * 0.24; // ...and up
   const pad = a * 0.07;
-  const W3 = a + d + pad * 2;
+  const width = a + dx + pad * 2;
+  const height = a + dy + pad * 2;
   const [top, right] = SIDE_FACES[value];
 
-  type Pt = [number, number];
-  const front = (u: number, v: number): Pt => [pad + u * a, pad + d + v * a];
-  const rightF = (u: number, v: number): Pt => [pad + a + u * d, pad + d - u * d + v * a];
-  const poly = (pts: Pt[]) => `M ${pts.map((q) => `${q[0].toFixed(2)} ${q[1].toFixed(2)}`).join(' L ')} Z`;
+  const front = (u: number, v: number): Pt => [pad + u * a, pad + dy + v * a];
+  // top: v = 1 is the edge shared with the front face
+  const topF = (u: number, v: number): Pt => [pad + u * a + (1 - v) * dx, pad + dy - (1 - v) * dy];
+  // right: u = 0 is the edge shared with the front face
+  const rightF = (u: number, v: number): Pt => [pad + a + u * dx, pad + dy - u * dy + v * a];
 
-  // top face: u runs left->right, v runs back->front (v=1 meets the front face)
-  const topPt = (u: number, v: number): Pt => [pad + u * a + (1 - v) * d, pad + (1 - v) * d];
+  const silhouette: Pt[] = [front(0, 1), front(0, 0), topF(0, 0), topF(1, 0), rightF(1, 1), front(1, 1)];
+  const inset = (face: (u: number, v: number) => Pt, e: number): Pt[] => [
+    face(e, e),
+    face(1 - e, e),
+    face(1 - e, 1 - e),
+    face(e, 1 - e),
+  ];
 
   const pips = (face: (u: number, v: number) => Pt, n: number, shade: number) => {
     const red = n === 1 || n === 4;
     const r = n === 1 ? 0.13 : 0.085;
-    return PIP_UV[n].map(([cu, cv], i) => {
+    const ring = (cu: number, cv: number, rr: number) => {
       const pts: Pt[] = [];
-      for (let k = 0; k < 14; k++) {
-        const t = (k / 14) * Math.PI * 2;
-        pts.push(face(cu + r * Math.cos(t), cv + r * Math.sin(t)));
+      for (let k = 0; k < 16; k++) {
+        const t = (k / 16) * Math.PI * 2;
+        pts.push(face(cu + rr * Math.cos(t), cv + rr * Math.sin(t)));
       }
-      return (
-        <Path
-          key={i}
-          d={poly(pts)}
-          fill={red ? '#C8102E' : '#1B1B22'}
-          fillOpacity={shade}
-        />
-      );
-    });
+      return `M ${pts.map((q) => `${q[0].toFixed(2)} ${q[1].toFixed(2)}`).join(' L ')} Z`;
+    };
+    return PIP_UV[n].map(([cu, cv], i) => (
+      <React.Fragment key={i}>
+        <Path d={ring(cu, cv, r)} fill={red ? '#B80F2A' : '#15151B'} fillOpacity={shade} />
+        {/* Light catching the lower-right rim makes each pip read as a dimple. */}
+        <Path d={ring(cu + r * 0.25, cv + r * 0.25, r * 0.55)} fill={red ? '#E8465E' : '#4A4A56'} fillOpacity={0.55 * shade} />
+      </React.Fragment>
+    ));
   };
 
-  const frontPts = [front(0, 0), front(1, 0), front(1, 1), front(0, 1)];
-  const topPts = [topPt(0, 0), topPt(1, 0), topPt(1, 1), topPt(0, 1)];
-  const rightPts = [rightF(0, 0), rightF(1, 0), rightF(1, 1), rightF(0, 1)];
-  const round = a * 0.07;
-
   return (
-    <Svg width={W3} height={W3}>
+    <Svg width={width} height={height}>
       <Defs>
+        <SvgLinearGradient id="d3edge" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#E9E9EE" />
+          <Stop offset="1" stopColor="#A7A7B3" />
+        </SvgLinearGradient>
         <SvgLinearGradient id="d3front" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#FFFFFF" />
-          <Stop offset="1" stopColor="#E2E2E8" />
+          <Stop offset="1" stopColor="#E6E6EC" />
         </SvgLinearGradient>
         <SvgLinearGradient id="d3top" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#FFFFFF" />
-          <Stop offset="1" stopColor="#F1F1F5" />
+          <Stop offset="1" stopColor="#F3F3F7" />
         </SvgLinearGradient>
         <SvgLinearGradient id="d3right" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#CFCFD8" />
-          <Stop offset="1" stopColor="#A9A9B6" />
+          <Stop offset="0" stopColor="#D2D2DA" />
+          <Stop offset="1" stopColor="#ADADB9" />
         </SvgLinearGradient>
       </Defs>
-      {/* Round the cube's corners by stroking each face in its own colour. */}
-      <Path d={poly(rightPts)} fill="url(#d3right)" stroke="#B9B9C4" strokeWidth={round} strokeLinejoin="round" strokeMiterlimit={1} />
-      <Path d={poly(topPts)} fill="url(#d3top)" stroke="#F4F4F8" strokeWidth={round} strokeLinejoin="round" strokeMiterlimit={1} />
-      <Path d={poly(frontPts)} fill="url(#d3front)" stroke="#EDEDF2" strokeWidth={round} strokeLinejoin="round" strokeMiterlimit={1} />
-      {pips(topPt, top, 0.75)}
-      {pips(rightF, right, 0.7)}
+      {/* Bevelled body: one rounded outline, so every corner meets. */}
+      <Path d={roundedPoly(silhouette, a * 0.16)} fill="url(#d3edge)" />
+      <Path d={roundedPoly(inset(rightF, 0.07), a * 0.08)} fill="url(#d3right)" />
+      <Path d={roundedPoly(inset(topF, 0.07), a * 0.08)} fill="url(#d3top)" />
+      <Path d={roundedPoly(inset(front, 0.045), a * 0.14)} fill="url(#d3front)" />
+      {pips(topF, top, 0.7)}
+      {pips(rightF, right, 0.65)}
       {pips(front, value, 1)}
-      {/* Bevel highlights along the two front edges. */}
-      <Path
-        d={`M ${front(0, 0)[0]} ${front(0, 0)[1]} L ${front(1, 0)[0]} ${front(1, 0)[1]} L ${rightF(1, 0)[0]} ${rightF(1, 0)[1]}`}
-        stroke="#FFFFFF"
-        strokeOpacity={0.9}
-        strokeWidth={1.2}
-        strokeLinejoin="round"
-        fill="none"
-      />
     </Svg>
   );
 });
