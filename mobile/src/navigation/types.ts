@@ -27,4 +27,5 @@ export type RootStackParamList = {
   Aviator: undefined;
   ChickenRoad: undefined;
   Mines: undefined;
+  SevenUpDown: undefined;
 };

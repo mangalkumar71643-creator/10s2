@@ -571,3 +571,78 @@ export function cashOutMinesRound(roundId: string) {
     body: JSON.stringify({ roundId }),
   });
 }
+
+// ---- 7 Up Down ----
+
+export type SevenUpDownArea = 'DOWN' | 'SEVEN' | 'UP' | 'N2' | 'N3' | 'N4' | 'N5' | 'N6' | 'N8' | 'N9' | 'N10' | 'N11' | 'N12';
+
+export interface SevenUpDownConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  roundSeconds: number;
+  betSeconds: number;
+  resultAtSeconds: number;
+  multipliers: Record<SevenUpDownArea, number>;
+}
+
+export interface SevenUpDownRoundView {
+  periodNumber: string;
+  startTime: string;
+  betEndTime: string;
+  resultTime: string;
+  endTime: string;
+  serverTime: string;
+  phase: 'BETTING' | 'ROLLING' | 'RESULT';
+  serverSeedHash: string;
+  dice: [number, number] | null;
+  total: number | null;
+  serverSeed: string | null;
+}
+
+export interface SevenUpDownBet {
+  id: string;
+  area: SevenUpDownArea;
+  amount: string;
+  multiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+}
+
+export interface SevenUpDownHistoryEntry {
+  periodNumber: string;
+  dice1: number;
+  dice2: number;
+  total: number;
+}
+
+export function fetchSevenUpDownConfig() {
+  return apiFetch<SevenUpDownConfig>('/seven-up-down/config');
+}
+
+export function fetchSevenUpDownCurrent() {
+  return apiFetch<SevenUpDownRoundView>('/seven-up-down/current');
+}
+
+export function fetchSevenUpDownHistory(limit = 100) {
+  return apiFetch<SevenUpDownHistoryEntry[]>(`/seven-up-down/history?limit=${limit}`);
+}
+
+export function placeSevenUpDownBets(bets: { area: SevenUpDownArea; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: SevenUpDownBet[] }>('/seven-up-down/bet', {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function cancelSevenUpDownBets(betIds?: string[]) {
+  return apiFetch<{ cancelled: string[]; refund: number }>('/seven-up-down/cancel', {
+    method: 'POST',
+    body: JSON.stringify(betIds ? { betIds } : {}),
+  });
+}
+
+export function fetchSevenUpDownMyRound(periodNumber?: string) {
+  const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
+  return apiFetch<{ periodNumber: string | null; bets: SevenUpDownBet[] }>(`/seven-up-down/my-round${q}`);
+}

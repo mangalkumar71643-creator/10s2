@@ -233,6 +233,9 @@ export async function placeSevenUpDownBets(userId: string, bets: BetInput[]) {
   const total = round2(bets.reduce((sum, b) => sum + b.amount, 0));
 
   const created = await prisma.$transaction(async (tx) => {
+    // Serialise this player's bet changes so parallel taps can't slip past
+    // the per-box limits between the read below and the insert.
+    await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
     const mine = await tx.sevenUpDownBet.findMany({
       where: { roundId: round.id, userId, status: "PENDING" },
       select: { area: true, amount: true },
@@ -284,6 +287,7 @@ export async function cancelSevenUpDownBets(userId: string, betIds?: string[]) {
   }
 
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
     const targets = await tx.sevenUpDownBet.findMany({
       where: { roundId: round.id, userId, status: "PENDING", ...(betIds ? { id: { in: betIds } } : {}) },
     });

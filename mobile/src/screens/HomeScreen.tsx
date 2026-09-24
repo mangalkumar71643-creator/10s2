@@ -1,7 +1,7 @@
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
-import { Image, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { AVATARS } from '../data/avatars';
 import { BottomTabParamList } from '../navigation/types';
@@ -63,15 +63,20 @@ export default function HomeScreen() {
   // Win Go is grid cell {row: 0, col: 0}, Aviator is {row: 0, col: 1} —
   // a later icon at {row: 0, col: 2} would sit at
   // left: GAME_GRID_LEFT + 2 * GAME_GRID_CELL, same top.
-  const winGoTileTop = gameGridTop;
+  // Tile tops are relative to the game grid, which scrolls once the rows
+  // run past the bottom of the screen.
+  const winGoTileTop = 0;
   const winGoTileLeft = GAME_GRID_LEFT;
-  const aviatorTileTop = gameGridTop;
+  const aviatorTileTop = 0;
   const aviatorTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   // Chicken Road sits directly below Win Go — same column, next row down.
-  const chickenRoadTileTop = gameGridTop + GAME_GRID_CELL;
+  const chickenRoadTileTop = GAME_GRID_CELL;
   const chickenRoadTileLeft = GAME_GRID_LEFT;
-  const minesTileTop = gameGridTop + GAME_GRID_CELL;
+  const minesTileTop = GAME_GRID_CELL;
   const minesTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
+  const sevenUpDownTileTop = 2 * GAME_GRID_CELL;
+  const sevenUpDownTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 3;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -170,6 +175,11 @@ export default function HomeScreen() {
         }}
         resizeMode="contain"
       />
+      <ScrollView
+        style={{ position: 'absolute', top: gameGridTop, left: 0, right: 0, bottom: 0 }}
+        contentContainerStyle={{ height: gameGridRows * GAME_GRID_CELL + GAME_GRID_GAP }}
+        showsVerticalScrollIndicator={false}
+      >
       <Pressable
         onPress={() => (navigation as any).navigate('ColorPredict')}
         style={{
@@ -239,6 +249,26 @@ export default function HomeScreen() {
       >
         <Text style={{ fontSize: GAME_ICON_SIZE * 0.5 }}>💣</Text>
       </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('SevenUpDown')}
+        style={{
+          position: 'absolute',
+          top: sevenUpDownTileTop,
+          left: sevenUpDownTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          backgroundColor: '#0C5230',
+          borderWidth: 2,
+          borderColor: '#B7791F',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: GAME_ICON_SIZE * 0.36 }}>🎲</Text>
+        <Text style={{ color: '#FFD66B', fontSize: 18, fontWeight: '900', marginTop: 2 }}>7 UP DOWN</Text>
+      </Pressable>
+      </ScrollView>
     </ScreenContainer>
   );
 }
