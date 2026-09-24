@@ -15,6 +15,7 @@ import colorGameRoutes from "./routes/colorGame.routes";
 import aviatorRoutes from "./routes/aviator.routes";
 import chickenRoadRoutes from "./routes/chickenRoad.routes";
 import minesRoutes from "./routes/mines.routes";
+import sevenUpDownRoutes from "./routes/sevenUpDown.routes";
 
 export const app = express();
 
@@ -36,5 +37,6 @@ app.use("/color-game", colorGameRoutes);
 app.use("/aviator", aviatorRoutes);
 app.use("/chicken-road", chickenRoadRoutes);
 app.use("/mines", minesRoutes);
+app.use("/seven-up-down", sevenUpDownRoutes);
 
 app.use(errorHandler);

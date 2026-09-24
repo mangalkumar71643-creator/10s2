@@ -176,6 +176,7 @@ model User {
   aviatorBets          AviatorBet[]
   chickenRoadRounds    ChickenRoadRound[]
   minesRounds          MinesRound[]
+  sevenUpDownBets      SevenUpDownBet[]
 }
 
 model KycVerification {
@@ -479,4 +480,46 @@ model MinesRound {
   settledAt      DateTime?
 
   @@index([userId])
+}
+
+// "7 Up Down" — two provably-fair dice per shared, slot-aligned round (see
+// sevenUpDownService.ts). The dice are fixed from serverSeed when the round
+// is created and only exposed once resultTime has passed.
+model SevenUpDownRound {
+  id             String           @id @default(uuid())
+  periodNumber   String           @unique
+  startTime      DateTime
+  betEndTime     DateTime
+  resultTime     DateTime
+  endTime        DateTime
+  dice1          Int
+  dice2          Int
+  serverSeed     String
+  serverSeedHash String
+  settled        Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  bets           SevenUpDownBet[]
+
+  @@index([startTime])
+  @@index([settled, resultTime])
+}
+
+// One chip stack per row. area is DOWN | SEVEN | UP | N2..N12 (no N7);
+// multiplier is the total return locked in when the bet was placed. VOID
+// marks a bet taken back (undo/clear) during the betting window.
+model SevenUpDownBet {
+  id         String           @id @default(uuid())
+  roundId    String
+  round      SevenUpDownRound @relation(fields: [roundId], references: [id])
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  area       String
+  amount     Decimal          @db.Decimal(12, 2)
+  multiplier Decimal          @db.Decimal(8, 2)
+  status     BetStatus        @default(PENDING)
+  payout     Decimal          @db.Decimal(12, 2) @default(0)
+  createdAt  DateTime         @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
 }
