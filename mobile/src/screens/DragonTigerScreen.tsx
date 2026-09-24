@@ -8,10 +8,14 @@ import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDi
 import Svg, {
   Circle,
   Defs,
+  G,
+  Image as SvgImage,
   LinearGradient as SvgLinearGradient,
+  Mask,
   Path,
   Polygon,
   RadialGradient,
+  Rect as SvgRect,
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
@@ -89,15 +93,34 @@ const SUIT_SYMBOL: Record<string, string> = { S: '♠', H: '♥', C: '♣', D: '
 // is laid out in the art's own pixel coordinates and mapped onto the screen,
 // so boxes, cards and chips always sit exactly on the painted spots.
 const TABLE_BG = require('../../assets/dragon-tiger/table.jpg');
-const HEAD_ART = {
-  DRAGON: require('../../assets/dragon-tiger/dragon.png'),
-  TIGER: require('../../assets/dragon-tiger/tiger.png'),
-};
 const IMG_W = 1852;
 const IMG_H = 849;
-const HEAD_ASPECT = 305 / 200;
 
 type Rect = [number, number, number, number];
+
+// VS scene art: full colour, a black-and-white copy for the loser and a
+// white silhouette that masks the winner's light sweep.
+const FIGHTER_ART = {
+  DRAGON: {
+    color: require('../../assets/dragon-tiger/dragon-head.png'),
+    bw: require('../../assets/dragon-tiger/dragon-head-bw.png'),
+    mask: require('../../assets/dragon-tiger/dragon-head-mask.png'),
+    aspect: 560 / 500,
+  },
+  TIGER: {
+    color: require('../../assets/dragon-tiger/tiger-head.png'),
+    bw: require('../../assets/dragon-tiger/tiger-head-bw.png'),
+    mask: require('../../assets/dragon-tiger/tiger-head-mask.png'),
+    aspect: 560 / 477,
+  },
+};
+const VS_ART = require('../../assets/dragon-tiger/vs.png');
+const VS_ASPECT = 416 / 620;
+// The same treatment for the heads painted on the table strip.
+const TABLE_HEAD: Record<'DRAGON' | 'TIGER', { bw: number; mask: number; r: Rect }> = {
+  DRAGON: { bw: require('../../assets/dragon-tiger/table-dragon-bw.png'), mask: require('../../assets/dragon-tiger/table-dragon-mask.png'), r: [395, 0, 700, 200] },
+  TIGER: { bw: require('../../assets/dragon-tiger/table-tiger-bw.png'), mask: require('../../assets/dragon-tiger/table-tiger-mask.png'), r: [1020, 0, 1325, 200] },
+};
 const BOXES: { area: DragonTigerArea; title: string; mark: string; big: boolean; r: Rect }[] = [
   { area: 'DRAGON', title: 'DRAGON', mark: '龍', big: true, r: [276, 220, 669, 664] },
   { area: 'TIE', title: 'TIE', mark: '和', big: false, r: [685, 220, 1081, 447] },
@@ -131,22 +154,7 @@ function HeadGlow({ side, state, size }: { side: 'DRAGON' | 'TIGER'; state: Head
     loop.start();
     return () => loop.stop();
   }, [state, pulse]);
-  if (state === 'lose') {
-    return (
-      <View pointerEvents="none" style={{ width: size, height: size }}>
-        <Svg width={size} height={size}>
-          <Defs>
-            <RadialGradient id={`hl${side}`} cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor="#000000" stopOpacity={0.72} />
-              <Stop offset="0.7" stopColor="#000000" stopOpacity={0.45} />
-              <Stop offset="1" stopColor="#000000" stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Circle cx={size / 2} cy={size / 2} r={size / 2} fill={`url(#hl${side})`} />
-        </Svg>
-      </View>
-    );
-  }
+  if (state === 'lose') return null;
   const color = state === 'win' ? '#FFD66B' : SIDE_GLOW[side];
   return (
     <Animated.View
@@ -206,8 +214,60 @@ function StripShine({ width, height }: { width: number; height: number }) {
   );
 }
 
-/** The painted head, lifted off the table for the VS scene. */
-function Portrait({ side, width }: { side: 'DRAGON' | 'TIGER'; width: number }) {
+const AnimatedSvgRect = Animated.createAnimatedComponent(SvgRect);
+
+/** A bright band sweeping across the art. It is masked by a white
+ * silhouette of the art, so only the art itself lights up, not its box. */
+function ShineSweep({ id, mask, width, height, delay = 0, stretch = false }: { id: string; mask: number; width: number; height: number; delay?: number; stretch?: boolean }) {
+  const x = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(x, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.quad), useNativeDriver: false }),
+        Animated.delay(700),
+        Animated.timing(x, { toValue: 0, duration: 0, useNativeDriver: false }),
+      ])
+    );
+    const t = setTimeout(() => loop.start(), delay);
+    return () => {
+      clearTimeout(t);
+      loop.stop();
+    };
+  }, [x, delay]);
+  const band = width * 0.5;
+  return (
+    <Svg width={width} height={height} style={styles.absFill} pointerEvents="none">
+      <Defs>
+        <SvgLinearGradient id={`sb${id}`} x1="0" y1="0" x2="1" y2="0.3">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0} />
+          <Stop offset="0.5" stopColor="#FFF6D8" stopOpacity={0.8} />
+          <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+        </SvgLinearGradient>
+        <Mask id={`sm${id}`} maskUnits="userSpaceOnUse" x={0} y={0} width={width} height={height}>
+          <SvgImage href={mask} x={0} y={0} width={width} height={height} preserveAspectRatio={stretch ? 'none' : 'xMidYMid meet'} />
+        </Mask>
+      </Defs>
+      <G mask={`url(#sm${id})`}>
+        <AnimatedSvgRect
+          x={x.interpolate({ inputRange: [0, 1], outputRange: [-band, width] })}
+          y={0}
+          width={band}
+          height={height}
+          fill={`url(#sb${id})`}
+        />
+      </G>
+    </Svg>
+  );
+}
+
+type FighterState = 'win' | 'lose' | 'tie';
+
+/** A head in the VS scene. Once the result lands (`reveal` 0 → 1) the
+ * loser drains to black and white; the winner keeps its colour, gains a
+ * gold aura and a light sweep. */
+function Fighter({ side, height, state, reveal }: { side: 'DRAGON' | 'TIGER'; height: number; state: FighterState; reveal: Animated.Value }) {
+  const art = FIGHTER_ART[side];
+  const width = height * art.aspect;
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -219,36 +279,86 @@ function Portrait({ side, width }: { side: 'DRAGON' | 'TIGER'; width: number }) 
     loop.start();
     return () => loop.stop();
   }, [pulse]);
-  const h = width / HEAD_ASPECT;
-  const g = width * 1.25;
+  const g = width * 1.2;
+  const aura = (color: string, id: string, opacity: Animated.AnimatedInterpolation<number> | number) => (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        width: g,
+        height: g,
+        opacity,
+        transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.05] }) }],
+      }}
+    >
+      <Svg width={g} height={g}>
+        <Defs>
+          <RadialGradient id={id} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor={color} stopOpacity={0.75} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={g / 2} cy={g / 2} r={g / 2} fill={`url(#${id})`} />
+      </Svg>
+    </Animated.View>
+  );
   return (
-    <View style={{ width, height: h, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: g,
-          height: g,
-          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.85] }),
-          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.05] }) }],
-        }}
-      >
-        <Svg width={g} height={g}>
-          <Defs>
-            <RadialGradient id={`pg${side}`} cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={SIDE_GLOW[side]} stopOpacity={0.7} />
-              <Stop offset="1" stopColor={SIDE_GLOW[side]} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Circle cx={g / 2} cy={g / 2} r={g / 2} fill={`url(#pg${side})`} />
-        </Svg>
-      </Animated.View>
-      <Image source={HEAD_ART[side]} style={{ width, height: h }} resizeMode="contain" />
-      <LinearGradient colors={['#FFE9A0', '#C98A1C']} style={styles.namePlate}>
+    <View style={{ width, height, alignItems: 'center', justifyContent: 'center' }}>
+      {aura(SIDE_GLOW[side], `fa${side}`, state === 'lose' ? reveal.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] }) : 0.7)}
+      {state === 'win' && aura('#FFC83D', `fw${side}`, Animated.multiply(reveal, pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] })))}
+      <Image source={art.color} style={{ width, height }} resizeMode="contain" />
+      {state === 'lose' && (
+        <Animated.Image source={art.bw} style={[styles.absFill, { width, height, opacity: reveal }]} resizeMode="contain" />
+      )}
+      {state === 'win' && <ShineSweep id={`f${side}`} mask={art.mask} width={width} height={height} delay={1900} />}
+      <LinearGradient colors={state === 'lose' ? ['#D8D8D8', '#7A7A7A'] : ['#FFE9A0', '#C98A1C']} style={styles.namePlate}>
         <Text style={styles.nameText}>{side}</Text>
       </LinearGradient>
     </View>
   );
+}
+
+/** The gold VS badge, breathing while the cards are revealed. */
+function VsBadge({ height }: { height: number }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 650, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  return (
+    <Animated.Image
+      source={VS_ART}
+      style={{ width: height * VS_ASPECT, height, transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }) }] }}
+      resizeMode="contain"
+    />
+  );
+}
+
+/** Result treatment on the table's painted heads: the loser fades to black
+ * and white, the winner gets the light sweep. */
+function BoardHeadFx({ side, state, frame }: { side: 'DRAGON' | 'TIGER'; state: HeadState; frame: { left: number; top: number; width: number; height: number } }) {
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    fade.setValue(0);
+    if (state === 'lose') Animated.timing(fade, { toValue: 1, duration: 600, useNativeDriver: true }).start();
+  }, [state, fade]);
+  if (state === 'lose') {
+    return <Animated.Image source={TABLE_HEAD[side].bw} style={[styles.abs, frame, { opacity: fade }]} resizeMode="stretch" />;
+  }
+  if (state === 'win') {
+    return (
+      <View pointerEvents="none" style={[styles.abs, frame]}>
+        <ShineSweep id={`b${side}`} mask={TABLE_HEAD[side].mask} width={frame.width} height={frame.height} stretch />
+      </View>
+    );
+  }
+  return null;
 }
 
 const Chip = memo(function Chip({ value, size, label }: { value: number; size: number; label?: string }) {
@@ -1054,15 +1164,18 @@ export default function DragonTigerScreen() {
   const beadS = Math.max(8, Math.floor(Math.min(18 * k, (rightPanel.width - 14) / BEAD_COLS - 2, (rightPanel.height - 62 * k) / BEAD_ROWS - 2)));
 
   const winnerSide = revealed?.winner;
-  const vsW = Math.min(W * 0.3, H * 0.9);
-  const vsEmblem = Math.min(vsW * 0.62, H * 0.4);
+  const fighterH = Math.min(H * 0.6, (W * 0.27) / 1.17);
+  const vsBadgeH = Math.min(H * 0.62, fighterH * 1.15);
+  const vsCardW = Math.min(70, fighterH * 0.3);
+  const fighterState = (side: 'DRAGON' | 'TIGER'): FighterState =>
+    winnerSide === 'TIE' ? 'tie' : winnerSide === side ? 'win' : 'lose';
   const headState = (side: 'DRAGON' | 'TIGER'): HeadState =>
     !boardResult ? 'idle' : boardResult.winner === side ? 'win' : boardResult.winner === 'TIE' ? 'idle' : 'lose';
 
   const sideStyle = (side: 'DRAGON' | 'TIGER') => {
     const winnerOrTie = winnerSide === 'TIE' || winnerSide === side;
     return {
-      opacity: winnerOrTie ? 1 : vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] }),
+      opacity: winnerOrTie ? 1 : vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, 0.85] }),
       transform: [
         { translateX: vsSlide.interpolate({ inputRange: [0, 1], outputRange: [side === 'DRAGON' ? -W * 0.5 : W * 0.5, 0] }) },
         { scale: vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, winnerOrTie ? 1.1 : 0.9] }) },
@@ -1084,6 +1197,9 @@ export default function DragonTigerScreen() {
         <View key={side} pointerEvents="none" style={[styles.abs, { left: X(HEAD_CENTER[side][0]) - glowSize / 2, top: Y(HEAD_CENTER[side][1]) - glowSize / 2 }]}>
           <HeadGlow side={side} state={headState(side)} size={glowSize} />
         </View>
+      ))}
+      {(['DRAGON', 'TIGER'] as const).map((side) => (
+        <BoardHeadFx key={side} side={side} state={headState(side)} frame={frameOf(TABLE_HEAD[side].r)} />
       ))}
 
       {/* Cards and the betting clock on the strip */}
@@ -1327,36 +1443,18 @@ export default function DragonTigerScreen() {
           <View style={styles.vsRow}>
             <Animated.View style={[styles.vsSide, sideStyle('DRAGON')]}>
               <View>
-                <Portrait side="DRAGON" width={vsW} />
+                <Fighter side="DRAGON" height={fighterH} state={fighterState('DRAGON')} reveal={vsResult} />
                 <Shards side="DRAGON" trigger={vsShards} />
               </View>
-              <FlipCard card={revealed.dragon} w={Math.min(70, vsEmblem * 0.5)} delay={650} />
+              <FlipCard card={revealed.dragon} w={vsCardW} delay={650} />
             </Animated.View>
             <Animated.View style={{ transform: [{ scale: vsSlide.interpolate({ inputRange: [0, 1], outputRange: [2.4, 1] }) }], opacity: vsSlide }}>
-              <Svg width={vsEmblem * 0.95} height={vsEmblem * 0.85}>
-                <Defs>
-                  <SvgLinearGradient id="vsGold" x1="0" y1="0" x2="1" y2="1">
-                    <Stop offset="0" stopColor="#FFF4C2" />
-                    <Stop offset="0.5" stopColor="#E9A92E" />
-                    <Stop offset="1" stopColor="#8A5A10" />
-                  </SvgLinearGradient>
-                </Defs>
-                <Polygon
-                  points={`${vsEmblem * 0.475},4 ${vsEmblem * 0.93},${vsEmblem * 0.82} 4,${vsEmblem * 0.82}`}
-                  fill="rgba(40,20,4,0.55)"
-                  stroke="url(#vsGold)"
-                  strokeWidth={4}
-                  strokeLinejoin="round"
-                />
-                <SvgText x={vsEmblem * 0.475} y={vsEmblem * 0.66} fontSize={vsEmblem * 0.34} fontWeight="900" fontStyle="italic" textAnchor="middle" fill="url(#vsGold)" stroke="#3A1E00" strokeWidth={1.5}>
-                  VS
-                </SvgText>
-              </Svg>
+              <VsBadge height={vsBadgeH} />
             </Animated.View>
             <Animated.View style={[styles.vsSide, sideStyle('TIGER')]}>
-              <FlipCard card={revealed.tiger} w={Math.min(70, vsEmblem * 0.5)} delay={1200} />
+              <FlipCard card={revealed.tiger} w={vsCardW} delay={1200} />
               <View>
-                <Portrait side="TIGER" width={vsW} />
+                <Fighter side="TIGER" height={fighterH} state={fighterState('TIGER')} reveal={vsResult} />
                 <Shards side="TIGER" trigger={vsShards} />
               </View>
             </Animated.View>
@@ -1399,6 +1497,7 @@ const styles = StyleSheet.create({
   rotatingText: { color: GOLD, fontSize: 16, fontWeight: '700' },
 
   abs: { position: 'absolute' },
+  absFill: { position: 'absolute', top: 0, left: 0 },
   center: { alignItems: 'center', justifyContent: 'center' },
   stripClip: { overflow: 'hidden' },
 
