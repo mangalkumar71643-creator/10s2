@@ -738,7 +738,9 @@ export default function MinesScreen() {
       )}
 
       <Modal visible={historyOpen} transparent animationType="fade" onRequestClose={() => setHistoryOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setHistoryOpen(false)}>
+        <View style={styles.backdrop}>
+          {/* Sibling, not parent, of the sheet so its ScrollView can scroll. */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setHistoryOpen(false)} />
           <View style={[styles.sheet, styles.historySheet]}>
             <Text style={styles.sheetTitle}>My bets</Text>
             <ScrollView>
@@ -760,7 +762,7 @@ export default function MinesScreen() {
               )}
             </ScrollView>
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </LinearGradient>
   );

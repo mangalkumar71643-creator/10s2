@@ -635,7 +635,9 @@ export default function PlinkoScreen() {
       )}
 
       <Modal visible={rulesOpen} transparent animationType="fade" onRequestClose={() => setRulesOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setRulesOpen(false)}>
+        <View style={styles.backdrop}>
+          {/* Sibling, not parent, of the sheet so its ScrollView can scroll. */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRulesOpen(false)} />
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>HOW TO PLAY</Text>
@@ -697,11 +699,13 @@ export default function PlinkoScreen() {
               </View>
             </ScrollView>
           </View>
-        </Pressable>
+        </View>
       </Modal>
 
       <Modal visible={historyOpen} transparent animationType="fade" onRequestClose={() => setHistoryOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setHistoryOpen(false)}>
+        <View style={styles.backdrop}>
+          {/* Sibling, not parent, of the sheet so its ScrollView can scroll. */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setHistoryOpen(false)} />
           <View style={[styles.sheet, { maxHeight: '70%' }]}>
             <View style={styles.sheetHeader}>
               <Text style={styles.sheetTitle}>MY BETS</Text>
@@ -730,7 +734,7 @@ export default function PlinkoScreen() {
               )}
             </ScrollView>
           </View>
-        </Pressable>
+        </View>
       </Modal>
     </LinearGradient>
   );
