@@ -66,6 +66,9 @@ export default function MinesScreen() {
   const [hitTile, setHitTile] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
+  // Tile tapped and waiting on the server — highlighted instantly so the tap
+  // feels immediate even on a slow connection.
+  const [pendingTile, setPendingTile] = useState<number | null>(null);
   const [minesPickerOpen, setMinesPickerOpen] = useState(false);
   const [coinPickerOpen, setCoinPickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -155,6 +158,7 @@ export default function MinesScreen() {
   const reveal = async (tile: number) => {
     if (!round || !isPlaying || busy || revealed.has(tile)) return;
     setBusy(true);
+    setPendingTile(tile);
     try {
       const res = await revealMinesTile(round.id, tile);
       if (res.hitMine) {
@@ -169,6 +173,7 @@ export default function MinesScreen() {
     } catch (err) {
       Alert.alert('Could not open tile', errorMessage(err));
     } finally {
+      setPendingTile(null);
       setBusy(false);
     }
   };
@@ -215,8 +220,9 @@ export default function MinesScreen() {
         key={tile}
         onPress={() => reveal(tile)}
         disabled={!isPlaying || isRevealed || busy}
-        style={[
+        style={({ pressed }) => [
           styles.tile,
+          (pressed || tile === pendingTile) && !showContent && styles.tilePending,
           showContent && styles.tileOpen,
           isHit && styles.tileHit,
           dimmed && styles.tileDimmed,
@@ -460,6 +466,7 @@ const styles = StyleSheet.create({
   tileOpen: { backgroundColor: '#0A2C62', borderBottomWidth: 1.5 },
   tileHit: { backgroundColor: '#E03A50', borderColor: '#FF7A8A' },
   tileDimmed: { opacity: 0.45 },
+  tilePending: { backgroundColor: '#3E8BFF', transform: [{ scale: 0.92 }] },
   tileDot: {
     width: TILE_HEIGHT * 0.32,
     height: TILE_HEIGHT * 0.32,

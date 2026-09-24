@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, Dimensions, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
@@ -134,30 +134,41 @@ const BG_CONTENT_HEIGHT = BG_BAND_COUNT * BG_BAND_HEIGHT;
 // last position) during betting and after the crash, same as the plane
 // itself effectively is at those times.
 function PanelBackground({ isFlying }: { isFlying: boolean }) {
-  const [offset, setOffset] = useState(0);
-  const rafRef = useRef<number | null>(null);
-  const lastNowRef = useRef<number | null>(null);
-  const isFlyingRef = useRef(isFlying);
-  isFlyingRef.current = isFlying;
+  // Scrolled on the native UI thread — no per-frame JS re-render.
+  const offset = useRef(new Animated.Value(0)).current;
+  const offsetNowRef = useRef(0);
 
   useEffect(() => {
-    let mounted = true;
-    const tick = (now: number) => {
-      if (!mounted) return;
-      if (lastNowRef.current == null) lastNowRef.current = now;
-      const dtSec = (now - lastNowRef.current) / 1000;
-      lastNowRef.current = now;
-      if (isFlyingRef.current) {
-        setOffset((prev) => (prev + dtSec * BG_SCROLL_PX_PER_SEC) % BG_STRIPE_TILE);
-      }
-      rafRef.current = requestAnimationFrame(tick);
+    const id = offset.addListener(({ value }) => {
+      offsetNowRef.current = value;
+    });
+    return () => offset.removeListener(id);
+  }, [offset]);
+
+  useEffect(() => {
+    if (!isFlying) {
+      offset.stopAnimation();
+      return;
+    }
+    let cancelled = false;
+    // Resume from wherever the stripes were parked, then loop whole tiles.
+    const run = (from: number) => {
+      offset.setValue(from);
+      Animated.timing(offset, {
+        toValue: BG_STRIPE_TILE,
+        duration: ((BG_STRIPE_TILE - from) / BG_SCROLL_PX_PER_SEC) * 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && !cancelled) run(0);
+      });
     };
-    rafRef.current = requestAnimationFrame(tick);
+    run(offsetNowRef.current % BG_STRIPE_TILE);
     return () => {
-      mounted = false;
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      cancelled = true;
+      offset.stopAnimation();
     };
-  }, []);
+  }, [isFlying, offset]);
 
   const bands = [];
   for (let i = 0; i < BG_BAND_COUNT; i++) {
@@ -178,7 +189,7 @@ function PanelBackground({ isFlying }: { isFlying: boolean }) {
 
   return (
     <View style={styles.panelBgClip}>
-      <View
+      <Animated.View
         style={{
           position: 'absolute',
           width: BG_CONTENT_WIDTH,
@@ -189,7 +200,7 @@ function PanelBackground({ isFlying }: { isFlying: boolean }) {
         }}
       >
         {bands}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -237,30 +248,30 @@ const COUNTDOWN_BAR_WIDTH = PANEL_WIDTH * 0.5;
 const COUNTDOWN_BAR_HEIGHT = 10;
 
 function BettingCountdownBar({ round }: { round: AviatorRoundView }) {
-  const [redFraction, setRedFraction] = useState(1);
-  const rafRef = useRef<number | null>(null);
+  // Native-driven drain: the full-width red fill slides left out of the
+  // clipped track, so the JS thread does no per-frame work.
+  const drain = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    let mounted = true;
     const bettingStart = new Date(round.bettingStartTime).getTime();
     const flyStart = new Date(round.flyStartTime).getTime();
     const totalMs = Math.max(1, flyStart - bettingStart);
-    const tick = () => {
-      if (!mounted) return;
-      const elapsed = Date.now() - bettingStart;
-      setRedFraction(Math.min(1, Math.max(0, 1 - elapsed / totalMs)));
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      mounted = false;
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    };
-  }, [round.periodNumber, round.bettingStartTime, round.flyStartTime]);
+    const elapsed = Math.min(totalMs, Math.max(0, Date.now() - bettingStart));
+    drain.setValue(elapsed / totalMs);
+    const anim = Animated.timing(drain, {
+      toValue: 1,
+      duration: totalMs - elapsed,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    });
+    anim.start();
+    return () => anim.stop();
+  }, [round.periodNumber, round.bettingStartTime, round.flyStartTime, drain]);
 
+  const translateX = drain.interpolate({ inputRange: [0, 1], outputRange: [0, -COUNTDOWN_BAR_WIDTH] });
   return (
     <View style={styles.countdownTrack}>
-      <View style={[styles.countdownFill, { width: `${redFraction * 100}%` }]} />
+      <Animated.View style={[styles.countdownFill, { transform: [{ translateX }] }]} />
     </View>
   );
 }
@@ -1120,14 +1131,20 @@ export default function AviatorScreen() {
       }
     };
 
-    poll();
     fetchAviatorHistory()
       .then((entries) => setHistory(entries.slice(0, 7).reverse().map((e) => Number(e.crashMultiplier))))
       .catch(() => {});
-    const id = setInterval(poll, 350);
+    // Chained rather than setInterval so a slow response never stacks up
+    // overlapping requests behind it.
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const loop = async () => {
+      await poll();
+      if (mounted) timer = setTimeout(loop, 300);
+    };
+    loop();
     return () => {
       mounted = false;
-      clearInterval(id);
+      if (timer) clearTimeout(timer);
     };
   }, [resolveIfPending]);
 
@@ -1585,6 +1602,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   countdownFill: {
+    width: '100%',
     height: '100%',
     borderRadius: COUNTDOWN_BAR_HEIGHT / 2,
     backgroundColor: '#E8102F',
