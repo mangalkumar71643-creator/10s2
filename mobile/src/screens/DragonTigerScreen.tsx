@@ -4,7 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -51,7 +51,9 @@ const WIN_CARD_MS = 3000;
 const TOAST_MS = 1600;
 const BANNER_MS = 1400;
 const VS_MS = 2900;
-const ROAD_LEN = 40;
+const BEAD_COLS = 7;
+const BEAD_ROWS = 6;
+const BEAD_COLOR: Record<string, string> = { DRAGON: '#2F63D8', TIGER: '#C9283A', TIE: '#1F9A55' };
 const GOLD = '#FFD66B';
 
 function round2(n: number): number {
@@ -83,123 +85,165 @@ const SUIT_SYMBOL: Record<string, string> = { S: '♠', H: '♥', C: '♣', D: '
 
 // ---------- art ----------
 
+// The table is one painted piece of art (1852×849). Everything interactive
+// is laid out in the art's own pixel coordinates and mapped onto the screen,
+// so boxes, cards and chips always sit exactly on the painted spots.
+const TABLE_BG = require('../../assets/dragon-tiger/table.jpg');
+const HEAD_ART = {
+  DRAGON: require('../../assets/dragon-tiger/dragon.png'),
+  TIGER: require('../../assets/dragon-tiger/tiger.png'),
+};
+const IMG_W = 1852;
+const IMG_H = 849;
+const HEAD_ASPECT = 305 / 200;
+
+type Rect = [number, number, number, number];
+const BOXES: { area: DragonTigerArea; title: string; mark: string; big: boolean; r: Rect }[] = [
+  { area: 'DRAGON', title: 'DRAGON', mark: '龍', big: true, r: [276, 220, 669, 664] },
+  { area: 'TIE', title: 'TIE', mark: '和', big: false, r: [685, 220, 1081, 447] },
+  { area: 'SUITED_TIE', title: 'SUITED TIE', mark: '♠ ♥ ♣ ♦', big: false, r: [685, 461, 1085, 664] },
+  { area: 'TIGER', title: 'TIGER', mark: '虎', big: true, r: [1095, 218, 1503, 664] },
+];
+// Painted head centres on the top strip.
+const HEAD_CENTER = { DRAGON: [555, 92], TIGER: [1170, 92] } as const;
+
 const PALETTES = {
   DRAGON: ['#06163F', '#0C2F7A', '#1A56C4', '#4E93FF', '#BFDBFF'],
   TIGER: ['#3F0704', '#86170D', '#CF3B1A', '#FF8436', '#FFDFA3'],
 };
+const SIDE_GLOW = { DRAGON: '#3D86FF', TIGER: '#FF5A2A' };
 
-/** A faceted crystal medallion with the Chinese character for dragon (龍)
- * or tiger (虎) in gold — every facet is shaded by its angle to a light
- * from the top-left, which is what gives it the cut-crystal look. */
-const CrystalEmblem = memo(function CrystalEmblem({ side, size }: { side: 'DRAGON' | 'TIGER'; size: number }) {
-  const s = size;
-  const pal = PALETTES[side];
-  const cx = s / 2;
-  const cy = s / 2;
-  const R = s * 0.47;
-  const verts = Array.from({ length: 6 }, (_, i) => {
-    const a = (-90 + i * 60) * (Math.PI / 180);
-    return [cx + R * Math.cos(a), cy + R * Math.sin(a)];
-  });
-  const light = (-135 * Math.PI) / 180;
-  const facets: React.ReactElement[] = [];
-  for (let i = 0; i < 6; i++) {
-    const a = verts[i];
-    const b = verts[(i + 1) % 6];
-    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    const inner = [cx + (m[0] - cx) * 0.42, cy + (m[1] - cy) * 0.42];
-    const tris = [
-      [a, m, inner],
-      [m, b, inner],
-      [[cx, cy], a, inner],
-      [[cx, cy], inner, b],
-    ];
-    tris.forEach((t, k) => {
-      const mx = (t[0][0] + t[1][0] + t[2][0]) / 3 - cx;
-      const my = (t[0][1] + t[1][1] + t[2][1]) / 3 - cy;
-      const ang = Math.atan2(my, mx);
-      const lit = 0.5 + 0.5 * Math.cos(ang - light) + (k % 2 === 0 ? 0.12 : -0.12) - (k >= 2 ? 0.15 : 0);
-      const idx = Math.max(0, Math.min(4, Math.round(lit * 4)));
-      facets.push(
-        <Polygon
-          key={`${i}-${k}`}
-          points={t.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}
-          fill={pal[idx]}
-          stroke={pal[Math.min(4, idx + 1)]}
-          strokeOpacity={0.35}
-          strokeWidth={0.6}
-        />
-      );
-    });
+type HeadState = 'idle' | 'win' | 'lose';
+
+/** Light laid over a painted head: a slow breath in the side's colour while
+ * betting, a strong gold pulse when it wins, a shadow when it loses. */
+function HeadGlow({ side, state, size }: { side: 'DRAGON' | 'TIGER'; state: HeadState; size: number }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const d = state === 'win' ? 520 : 1600;
+    pulse.setValue(0);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: d, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: d, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [state, pulse]);
+  if (state === 'lose') {
+    return (
+      <View pointerEvents="none" style={{ width: size, height: size }}>
+        <Svg width={size} height={size}>
+          <Defs>
+            <RadialGradient id={`hl${side}`} cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor="#000000" stopOpacity={0.72} />
+              <Stop offset="0.7" stopColor="#000000" stopOpacity={0.45} />
+              <Stop offset="1" stopColor="#000000" stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Circle cx={size / 2} cy={size / 2} r={size / 2} fill={`url(#hl${side})`} />
+        </Svg>
+      </View>
+    );
   }
-  const outline = verts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
-  const inset = verts.map((p) => `${(cx + (p[0] - cx) * 0.9).toFixed(1)},${(cy + (p[1] - cy) * 0.9).toFixed(1)}`).join(' ');
-  const glyph = side === 'DRAGON' ? '龍' : '虎';
-  const fs = s * 0.42;
-  const id = side === 'DRAGON' ? 'dg' : 'tg';
+  const color = state === 'win' ? '#FFD66B' : SIDE_GLOW[side];
   return (
-    <Svg width={s} height={s}>
-      <Defs>
-        <SvgLinearGradient id={`${id}Gold`} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#FFF4C2" />
-          <Stop offset="0.45" stopColor="#F2BE45" />
-          <Stop offset="0.7" stopColor="#B27416" />
-          <Stop offset="1" stopColor="#FFE9A0" />
-        </SvgLinearGradient>
-      </Defs>
-      {facets}
-      <Polygon points={outline} fill="none" stroke={`url(#${id}Gold)`} strokeWidth={s * 0.045} strokeLinejoin="round" />
-      <Polygon points={inset} fill="none" stroke="#FFE7A0" strokeOpacity={0.55} strokeWidth={1} strokeLinejoin="round" />
-      {/* Solid colours (not a gradient fill) so the glyph renders the same
-          on every device: a dark drop shadow, then the gold character. */}
-      <SvgText x={cx + s * 0.012} y={cy + fs * 0.36 + s * 0.02} fontSize={fs} fontWeight="900" textAnchor="middle" fill="#1A0A00" fillOpacity={0.7}>
-        {glyph}
-      </SvgText>
-      <SvgText x={cx} y={cy + fs * 0.36} fontSize={fs} fontWeight="900" textAnchor="middle" fill="#FFD866" stroke="#7A4A08" strokeWidth={s * 0.012}>
-        {glyph}
-      </SvgText>
-    </Svg>
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        width: size,
+        height: size,
+        opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: state === 'win' ? [0.35, 0.8] : [0.08, 0.28] }),
+        transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.06] }) }],
+      }}
+    >
+      <Svg width={size} height={size}>
+        <Defs>
+          <RadialGradient id={`hg${side}${state}`} cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor={color} stopOpacity={0.85} />
+            <Stop offset="1" stopColor={color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={size / 2} fill={`url(#hg${side}${state})`} />
+      </Svg>
+    </Animated.View>
   );
-});
+}
 
-/** Emblem plus a breathing glow behind it and a gold name plate. */
-function Emblem({ side, size, dim }: { side: 'DRAGON' | 'TIGER'; size: number; dim?: boolean }) {
+/** A band of light sweeping across the glass strip every few seconds. */
+function StripShine({ width, height }: { width: number; height: number }) {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(t, { toValue: 1, duration: 1700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.delay(2800),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [t]);
+  const band = Math.max(40, height * 0.9);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: -height * 0.2,
+        width: band,
+        height: height * 1.4,
+        transform: [{ translateX: t.interpolate({ inputRange: [0, 1], outputRange: [-band * 1.5, width + band * 0.5] }) }, { skewX: '-25deg' }],
+      }}
+    >
+      <LinearGradient
+        colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={StyleSheet.absoluteFill}
+      />
+    </Animated.View>
+  );
+}
+
+/** The painted head, lifted off the table for the VS scene. */
+function Portrait({ side, width }: { side: 'DRAGON' | 'TIGER'; width: number }) {
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [pulse]);
-  const glowColor = side === 'DRAGON' ? '#3D86FF' : '#FF5A2A';
+  const h = width / HEAD_ASPECT;
+  const g = width * 1.25;
   return (
-    <View style={{ alignItems: 'center', opacity: dim ? 0.45 : 1 }}>
+    <View style={{ width, height: h, alignItems: 'center', justifyContent: 'center' }}>
       <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          width: size * 1.35,
-          height: size * 1.35,
-          top: -size * 0.175,
-          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }),
-          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.06] }) }],
+          width: g,
+          height: g,
+          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.85] }),
+          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.05] }) }],
         }}
       >
-        <Svg width={size * 1.35} height={size * 1.35}>
+        <Svg width={g} height={g}>
           <Defs>
-            <RadialGradient id={`glow${side}`} cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={glowColor} stopOpacity={0.75} />
-              <Stop offset="1" stopColor={glowColor} stopOpacity={0} />
+            <RadialGradient id={`pg${side}`} cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor={SIDE_GLOW[side]} stopOpacity={0.7} />
+              <Stop offset="1" stopColor={SIDE_GLOW[side]} stopOpacity={0} />
             </RadialGradient>
           </Defs>
-          <Circle cx={size * 0.675} cy={size * 0.675} r={size * 0.675} fill={`url(#glow${side})`} />
+          <Circle cx={g / 2} cy={g / 2} r={g / 2} fill={`url(#pg${side})`} />
         </Svg>
       </Animated.View>
-      <CrystalEmblem side={side} size={size} />
+      <Image source={HEAD_ART[side]} style={{ width, height: h }} resizeMode="contain" />
       <LinearGradient colors={['#FFE9A0', '#C98A1C']} style={styles.namePlate}>
         <Text style={styles.nameText}>{side}</Text>
       </LinearGradient>
@@ -388,61 +432,67 @@ function WinBurst() {
 
 type AreaState = 'normal' | 'win' | 'lose';
 
-const SUIT_ROW = '♠ ♥ ♣ ♦ ♠ ♥ ♣ ♦ ♠ ♥ ♣ ♦';
-
+/** A transparent hit area laid over one painted box: its name and payout,
+ * a faint watermark, this player's stake and the win / lose lighting. */
 const BetBox = memo(function BetBox({
   area,
   title,
+  mark,
   multiplier,
-  colors,
   total,
   state,
   big,
   onPress,
   glow,
   boxRef,
+  frame,
+  k,
 }: {
   area: DragonTigerArea;
   title: string;
+  mark: string;
   multiplier: number;
-  colors: [string, string];
   total: number;
   state: AreaState;
   big: boolean;
   onPress: (area: DragonTigerArea) => void;
   glow: Animated.Value;
   boxRef: (v: View | null) => void;
+  frame: { left: number; top: number; width: number; height: number };
+  k: number;
 }) {
+  const radius = 14 * k;
+  const markSize = Math.min(frame.height * (big ? 0.62 : 0.5), frame.width * (mark.length > 2 ? 0.16 : 0.62));
   return (
-    <Pressable onPress={() => onPress(area)} style={({ pressed }) => [styles.boxOuter, pressed && styles.pressed]}>
-      <View ref={boxRef} collapsable={false} style={{ flex: 1 }}>
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 0.35, y: 1 }} style={[styles.boxFill, state === 'win' && styles.boxWin]}>
-          <View pointerEvents="none" style={styles.suitPattern}>
-            {Array.from({ length: 5 }, (_, i) => (
-              <Text key={i} style={styles.suitRow} numberOfLines={1}>
-                {SUIT_ROW}
-              </Text>
-            ))}
-          </View>
-          <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']} style={styles.boxShine} pointerEvents="none" />
-          <Text style={[styles.boxTitle, big && styles.boxTitleBig]} numberOfLines={1} adjustsFontSizeToFit>
-            {title}
-          </Text>
-          <Text style={[styles.boxMult, big && styles.boxMultBig]}>{multiplier}x</Text>
-          <Text style={styles.boxMine}>₹{round2(total)}</Text>
-          {total > 0 && (
-            <View style={big ? styles.boxChipBig : styles.boxChip} pointerEvents="none">
-              <Chip value={total} size={big ? 38 : 30} label={shortAmount(total)} />
+    <Pressable
+      onPress={() => onPress(area)}
+      style={({ pressed }) => [styles.boxHit, frame, { borderRadius: radius }, pressed && styles.boxPressed]}
+    >
+      <View ref={boxRef} collapsable={false} style={[styles.boxInner, { borderRadius: radius }, state === 'win' && styles.boxWin]}>
+        <Text pointerEvents="none" style={[styles.boxMark, { fontSize: markSize, lineHeight: markSize * 1.15 }]} numberOfLines={1}>
+          {mark}
+        </Text>
+        <Text style={[styles.boxTitle, { fontSize: (big ? 26 : 15) * k, letterSpacing: (big ? 5 : 2) * k }]} numberOfLines={1} adjustsFontSizeToFit>
+          {title}
+        </Text>
+        <Text style={[styles.boxMult, { fontSize: (big ? 22 : 15) * k }]}>{multiplier}x</Text>
+        {total > 0 && (
+          <>
+            <View style={[styles.boxBet, { left: 8 * k, bottom: (big ? 12 : 6) * k }]} pointerEvents="none">
+              <Text style={[styles.boxBetText, { fontSize: 11 * k }]}>₹{round2(total)}</Text>
             </View>
-          )}
-          {state === 'win' && (
-            <>
-              <Animated.View pointerEvents="none" style={[styles.winGlow, { opacity: glow }]} />
-              <WinBurst />
-            </>
-          )}
-          {state === 'lose' && <View pointerEvents="none" style={styles.loseShade} />}
-        </LinearGradient>
+            <View style={big ? { position: 'absolute', right: 10 * k, bottom: 10 * k } : { position: 'absolute', right: 6 * k, top: 6 * k }} pointerEvents="none">
+              <Chip value={total} size={(big ? 38 : 28) * k} label={shortAmount(total)} />
+            </View>
+          </>
+        )}
+        {state === 'win' && (
+          <>
+            <Animated.View pointerEvents="none" style={[styles.winGlow, { opacity: glow, borderRadius: radius }]} />
+            <WinBurst />
+          </>
+        )}
+        {state === 'lose' && <View pointerEvents="none" style={[styles.loseShade, { borderRadius: radius }]} />}
       </View>
     </Pressable>
   );
@@ -555,6 +605,7 @@ export default function DragonTigerScreen() {
   const mountedRef = useRef(true);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<View>(null);
   const chipRefs = useRef<Record<number, View | null>>({});
   const boxRefs = useRef<Partial<Record<DragonTigerArea, View | null>>>({});
@@ -625,6 +676,7 @@ export default function DragonTigerScreen() {
       mountedRef.current = false;
       if (toastTimer.current) clearTimeout(toastTimer.current);
       if (bannerTimer.current) clearTimeout(bannerTimer.current);
+      if (vsTimer.current) clearTimeout(vsTimer.current);
     };
   }, []);
 
@@ -746,7 +798,10 @@ export default function DragonTigerScreen() {
       Animated.timing(vsShards, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
     Animated.timing(vsResult, { toValue: 1, duration: 450, delay: 1900, useNativeDriver: true }).start();
-    const closeTimer = setTimeout(() => {
+    // Held in a ref, not cleaned up with this effect: every poll brings a new
+    // `view`, which would otherwise cancel the close and strand the scene.
+    if (vsTimer.current) clearTimeout(vsTimer.current);
+    vsTimer.current = setTimeout(() => {
       Animated.timing(vsAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
         vsRays.stopAnimation();
         if (mountedRef.current) setVsOpen(false);
@@ -772,7 +827,6 @@ export default function DragonTigerScreen() {
         refreshWallet();
       });
     }
-    return () => clearTimeout(closeTimer);
   }, [view, enqueue, refreshWallet, vsAnim, vsSlide, vsShards, vsResult, vsRays]);
 
   useEffect(() => {
@@ -940,7 +994,8 @@ export default function DragonTigerScreen() {
     placeChips([...m.entries()].map(([area, amount]) => ({ area, amount })));
   };
 
-  const road = history.slice(0, ROAD_LEN).reverse();
+  // Bead plate: oldest first, filled down each column.
+  const beads = history.slice(0, BEAD_COLS * BEAD_ROWS).reverse();
   const stats = useMemo(() => {
     const n = history.length;
     if (!n) return null;
@@ -966,19 +1021,43 @@ export default function DragonTigerScreen() {
     );
   }
 
-  // ---- landscape sizes ----
-  const padL = Math.max(insets.left, 10);
-  const padR = Math.max(insets.right, 10);
-  const topH = 34;
-  const stageH = Math.max(90, H * 0.26);
-  const roadH = 26;
-  const bottomH = 58 + Math.max(insets.bottom, 4);
-  const emblemSize = stageH * 0.84;
-  const cardW = Math.min(stageH * 0.48, 58);
-  const sideW = Math.max(96, W * 0.12);
-  const chipSize = Math.min(42, (W * 0.5) / 8.2);
+  // ---- table art → screen ----
+  let sx = W / IMG_W;
+  let sy = H / IMG_H;
+  // Phones are within a few % of the art's shape, so it is stretched edge to
+  // edge; squarer screens (tablets) keep its aspect and letterbox instead.
+  if (sx / sy > 1.1 || sy / sx > 1.1) sx = sy = Math.min(sx, sy);
+  const ox = (W - IMG_W * sx) / 2;
+  const oy = (H - IMG_H * sy) / 2;
+  const s = Math.min(sx, sy);
+  const k = Math.max(0.75, Math.min(1.8, s / 0.485));
+  const X = (x: number) => ox + x * sx;
+  const Y = (y: number) => oy + y * sy;
+  const frameOf = ([x0, y0, x1, y1]: Rect) => ({ left: X(x0), top: Y(y0), width: (x1 - x0) * sx, height: (y1 - y0) * sy });
+  const leftEdge = insets.left + 6;
+  const rightInset = insets.right + 6;
+  // Keep the bottom-rail controls clear of a gesture bar.
+  const lift = Math.max(0, insets.bottom - (H - Y(IMG_H)));
+
+  const cardW = Math.min(100 * sx, (138 * sy) / 1.4);
+  const cardPos = (cx: number) => ({ left: X(cx) - (cardW + 6) / 2, top: Y(118) - (cardW * 1.4 + 6) / 2 });
+  const clockSize = 98 * s;
+  const chipSize = Math.min(48, 84 * sy, (880 * sx) / 9.5);
+  const ctrlW = Math.min(64, 150 * sx);
+  const ctrlH = Math.min(46, 78 * sy);
+  const glowSize = 330 * s;
+
+  const leftPanelL = Math.max(X(48), leftEdge);
+  const leftPanel = { left: leftPanelL, top: Y(262), width: X(266) - leftPanelL, height: 360 * sy };
+  const rightPanelR = Math.min(X(1806), W - rightInset);
+  const rightPanel = { left: X(1516), top: Y(236), width: rightPanelR - X(1516), height: 410 * sy };
+  const beadS = Math.max(8, Math.floor(Math.min(18 * k, (rightPanel.width - 14) / BEAD_COLS - 2, (rightPanel.height - 62 * k) / BEAD_ROWS - 2)));
+
   const winnerSide = revealed?.winner;
-  const vsEmblem = Math.min(H * 0.46, W * 0.2);
+  const vsW = Math.min(W * 0.3, H * 0.9);
+  const vsEmblem = Math.min(vsW * 0.62, H * 0.4);
+  const headState = (side: 'DRAGON' | 'TIGER'): HeadState =>
+    !boardResult ? 'idle' : boardResult.winner === side ? 'win' : boardResult.winner === 'TIE' ? 'idle' : 'lose';
 
   const sideStyle = (side: 'DRAGON' | 'TIGER') => {
     const winnerOrTie = winnerSide === 'TIE' || winnerSide === side;
@@ -994,131 +1073,155 @@ export default function DragonTigerScreen() {
   const bannerStart = banner?.start ?? true;
 
   return (
-    <View ref={rootRef} collapsable={false} style={[styles.root, { paddingLeft: padL, paddingRight: padR }]}>
-      {/* Top bar */}
-      <LinearGradient colors={['#4A1119', '#2A070C']} style={[styles.topBar, { height: topH, marginHorizontal: -padL, paddingLeft: padL, paddingRight: padR }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={8}>
-          <MaterialCommunityIcons name="chevron-left" size={26} color="#F5B942" />
-          <Text style={styles.title}>DRAGON TIGER</Text>
-        </Pressable>
-        <Text style={styles.topStatus}>
-          #{view?.periodNumber.slice(-5) ?? '-----'} · {statusText}
-        </Text>
-        <Pressable onPress={() => navigation.navigate('Deposit')} style={styles.depositPill}>
-          <MaterialCommunityIcons name="wallet-plus" size={16} color="#F5B942" />
-          <Text style={styles.depositText}>Deposit</Text>
-        </Pressable>
-      </LinearGradient>
+    <View ref={rootRef} collapsable={false} style={styles.root}>
+      <Image source={TABLE_BG} style={[styles.abs, frameOf([0, 0, IMG_W, IMG_H])]} resizeMode="stretch" />
 
-      {/* Stage: Dragon · cards & clock · Tiger */}
-      <LinearGradient colors={['#1A3C8F33', '#2A0A2E', '#8F1A1A33']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={[styles.stage, { height: stageH }]}>
-        <Emblem side="DRAGON" size={emblemSize} dim={!!boardResult && boardResult.winner === 'TIGER'} />
-        <View style={styles.stageCenter}>
-          <DealtCard phase={phase} card={revealed?.dragon ?? null} w={cardW} from={-1} />
-          <View style={styles.clockWrap}>
-            {phase === 'BETTING' ? (
-              <Clock secs={secsLeft} fraction={clockFraction} size={stageH * 0.56} />
-            ) : (
-              <Text style={styles.vsSmall}>VS</Text>
-            )}
-          </View>
-          <DealtCard phase={phase} card={revealed?.tiger ?? null} w={cardW} from={1} />
+      {/* Glass strip: light sweep and the glow on the painted heads */}
+      <View pointerEvents="none" style={[styles.abs, styles.stripClip, frameOf([432, 62, 1284, 178]), { borderRadius: 10 * k }]}>
+        <StripShine width={852 * sx} height={116 * sy} />
+      </View>
+      {(['DRAGON', 'TIGER'] as const).map((side) => (
+        <View key={side} pointerEvents="none" style={[styles.abs, { left: X(HEAD_CENTER[side][0]) - glowSize / 2, top: Y(HEAD_CENTER[side][1]) - glowSize / 2 }]}>
+          <HeadGlow side={side} state={headState(side)} size={glowSize} />
         </View>
-        <Emblem side="TIGER" size={emblemSize} dim={!!boardResult && boardResult.winner === 'DRAGON'} />
-      </LinearGradient>
+      ))}
 
-      {/* Road */}
-      <View style={[styles.roadWrap, { height: roadH }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.road}>
-          {road.map((h, i) => {
-            const latest = i === road.length - 1;
-            const colors: [string, string] =
-              h.winner === 'DRAGON' ? ['#6FA0FF', '#1D4FC4'] : h.winner === 'TIGER' ? ['#FF8A94', '#C21F31'] : ['#7CE3A4', '#1C8A48'];
-            return (
-              <LinearGradient key={h.periodNumber} colors={colors} style={[styles.bead, latest && styles.beadLatest]}>
-                <Text style={styles.beadText}>{h.winner === 'DRAGON' ? 'D' : h.winner === 'TIGER' ? 'T' : '='}</Text>
-              </LinearGradient>
-            );
-          })}
-        </ScrollView>
+      {/* Cards and the betting clock on the strip */}
+      <View style={[styles.abs, cardPos(738)]}>
+        <DealtCard phase={phase} card={revealed?.dragon ?? null} w={cardW} from={-1} />
+      </View>
+      <View style={[styles.abs, styles.center, { left: X(860) - clockSize / 2, top: Y(118) - clockSize / 2, width: clockSize, height: clockSize }]}>
+        {phase === 'BETTING' ? (
+          <Clock secs={secsLeft} fraction={clockFraction} size={clockSize} />
+        ) : (
+          <Text style={[styles.vsSmall, { fontSize: 30 * k }]}>VS</Text>
+        )}
+      </View>
+      <View style={[styles.abs, cardPos(982)]}>
+        <DealtCard phase={phase} card={revealed?.tiger ?? null} w={cardW} from={1} />
       </View>
 
-      {/* Table */}
-      <LinearGradient colors={['#5E1F70', '#3A0F4A']} style={styles.table}>
-        <View style={[styles.sidePanel, { width: sideW }]}>
-          <MaterialCommunityIcons name="account-circle" size={30} color={GOLD} />
-          <Text style={styles.sideName} numberOfLines={1}>
-            {backendUser?.firstName ?? 'Player'}
-          </Text>
-          <Text style={styles.sideLabel}>Balance</Text>
-          <Text style={styles.sideValue}>₹{displayBalance.toFixed(2)}</Text>
-          <Text style={styles.sideLabel}>Your bet</Text>
-          <Text style={styles.sideValueWhite}>₹{myTotal.toFixed(2)}</Text>
-        </View>
-        <View style={styles.boxes}>
-          <View style={{ flex: 1.35 }}>
-            <BetBox area="DRAGON" title="DRAGON" multiplier={multipliers.DRAGON} colors={['#3A6FE0', '#162A70']} total={shownTotal('DRAGON')} state={areaState('DRAGON')} big onPress={onAreaPress} glow={glow} boxRef={(v) => {
-              boxRefs.current.DRAGON = v;
-            }} />
-          </View>
-          <View style={styles.centerCol}>
-            <BetBox area="TIE" title="TIE" multiplier={multipliers.TIE} colors={['#169C8C', '#0A4C46']} total={shownTotal('TIE')} state={areaState('TIE')} big={false} onPress={onAreaPress} glow={glow} boxRef={(v) => {
-              boxRefs.current.TIE = v;
-            }} />
-            <BetBox area="SUITED_TIE" title="SUITED TIE" multiplier={multipliers.SUITED_TIE} colors={['#46AB40', '#1A5418']} total={shownTotal('SUITED_TIE')} state={areaState('SUITED_TIE')} big={false} onPress={onAreaPress} glow={glow} boxRef={(v) => {
-              boxRefs.current.SUITED_TIE = v;
-            }} />
-          </View>
-          <View style={{ flex: 1.35 }}>
-            <BetBox area="TIGER" title="TIGER" multiplier={multipliers.TIGER} colors={['#DE3C4A', '#6C0E1C']} total={shownTotal('TIGER')} state={areaState('TIGER')} big onPress={onAreaPress} glow={glow} boxRef={(v) => {
-              boxRefs.current.TIGER = v;
-            }} />
-          </View>
-        </View>
-        <View style={[styles.sidePanel, { width: sideW }]}>
-          <Text style={styles.sideLabel}>Last {stats?.n ?? 0}</Text>
-          <Text style={[styles.statLine, { color: '#8FB6FF' }]}>Dragon {stats?.d ?? 0}%</Text>
-          <Text style={[styles.statLine, { color: '#FF9AA4' }]}>Tiger {stats?.t ?? 0}%</Text>
-          <Text style={[styles.statLine, { color: '#7EE2A3' }]}>Tie {stats?.tie ?? 0}%</Text>
-          <Text style={styles.sideHint}>A low · K high{'\n'}D/T lose on tie</Text>
-        </View>
-      </LinearGradient>
-
-      {/* Chips + actions */}
-      <LinearGradient
-        colors={['#2A0A2E', '#14041A']}
-        style={[styles.bottomBar, { height: bottomH, paddingBottom: Math.max(insets.bottom, 4), marginHorizontal: -padL, paddingLeft: padL, paddingRight: padR }]}
+      {/* Top corners and status */}
+      <Pressable onPress={() => navigation.goBack()} style={[styles.abs, styles.backBtn, { left: Math.max(X(14), leftEdge), top: Y(10) }]} hitSlop={8}>
+        <MaterialCommunityIcons name="chevron-left" size={26 * k} color="#F5B942" />
+        <Text style={[styles.title, { fontSize: 15 * k }]}>DRAGON TIGER</Text>
+      </Pressable>
+      <View pointerEvents="none" style={[styles.abs, styles.center, frameOf([648, 4, 1066, 58])]}>
+        <Text style={[styles.topStatus, { fontSize: 11 * k }]} numberOfLines={1}>
+          #{view?.periodNumber.slice(-5) ?? '-----'} · {statusText}
+        </Text>
+      </View>
+      <Pressable
+        onPress={() => navigation.navigate('Deposit')}
+        style={[styles.abs, styles.depositPill, { right: Math.max(W - X(1836), rightInset), top: Y(12) }]}
       >
-        <View style={styles.chipRail}>
-          {CHIP_VALUES.map((v) => {
-            const allowed = v >= minStake && v <= maxStake;
-            const active = v === selectedChip;
-            return (
-              <Pressable key={v} disabled={!allowed} onPress={() => setSelectedChip(v)} style={[styles.chipBtn, active && styles.chipActive, !allowed && styles.dim]}>
-                <View ref={(r) => {
+        <MaterialCommunityIcons name="wallet-plus" size={15 * k} color="#F5B942" />
+        <Text style={[styles.depositText, { fontSize: 13 * k }]}>Deposit</Text>
+      </Pressable>
+
+      {/* Player panel in the left end of the table */}
+      <View style={[styles.abs, styles.sidePanel, leftPanel]}>
+        <MaterialCommunityIcons name="account-circle" size={30 * k} color={GOLD} />
+        <Text style={[styles.sideName, { fontSize: 12 * k }]} numberOfLines={1}>
+          {backendUser?.firstName ?? 'Player'}
+        </Text>
+        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>Balance</Text>
+        <Text style={[styles.sideValue, { fontSize: 14 * k }]} numberOfLines={1} adjustsFontSizeToFit>
+          ₹{displayBalance.toFixed(2)}
+        </Text>
+        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>Your bet</Text>
+        <Text style={[styles.sideValueWhite, { fontSize: 13 * k }]} numberOfLines={1} adjustsFontSizeToFit>
+          ₹{myTotal.toFixed(2)}
+        </Text>
+      </View>
+
+      {/* Road in the right end of the table */}
+      <View style={[styles.abs, styles.sidePanel, rightPanel]}>
+        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>LAST {Math.min(stats?.n ?? 0, BEAD_COLS * BEAD_ROWS)}</Text>
+        <View style={styles.beadGrid}>
+          {Array.from({ length: BEAD_COLS }, (_, c) => (
+            <View key={c} style={styles.beadCol}>
+              {Array.from({ length: BEAD_ROWS }, (_, r) => {
+                const h = beads[c * BEAD_ROWS + r];
+                const size = { width: beadS, height: beadS, borderRadius: beadS / 2 };
+                if (!h) return <View key={r} style={[styles.beadEmpty, size]} />;
+                const latest = c * BEAD_ROWS + r === beads.length - 1;
+                return (
+                  <View key={r} style={[styles.bead, size, { backgroundColor: BEAD_COLOR[h.winner] ?? BEAD_COLOR.TIE }, latest && styles.beadLatest]}>
+                    <Text style={[styles.beadText, { fontSize: beadS * 0.55 }]}>{h.winner === 'DRAGON' ? 'D' : h.winner === 'TIGER' ? 'T' : '='}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+        <View style={styles.statRow}>
+          <Text style={[styles.statLine, { color: '#8FB6FF', fontSize: 10 * k }]}>D {stats?.d ?? 0}%</Text>
+          <Text style={[styles.statLine, { color: '#FF9AA4', fontSize: 10 * k }]}>T {stats?.t ?? 0}%</Text>
+          <Text style={[styles.statLine, { color: '#7EE2A3', fontSize: 10 * k }]}>= {stats?.tie ?? 0}%</Text>
+        </View>
+      </View>
+
+      {/* Bet boxes over the painted ones */}
+      {BOXES.map((b) => (
+        <BetBox
+          key={b.area}
+          area={b.area}
+          title={b.title}
+          mark={b.mark}
+          multiplier={multipliers[b.area]}
+          total={shownTotal(b.area)}
+          state={areaState(b.area)}
+          big={b.big}
+          onPress={onAreaPress}
+          glow={glow}
+          boxRef={(v) => {
+            boxRefs.current[b.area] = v;
+          }}
+          frame={frameOf(b.r)}
+          k={k}
+        />
+      ))}
+
+      {/* Bottom rail: limits · chips · actions */}
+      <View pointerEvents="none" style={[styles.abs, { left: Math.max(X(40), leftEdge), top: Y(772) - lift }]}>
+        <Text style={[styles.railText, { fontSize: 10 * k }]}>
+          Bet ₹{minStake} – ₹{maxStake} per box
+        </Text>
+        <Text style={[styles.railHint, { fontSize: 9 * k }]}>A low · K high · Tie: D/T lose</Text>
+      </View>
+      <View style={[styles.abs, styles.chipRail, { left: X(392), width: 896 * sx, top: Y(794) - chipSize / 2 - 2 - lift, gap: Math.max(4, 10 * sx) }]}>
+        {CHIP_VALUES.map((v) => {
+          const allowed = v >= minStake && v <= maxStake;
+          const active = v === selectedChip;
+          return (
+            <Pressable key={v} disabled={!allowed} onPress={() => setSelectedChip(v)} style={[styles.chipBtn, active && styles.chipActive, !allowed && styles.dim]}>
+              <View
+                ref={(r) => {
                   chipRefs.current[v] = r;
-                }} collapsable={false}>
-                  <Chip value={v} size={chipSize} />
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-        <View style={styles.actions}>
-          <Pressable onPress={undo} style={styles.ctrlBtn}>
-            <MaterialCommunityIcons name="undo-variant" size={20} color="#F2E6FF" />
-            <Text style={styles.ctrlLabel}>UNDO</Text>
+                }}
+                collapsable={false}
+              >
+                <Chip value={v} size={chipSize} />
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={[styles.abs, styles.actions, { right: Math.max(W - X(1834), rightInset), top: Y(803) - ctrlH / 2 - lift }]}>
+        {(
+          [
+            { label: 'UNDO', icon: 'undo-variant', color: '#F2E6FF', onPress: undo },
+            { label: 'REPEAT', icon: 'repeat', color: '#F2E6FF', onPress: repeat },
+            { label: 'CLEAR', icon: 'close-thick', color: '#FF6B6B', onPress: clearAll },
+          ] as const
+        ).map((a) => (
+          <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [styles.ctrlBtn, { width: ctrlW, height: ctrlH }, pressed && styles.pressed]}>
+            <MaterialCommunityIcons name={a.icon} size={18 * k} color={a.color} />
+            <Text style={[styles.ctrlLabel, { fontSize: 9 * k }]}>{a.label}</Text>
           </Pressable>
-          <Pressable onPress={repeat} style={styles.ctrlBtn}>
-            <MaterialCommunityIcons name="repeat" size={20} color="#F2E6FF" />
-            <Text style={styles.ctrlLabel}>REPEAT</Text>
-          </Pressable>
-          <Pressable onPress={clearAll} style={styles.ctrlBtn}>
-            <MaterialCommunityIcons name="close-thick" size={20} color="#FF6B6B" />
-            <Text style={styles.ctrlLabel}>CLEAR</Text>
-          </Pressable>
-        </View>
-      </LinearGradient>
+        ))}
+      </View>
 
       {/* Chips in flight */}
       {flights.map((f) => (
@@ -1224,7 +1327,7 @@ export default function DragonTigerScreen() {
           <View style={styles.vsRow}>
             <Animated.View style={[styles.vsSide, sideStyle('DRAGON')]}>
               <View>
-                <Emblem side="DRAGON" size={vsEmblem} />
+                <Portrait side="DRAGON" width={vsW} />
                 <Shards side="DRAGON" trigger={vsShards} />
               </View>
               <FlipCard card={revealed.dragon} w={Math.min(70, vsEmblem * 0.5)} delay={650} />
@@ -1253,7 +1356,7 @@ export default function DragonTigerScreen() {
             <Animated.View style={[styles.vsSide, sideStyle('TIGER')]}>
               <FlipCard card={revealed.tiger} w={Math.min(70, vsEmblem * 0.5)} delay={1200} />
               <View>
-                <Emblem side="TIGER" size={vsEmblem} />
+                <Portrait side="TIGER" width={vsW} />
                 <Shards side="TIGER" trigger={vsShards} />
               </View>
             </Animated.View>
@@ -1291,24 +1394,24 @@ export default function DragonTigerScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#12040F' },
+  root: { flex: 1, backgroundColor: '#070006' },
   rotating: { alignItems: 'center', justifyContent: 'center', gap: 12 },
   rotatingText: { color: GOLD, fontSize: 16, fontWeight: '700' },
 
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#7A2A33' },
-  backBtn: { flexDirection: 'row', alignItems: 'center' },
-  title: { color: '#E7D9D2', fontSize: 15, fontWeight: '900', letterSpacing: 1.5 },
-  topStatus: { color: GOLD, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  depositPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16, backgroundColor: '#3A0A10', borderWidth: 1, borderColor: '#8A2E38' },
-  depositText: { color: '#F5B942', fontSize: 13, fontWeight: '700' },
+  abs: { position: 'absolute' },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  stripClip: { overflow: 'hidden' },
 
-  stage: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 12 },
-  stageCenter: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  clockWrap: { minWidth: 60, alignItems: 'center', justifyContent: 'center' },
+  backBtn: { flexDirection: 'row', alignItems: 'center' },
+  title: { color: '#E7D9D2', fontWeight: '900', letterSpacing: 1.5 },
+  topStatus: { color: GOLD, fontWeight: '800', letterSpacing: 0.5, textShadowColor: '#000', textShadowRadius: 4 },
+  depositPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16, backgroundColor: 'rgba(58,10,16,0.85)', borderWidth: 1, borderColor: '#8A2E38' },
+  depositText: { color: '#F5B942', fontWeight: '700' },
+
   clockText: { color: GOLD, fontWeight: '900' },
-  vsSmall: { color: GOLD, fontSize: 30, fontWeight: '900', fontStyle: 'italic', textShadowColor: '#C98A1C', textShadowRadius: 8 },
-  namePlate: { marginTop: -8, paddingHorizontal: 10, paddingVertical: 1, borderRadius: 8, borderWidth: 1, borderColor: '#7A4A00' },
-  nameText: { color: '#3A1E00', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  vsSmall: { color: GOLD, fontWeight: '900', fontStyle: 'italic', textShadowColor: '#C98A1C', textShadowRadius: 8 },
+  namePlate: { position: 'absolute', bottom: -6, paddingHorizontal: 12, paddingVertical: 1, borderRadius: 8, borderWidth: 1, borderColor: '#7A4A00' },
+  nameText: { color: '#3A1E00', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
 
   card: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C9C9D2', overflow: 'hidden' },
   cardCorner: { position: 'absolute', top: 3, left: 5, alignItems: 'center' },
@@ -1317,53 +1420,47 @@ const styles = StyleSheet.create({
   cardBackInner: { position: 'absolute', top: 4, left: 4, right: 4, bottom: 4, borderWidth: 1, borderColor: 'rgba(217,164,65,0.6)', alignItems: 'center', justifyContent: 'center' },
   cardBackDiamond: { position: 'absolute', borderWidth: 1.5, borderColor: 'rgba(217,164,65,0.7)', transform: [{ rotate: '45deg' }] },
   cardBackMark: { color: '#D9A441', fontWeight: '900' },
-  cardSlot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255,214,107,0.35)', backgroundColor: 'rgba(0,0,0,0.25)' },
+  cardSlot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255,214,107,0.45)', backgroundColor: 'rgba(0,0,0,0.3)' },
 
-  roadWrap: { justifyContent: 'center', backgroundColor: '#1F0826', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#5A2468' },
-  road: { gap: 3, alignItems: 'center', paddingHorizontal: 4 },
-  bead: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  sidePanel: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderRadius: 18, backgroundColor: 'rgba(16,2,20,0.55)', borderWidth: 1, borderColor: 'rgba(255,120,200,0.22)', gap: 1 },
+  sideName: { color: '#FFFFFF', fontWeight: '800', marginBottom: 4 },
+  sideLabel: { color: '#C9B6EE', fontWeight: '700', letterSpacing: 0.5 },
+  sideValue: { color: GOLD, fontWeight: '900', marginBottom: 3 },
+  sideValueWhite: { color: '#FFFFFF', fontWeight: '800' },
+  beadGrid: { flexDirection: 'row', gap: 2, marginVertical: 4 },
+  beadCol: { gap: 2 },
+  bead: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
+  beadEmpty: { backgroundColor: 'rgba(255,255,255,0.06)' },
   beadLatest: { borderWidth: 2, borderColor: GOLD },
-  beadText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  beadText: { color: '#FFFFFF', fontWeight: '900' },
+  statRow: { flexDirection: 'row', gap: 6 },
+  statLine: { fontWeight: '800' },
 
-  table: { flex: 1, flexDirection: 'row', marginTop: 6, marginBottom: 6, padding: 6, borderRadius: 26, borderWidth: 2, borderColor: '#B0468F', gap: 6 },
-  sidePanel: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderRadius: 18, backgroundColor: 'rgba(20,4,26,0.45)', gap: 1 },
-  sideName: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', marginBottom: 4 },
-  sideLabel: { color: '#C9B6EE', fontSize: 10 },
-  sideValue: { color: GOLD, fontSize: 14, fontWeight: '900', marginBottom: 3 },
-  sideValueWhite: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
-  statLine: { fontSize: 12, fontWeight: '800' },
-  sideHint: { color: 'rgba(255,220,255,0.55)', fontSize: 9, textAlign: 'center', marginTop: 6 },
-  boxes: { flex: 1, flexDirection: 'row', gap: 6 },
-  centerCol: { flex: 1, gap: 6 },
-
-  boxOuter: { flex: 1 },
-  pressed: { transform: [{ scale: 0.97 }] },
-  boxFill: { flex: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)' },
+  boxHit: { position: 'absolute' },
+  boxPressed: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  boxInner: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   boxWin: { borderColor: GOLD, borderWidth: 3 },
-  suitPattern: { position: 'absolute', top: -6, left: -20, right: -20, bottom: 0, opacity: 0.07, transform: [{ rotate: '-12deg' }] },
-  suitRow: { color: '#FFFFFF', fontSize: 20, letterSpacing: 6, marginBottom: 6 },
-  boxShine: { position: 'absolute', top: 0, left: 0, right: 0, height: '45%' },
-  boxTitle: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '900', letterSpacing: 1.5 },
-  boxTitleBig: { fontSize: 24, letterSpacing: 4 },
-  boxMult: { color: GOLD, fontSize: 16, fontWeight: '900', marginTop: 1 },
-  boxMultBig: { fontSize: 26 },
-  boxMine: { position: 'absolute', bottom: 5, left: 10, color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' },
-  boxChip: { position: 'absolute', right: 5, top: 5 },
-  boxChipBig: { position: 'absolute', right: 10, bottom: 8 },
-  winGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,214,107,0.2)' },
-  burstWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  boxMark: { position: 'absolute', color: '#FFFFFF', opacity: 0.08, fontWeight: '900', textAlign: 'center' },
+  boxTitle: { color: 'rgba(255,255,255,0.95)', fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.65)', textShadowRadius: 5, textShadowOffset: { width: 0, height: 2 } },
+  boxMult: { color: GOLD, fontWeight: '900', marginTop: 1, textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } },
+  boxBet: { position: 'absolute', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.45)', borderWidth: 1, borderColor: 'rgba(255,214,107,0.5)' },
+  boxBetText: { color: '#FFFFFF', fontWeight: '800' },
+  pressed: { transform: [{ scale: 0.95 }] },
+  winGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,214,107,0.22)' },
+  burstWrap: { position: 'absolute', top: '42%', left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   coin: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFD23F', borderWidth: 1, borderColor: '#B7791F' },
   winText: { color: GOLD, fontSize: 30, fontWeight: '900', fontStyle: 'italic', textShadowColor: '#7A4A00', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
   loseShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
 
-  bottomBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#5A2468' },
-  chipRail: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  railText: { color: GOLD, fontWeight: '800' },
+  railHint: { color: 'rgba(255,220,255,0.6)', marginTop: 1 },
+  chipRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   chipBtn: { borderRadius: 30, padding: 2 },
-  chipActive: { backgroundColor: GOLD, transform: [{ translateY: -5 }], elevation: 8, shadowColor: GOLD, shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
+  chipActive: { backgroundColor: GOLD, transform: [{ translateY: -6 }], elevation: 8, shadowColor: GOLD, shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
   dim: { opacity: 0.35 },
-  actions: { flexDirection: 'row', gap: 8 },
-  ctrlBtn: { width: 58, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3A1648', borderWidth: 1.5, borderColor: '#7A3A8E' },
-  ctrlLabel: { color: '#F2E6FF', fontSize: 9, fontWeight: '800', marginTop: 1 },
+  actions: { flexDirection: 'row', gap: 6 },
+  ctrlBtn: { borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(58,22,72,0.9)', borderWidth: 1.5, borderColor: '#7A3A8E' },
+  ctrlLabel: { color: '#F2E6FF', fontWeight: '800', marginTop: 1 },
 
   bannerLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   bannerBar: { position: 'absolute', overflow: 'hidden' },
