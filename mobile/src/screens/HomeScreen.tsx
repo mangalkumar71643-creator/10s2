@@ -78,7 +78,9 @@ export default function HomeScreen() {
   const sevenUpDownTileLeft = GAME_GRID_LEFT;
   const plinkoTileTop = 2 * GAME_GRID_CELL;
   const plinkoTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 3;
+  const dragonTigerTileTop = 3 * GAME_GRID_CELL;
+  const dragonTigerTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 4;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -296,6 +298,31 @@ export default function HomeScreen() {
         ))}
         <View style={{ position: 'absolute', top: 22, right: 44, width: 14, height: 14, borderRadius: 7, backgroundColor: '#FF3D9A' }} />
         <Text style={{ color: '#FFD66B', fontSize: 20, fontWeight: '900', marginTop: 2, letterSpacing: 2 }}>PLINKO</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('DragonTiger')}
+        style={{
+          position: 'absolute',
+          top: dragonTigerTileTop,
+          left: dragonTigerTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#D9A441',
+          flexDirection: 'row',
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: '#1F3F9E', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 40 }}>🐉</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: '#9E1F2E', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 40 }}>🐯</Text>
+        </View>
+        <View style={{ position: 'absolute', bottom: 8, left: 0, right: 0, alignItems: 'center' }}>
+          <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1 }}>DRAGON TIGER</Text>
+        </View>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

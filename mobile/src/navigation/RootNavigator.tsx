@@ -9,6 +9,7 @@ import ChickenRoadScreen from '../screens/ChickenRoadScreen';
 import MinesScreen from '../screens/MinesScreen';
 import SevenUpDownScreen from '../screens/SevenUpDownScreen';
 import PlinkoScreen from '../screens/PlinkoScreen';
+import DragonTigerScreen from '../screens/DragonTigerScreen';
 import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
@@ -67,6 +68,7 @@ function MainNavigator() {
       <Stack.Screen name="Mines" component={MinesScreen} />
       <Stack.Screen name="SevenUpDown" component={SevenUpDownScreen} />
       <Stack.Screen name="Plinko" component={PlinkoScreen} />
+      <Stack.Screen name="DragonTiger" component={DragonTigerScreen} />
     </Stack.Navigator>
   );
 }

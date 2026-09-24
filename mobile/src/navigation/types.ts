@@ -29,4 +29,5 @@ export type RootStackParamList = {
   Mines: undefined;
   SevenUpDown: undefined;
   Plinko: undefined;
+  DragonTiger: undefined;
 };
