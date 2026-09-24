@@ -26,7 +26,11 @@ export function multiplierFor(mineCount: number, safeRevealed: number): number {
   for (let i = 0; i < safeRevealed; i++) {
     survive *= (TILE_COUNT - mineCount - i) / (TILE_COUNT - i);
   }
-  return round2(env.games.rtp / survive);
+  // A safe pick never pays back less than the stake: each one is worth at
+  // least 1% more than the last (1.01x, 1.02x, ...). This only lifts the
+  // first pick or two with 1-2 mines, where the fair value dips under 1x;
+  // those few cash-out points return a bit more than rtp.
+  return Math.max(round2(env.games.rtp / survive), round2(1 + 0.01 * safeRevealed));
 }
 
 /**
