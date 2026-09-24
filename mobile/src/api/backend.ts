@@ -646,3 +646,49 @@ export function fetchSevenUpDownMyRound(periodNumber?: string) {
   const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
   return apiFetch<{ periodNumber: string | null; bets: SevenUpDownBet[] }>(`/seven-up-down/my-round${q}`);
 }
+
+// ---- Plinko ----
+
+export type PlinkoRisk = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface PlinkoConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  minRows: number;
+  maxRows: number;
+  risks: PlinkoRisk[];
+  rtpPercent: number;
+  // multipliers[risk][rows] = payout for each landing slot, left to right
+  multipliers: Record<PlinkoRisk, Record<string, number[]>>;
+}
+
+export interface PlinkoBet {
+  id: string;
+  stake: string;
+  rows: number;
+  risk: PlinkoRisk;
+  path: number[]; // 0 = bounced left, 1 = bounced right, one per row
+  slot: number;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export function fetchPlinkoConfig() {
+  return apiFetch<PlinkoConfig>('/plinko/config');
+}
+
+export function dropPlinkoBall(stake: number, rows: number, risk: PlinkoRisk) {
+  return apiFetch<PlinkoBet>('/plinko/drop', {
+    method: 'POST',
+    body: JSON.stringify({ stake, rows, risk }),
+  });
+}
+
+export function fetchPlinkoHistory(limit = 30) {
+  return apiFetch<PlinkoBet[]>(`/plinko/my-history?limit=${limit}`);
+}

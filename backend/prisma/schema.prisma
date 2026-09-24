@@ -177,6 +177,7 @@ model User {
   chickenRoadRounds    ChickenRoadRound[]
   minesRounds          MinesRound[]
   sevenUpDownBets      SevenUpDownBet[]
+  plinkoBets           PlinkoBet[]
 }
 
 model KycVerification {
@@ -522,4 +523,27 @@ model SevenUpDownBet {
 
   @@index([userId])
   @@index([roundId, userId])
+}
+
+// "Plinko" — one row per ball dropped (see plinkoService.ts). path holds
+// one 0 (left) / 1 (right) per row, drawn from the player's provably-fair
+// seeds; slot is its sum. serverSeed is kept for audit but never sent.
+model PlinkoBet {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  rows           Int
+  risk           String
+  path           Int[]
+  slot           Int
+  multiplier     Decimal  @db.Decimal(10, 2)
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
