@@ -42,6 +42,7 @@ const AUTO_ROUND_OPTIONS = [3, 10, 25, 50, 100];
 const DEFAULT_AUTO_ROUNDS = 10;
 const AUTO_REVEAL_GAP_MS = 250;
 const AUTO_ROUND_PAUSE_MS = 900;
+const WIN_CARD_MS = 3000;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const BOARD_GAP = 10;
@@ -158,6 +159,13 @@ export default function MinesScreen() {
     };
   }, []);
 
+  // The win card clears itself after a few seconds, or at once via its ✕.
+  useEffect(() => {
+    if (result?.kind !== 'won') return;
+    const id = setTimeout(() => setResult(null), WIN_CARD_MS);
+    return () => clearTimeout(id);
+  }, [result]);
+
   const isPlaying = round?.status === 'PENDING';
   const locked = busy || autoRunning;
   const activeMines = round?.mineCount ?? mineCount;
@@ -167,6 +175,7 @@ export default function MinesScreen() {
   const revealedCount = round?.revealed.length ?? 0;
   const safeTiles = TILE_COUNT - activeMines;
   const selectingTiles = autoMode && !autoRunning && !isPlaying;
+  const randomEnabled = selectingTiles || (isPlaying && !locked);
 
   const ladder = config?.multipliers[String(activeMines)];
   const nextStep = selectingTiles && autoTiles.length > 0 ? autoTiles.length : (isPlaying ? revealedCount : 0) + 1;
@@ -461,10 +470,15 @@ export default function MinesScreen() {
       <View style={styles.boardArea}>
         <View style={styles.board}>{Array.from({ length: TILE_COUNT }, (_, i) => renderTile(i))}</View>
         {result?.kind === 'won' && (
-          <View style={styles.winCard} pointerEvents="none">
-            <Text style={styles.winMultiplier}>x{result.multiplier.toFixed(2)}</Text>
-            <Text style={styles.winPayout}>₹{result.payout.toFixed(2)}</Text>
-            {result.payout >= maxPayout && <Text style={styles.winNote}>Max win reached</Text>}
+          <View style={styles.winWrap} pointerEvents="box-none">
+            <View style={styles.winCard}>
+              <Text style={styles.winMultiplier}>x{result.multiplier.toFixed(2)}</Text>
+              <Text style={styles.winPayout}>₹{result.payout.toFixed(2)}</Text>
+              {result.payout >= maxPayout && <Text style={styles.winNote}>Max win reached</Text>}
+            </View>
+            <Pressable onPress={() => setResult(null)} style={styles.winClose} hitSlop={10}>
+              <MaterialCommunityIcons name="close" size={20} color="#FFFFFF" />
+            </Pressable>
           </View>
         )}
         {selectingTiles && autoTiles.length === 0 && (
@@ -477,19 +491,23 @@ export default function MinesScreen() {
       <View style={styles.optionsRow}>
         <Pressable
           onPress={randomPick}
-          disabled={!(selectingTiles || (isPlaying && !locked))}
-          style={[styles.randomBtn, !(selectingTiles || isPlaying) && styles.locked]}
+          disabled={!randomEnabled}
+          style={[styles.randomBtn, !randomEnabled && styles.locked]}
         >
-          <Text style={styles.randomBtnText}>RANDOM</Text>
+          <Text style={[styles.randomBtnText, randomEnabled && styles.randomBtnTextOn]} numberOfLines={1} adjustsFontSizeToFit>
+            RANDOM
+          </Text>
         </Pressable>
         <Pressable
           onPress={toggleAutoMode}
           disabled={locked || isPlaying}
           style={[styles.autoPill, (locked || isPlaying) && !autoMode && styles.locked]}
         >
-          <MaterialCommunityIcons name="autorenew" size={26} color="#FFFFFF" />
+          <MaterialCommunityIcons name="autorenew" size={24} color="#FFFFFF" />
           <Toggle value={autoMode} />
-          <Text style={styles.autoPillText}>Auto Game</Text>
+          <Text style={styles.autoPillText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            Auto Game
+          </Text>
         </Pressable>
       </View>
 
@@ -810,8 +828,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#3A78D4',
   },
   tileDotSelected: { backgroundColor: '#F5C21B' },
+  winWrap: { position: 'absolute', alignItems: 'center' },
+  winClose: {
+    marginTop: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(6, 30, 80, 0.92)',
+    borderWidth: 2,
+    borderColor: '#35E0B0',
+  },
   winCard: {
-    position: 'absolute',
     alignItems: 'center',
     paddingHorizontal: 34,
     paddingVertical: 16,
@@ -836,17 +865,19 @@ const styles = StyleSheet.create({
     borderColor: '#0A3F86',
   },
   randomBtnText: { color: '#8FB8F0', fontSize: 18, fontWeight: '600', letterSpacing: 0.5 },
+  randomBtnTextOn: { color: '#FFFFFF' },
   autoPill: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
+    gap: 8,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 24,
     backgroundColor: '#0A3F86',
+    overflow: 'hidden',
   },
-  autoPillText: { color: '#FFFFFF', fontSize: 16, fontWeight: '500' },
+  autoPillText: { flex: 1, color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
   toggleTrack: {
     width: 40,
     height: 22,
