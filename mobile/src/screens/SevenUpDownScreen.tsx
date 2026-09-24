@@ -47,21 +47,21 @@ const CHIP_COLORS: Record<number, string> = {
 const DEFAULT_CHIP = 10;
 
 // Shown when the config hasn't loaded yet — same formula as the server
-// (rtp * 36 / ways, rounded down at 92% RTP).
+// (rtp * 36 / ways, rounded down at 90% RTP).
 const FALLBACK_MULTIPLIERS: Record<SevenUpDownArea, number> = {
-  DOWN: 2.2,
-  SEVEN: 5.52,
-  UP: 2.2,
-  N2: 33.12,
-  N3: 16.56,
-  N4: 11.04,
-  N5: 8.28,
-  N6: 6.62,
-  N8: 6.62,
-  N9: 8.28,
-  N10: 11.04,
-  N11: 16.56,
-  N12: 33.12,
+  DOWN: 2.16,
+  SEVEN: 5.4,
+  UP: 2.16,
+  N2: 32.4,
+  N3: 16.2,
+  N4: 10.8,
+  N5: 8.1,
+  N6: 6.48,
+  N8: 6.48,
+  N9: 8.1,
+  N10: 10.8,
+  N11: 16.2,
+  N12: 32.4,
 };
 
 // Every box on the board has its own background.

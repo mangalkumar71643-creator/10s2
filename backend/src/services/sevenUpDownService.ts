@@ -40,7 +40,7 @@ function winningWays(area: Area): number {
 }
 
 /** Total return per unit staked (stake included), so that
- * multiplier * P(win) = rtp — the same 8% edge as the other games.
+ * multiplier * P(win) = rtp — the same house edge as the other games.
  * Rounded down so the edge is never smaller than advertised. */
 export function multiplierFor(area: Area): number {
   return floor2((env.games.rtp * 36) / winningWays(area));
