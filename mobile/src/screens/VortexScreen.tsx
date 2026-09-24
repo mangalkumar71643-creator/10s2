@@ -3,8 +3,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import Svg, { Circle, Defs, G, Path, RadialGradient, Stop } from 'react-native-svg';
+import { Animated, Easing, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Svg, { Circle, Defs, G, Line, Path, RadialGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -46,6 +46,18 @@ const LOOK: Record<VortexOutcome, Look> = {
   FIRE: { name: 'Fire', icon: 'fire', colors: ['#FF8A2A', '#B51E08'], glow: '#FF7A2A' },
   CRASH: { name: 'Vortex', icon: 'weather-hurricane', colors: ['#3A1260', '#0C0218'], glow: '#B45CFF' },
 };
+const ELEMENT_ART: Record<VortexElement, number> = {
+  WATER: require('../../assets/vortex/water.png'),
+  EARTH: require('../../assets/vortex/earth.png'),
+  FIRE: require('../../assets/vortex/fire.png'),
+};
+
+/** Element badge art, or the vortex glyph for the losing segment. */
+function ElementIcon({ kind, size }: { kind: VortexOutcome; size: number }) {
+  if (kind === 'CRASH') return <MaterialCommunityIcons name={LOOK.CRASH.icon} size={size * 0.9} color="#D9A6FF" />;
+  return <Image source={ELEMENT_ART[kind]} style={{ width: size, height: size }} />;
+}
+
 // Rings from the outside in.
 const RING_ORDER: VortexElement[] = ['FIRE', 'EARTH', 'WATER'];
 const FILL_KEY: Record<VortexElement, 'water' | 'earth' | 'fire'> = { WATER: 'water', EARTH: 'earth', FIRE: 'fire' };
@@ -94,9 +106,9 @@ const Wheel = memo(function Wheel({ size, wheel }: { size: number; wheel: Vortex
   const c = size / 2;
   const seg = 360 / wheel.length;
   const r1 = size * 0.485;
-  const r0 = size * 0.355;
+  const r0 = size * 0.4;
   const iconR = (r0 + r1) / 2;
-  const iconSize = size * 0.058;
+  const iconSize = size * 0.068;
   return (
     <View style={{ width: size, height: size }}>
       <Svg width={size} height={size}>
@@ -119,7 +131,7 @@ const Wheel = memo(function Wheel({ size, wheel }: { size: number; wheel: Vortex
         const [x, y] = polar(c, c, iconR, deg);
         return (
           <View key={i} style={{ position: 'absolute', left: x - iconSize / 2, top: y - iconSize / 2, transform: [{ rotate: `${deg}deg` }] }}>
-            <MaterialCommunityIcons name={LOOK[k].icon} size={iconSize} color={k === 'CRASH' ? '#D9A6FF' : '#FFFFFF'} />
+            <ElementIcon kind={k} size={iconSize} />
           </View>
         );
       })}
@@ -160,27 +172,73 @@ function RimLights({ size, count }: { size: number; count: number }) {
   );
 }
 
-/** One element's ring of sections; `pulse` flashes the lit sections. */
-function Ring({ size, r, width, sections, filled, element, pulse, dim }: { size: number; r: number; width: number; sections: number; filled: number; element: VortexElement; pulse: Animated.Value; dim: boolean }) {
+/** One element's ring: its badge at 12 o'clock, then one slot per section
+ * labelled with what the ring is worth once that section is filled. Lit
+ * slots take the element's colour; `pulse` flashes them when one is added. */
+function ElementRing({ size, rIn, rOut, element, ladder, filled, pulse }: { size: number; rIn: number; rOut: number; element: VortexElement; ladder: number[]; filled: number; pulse: Animated.Value }) {
   const c = size / 2;
-  const step = 360 / sections;
-  const gap = Math.min(4, step * 0.18);
+  const sections = ladder.length - 1;
+  const slots = sections + 1;
+  const step = 360 / slots;
+  const band = rOut - rIn;
+  const rMid = (rIn + rOut) / 2;
+  const fs = Math.min(band * 0.42, (2 * Math.PI * rMid) / slots / 3.2);
   const look = LOOK[element];
-  const paths = Array.from({ length: sections }, (_, j) => arc(c, c, r, j * step + gap / 2, (j + 1) * step - gap / 2));
+  const lit = (j: number) => j >= 1 && j <= filled;
+  const slotPath = (j: number) => wedge(c, c, rIn + 2, rOut - 2, (j - 0.5) * step + 1, (j + 0.5) * step - 1);
+  const badge = band * 0.95;
   return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: dim ? 0.35 : 1 }]}>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-        {paths.map((d, j) => (
-          <Path key={j} d={d} stroke={j < filled ? look.colors[0] : '#FFFFFF'} strokeOpacity={j < filled ? 1 : 0.12} strokeWidth={width} strokeLinecap="round" fill="none" />
-        ))}
+        <Circle cx={c} cy={c} r={rMid} stroke="#1C1E24" strokeWidth={band} fill="none" />
+        <Circle cx={c} cy={c} r={rOut} stroke="#3A3D47" strokeWidth={1.5} fill="none" />
+        <Circle cx={c} cy={c} r={rIn} stroke="#0C0D10" strokeWidth={2} fill="none" />
+        {Array.from({ length: sections }, (_, i) => i + 1)
+          .filter(lit)
+          .map((j) => (
+            <Path key={`f${j}`} d={slotPath(j)} fill={look.colors[0]} fillOpacity={0.78} />
+          ))}
+        {Array.from({ length: slots }, (_, j) => {
+          const a = (j + 0.5) * step;
+          const [x0, y0] = polar(c, c, rMid - band * 0.18, a);
+          const [x1, y1] = polar(c, c, rMid + band * 0.18, a);
+          return <Line key={`t${j}`} x1={x0} y1={y0} x2={x1} y2={y1} stroke="#5A5E69" strokeWidth={1.5} strokeLinecap="round" />;
+        })}
+        {Array.from({ length: sections }, (_, i) => i + 1).map((j) => {
+          const a = j * step;
+          const [x, y] = polar(c, c, rMid, a);
+          const rot = a > 90 && a < 270 ? a - 180 : a;
+          return (
+            <SvgText
+              key={`l${j}`}
+              x={x}
+              y={y + fs * 0.36}
+              fontSize={fs}
+              fontWeight="900"
+              fontFamily="sans-serif"
+              textAnchor="middle"
+              fill={lit(j) ? '#FFFFFF' : '#7C808C'}
+              rotation={rot}
+              origin={`${x}, ${y}`}
+            >
+              {`${ladder[j]}X`}
+            </SvgText>
+          );
+        })}
+        <Circle cx={c} cy={c - rMid} r={badge / 2 + 2} fill="#15171B" stroke="#3A3D47" strokeWidth={1.5} />
       </Svg>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: pulse }]}>
         <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-          {paths.slice(0, filled).map((d, j) => (
-            <Path key={j} d={d} stroke={look.glow} strokeOpacity={0.55} strokeWidth={width * 2.4} strokeLinecap="round" fill="none" />
-          ))}
+          {Array.from({ length: sections }, (_, i) => i + 1)
+            .filter(lit)
+            .map((j) => (
+              <Path key={j} d={slotPath(j)} fill={look.glow} fillOpacity={0.6} />
+            ))}
         </Svg>
       </Animated.View>
+      <View style={{ position: 'absolute', left: c - badge / 2, top: c - rMid - badge / 2 }}>
+        <ElementIcon kind={element} size={badge} />
+      </View>
     </View>
   );
 }
@@ -448,8 +506,7 @@ export default function VortexScreen() {
   const avail = H - insets.top - topH - 64 - 34 - bottomH;
   const S = Math.max(220, Math.min(W - 28, avail));
   const c = S / 2;
-  const ringW = S * 0.03;
-  const ringR: Record<VortexElement, number> = { FIRE: S * 0.31, EARTH: S * 0.262, WATER: S * 0.214 };
+  const ringBand: Record<VortexElement, [number, number]> = { FIRE: [S * 0.322, S * 0.392], EARTH: [S * 0.252, S * 0.322], WATER: [S * 0.182, S * 0.252] };
   const swirlSize = S * 0.36;
 
   const multiplier = round ? Number(round.multiplier) : 0;
@@ -499,7 +556,7 @@ export default function VortexScreen() {
           const filled = showFills && round ? round[FILL_KEY[el]] : 0;
           return (
             <LinearGradient key={el} colors={[LOOK[el].colors[1], '#12002A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.meter}>
-              <MaterialCommunityIcons name={LOOK[el].icon} size={20} color={LOOK[el].colors[0]} />
+              <ElementIcon kind={el} size={30} />
               <View style={{ marginLeft: 6 }}>
                 <Text style={styles.meterMult}>x{(e?.ladder[filled] ?? 1).toFixed(2)}</Text>
                 <Text style={styles.meterSub}>
@@ -525,33 +582,35 @@ export default function VortexScreen() {
             <Svg width={S} height={S} style={StyleSheet.absoluteFill}>
               <Defs>
                 <RadialGradient id="disc" cx="50%" cy="50%" r="50%">
-                  <Stop offset="0" stopColor="#2A0550" />
-                  <Stop offset="1" stopColor="#0B0118" />
+                  <Stop offset="0" stopColor="#1A1C22" />
+                  <Stop offset="1" stopColor="#2A2D35" />
                 </RadialGradient>
               </Defs>
-              <Circle cx={c} cy={c} r={S * 0.35} fill="url(#disc)" />
+              <Circle cx={c} cy={c} r={S * 0.398} fill="url(#disc)" />
+              <Circle cx={c} cy={c} r={S * 0.176} fill="#17181D" stroke="#34373F" strokeWidth={2} />
             </Svg>
             <Animated.View style={[StyleSheet.absoluteFill, { opacity: crashAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.25] }) }]}>
               {RING_ORDER.map((el) => (
-                <Ring
+                <ElementRing
                   key={el}
                   size={S}
-                  r={ringR[el]}
-                  width={ringW}
-                  sections={elements[el]?.sections ?? 5}
-                  filled={showFills && round ? round[FILL_KEY[el]] : 0}
+                  rIn={ringBand[el][0]}
+                  rOut={ringBand[el][1]}
                   element={el}
+                  ladder={elements[el]?.ladder ?? [1]}
+                  filled={showFills && round ? round[FILL_KEY[el]] : 0}
                   pulse={pulses[el]}
-                  dim={false}
                 />
               ))}
             </Animated.View>
             <Animated.View
               style={{
                 position: 'absolute',
+                // Hidden until the vortex hits, then it swallows the rings.
+                opacity: crashAnim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.95, 0.9] }),
                 transform: [
                   { rotate: swirlSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] }) },
-                  { scale: crashAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.1] }) },
+                  { scale: crashAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 2.1] }) },
                 ],
               }}
             >
@@ -592,9 +651,9 @@ export default function VortexScreen() {
             {landed.map((seg, i) => {
               const k = wheel[seg];
               return (
-                <LinearGradient key={i} colors={LOOK[k].colors} style={styles.trailChip}>
-                  <MaterialCommunityIcons name={LOOK[k].icon} size={14} color="#FFFFFF" />
-                </LinearGradient>
+                <View key={i} style={styles.trailChip}>
+                  <ElementIcon kind={k} size={24} />
+                </View>
               );
             })}
           </ScrollView>
@@ -688,7 +747,7 @@ export default function VortexScreen() {
                   <Text style={styles.sheetSection}>ELEMENTS</Text>
                   {config.elements.map((e) => (
                     <View key={e.element} style={styles.elementRow}>
-                      <MaterialCommunityIcons name={LOOK[e.element].icon} size={20} color={LOOK[e.element].colors[0]} />
+                      <ElementIcon kind={e.element} size={22} />
                       <Text style={styles.elementName}>{LOOK[e.element].name}</Text>
                       <Text style={styles.elementInfo}>
                         x{e.factor} per hit · {e.sections} sections · full ring x{e.ladder[e.sections]}
@@ -696,7 +755,7 @@ export default function VortexScreen() {
                     </View>
                   ))}
                   <View style={styles.elementRow}>
-                    <MaterialCommunityIcons name={LOOK.CRASH.icon} size={20} color="#D9A6FF" />
+                    <ElementIcon kind="CRASH" size={22} />
                     <Text style={styles.elementName}>Vortex</Text>
                     <Text style={styles.elementInfo}>round lost</Text>
                   </View>
@@ -731,7 +790,7 @@ export default function VortexScreen() {
                           <Text style={styles.histTime}>{new Date(h.createdAt).toLocaleString()}</Text>
                           <View style={styles.histSegs}>
                             {h.segments.map((s, i) => (
-                              <MaterialCommunityIcons key={i} name={LOOK[wheel[s]]?.icon ?? 'circle'} size={13} color={LOOK[wheel[s]]?.colors[0] ?? '#FFF'} />
+                              <ElementIcon key={i} kind={wheel[s] ?? 'CRASH'} size={15} />
                             ))}
                           </View>
                         </View>
@@ -799,7 +858,7 @@ const styles = StyleSheet.create({
   trail: { height: 34, justifyContent: 'center', paddingHorizontal: 12 },
   trailHint: { color: 'rgba(233,216,255,0.6)', fontSize: 12, textAlign: 'center', fontWeight: '700' },
   trailRow: { gap: 5, alignItems: 'center' },
-  trailChip: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  trailChip: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1C1E24', overflow: 'hidden' },
 
   panel: { paddingHorizontal: 12, paddingTop: 10, backgroundColor: 'rgba(20,4,40,0.92)', borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: 1, borderColor: 'rgba(178,77,255,0.35)', gap: 10 },
   stakeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
