@@ -7,7 +7,7 @@ import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 import ScreenContainer from '../components/ScreenContainer';
 import { ApiClientError } from '../api/client';
 import { RootStackParamList } from '../navigation/types';
-import { useAuth } from '../state/AuthContext';
+import { KYC_REQUIRED, useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
 import * as walletService from '../services/walletService';
 import { colors, gradients, radius, spacing, typography } from '../theme';
@@ -35,7 +35,7 @@ export default function DepositScreen() {
   const [amountText, setAmountText] = useState(String(QUICK_AMOUNTS[1]));
   const [busy, setBusy] = useState(false);
 
-  const kycApproved = backendUser?.kycStatus === 'APPROVED';
+  const kycApproved = !KYC_REQUIRED || backendUser?.kycStatus === 'APPROVED';
   const amount = Number(amountText);
   const isValidAmount = amountText.trim().length > 0 && amount >= MIN_DEPOSIT && amount <= MAX_DEPOSIT;
   const bonusPreview = !firstDepositBonusClaimed && isValidAmount ? previewBonus(amount) : 0;

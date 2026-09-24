@@ -7,7 +7,7 @@ import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'reac
 import ScreenContainer from '../components/ScreenContainer';
 import { ApiClientError } from '../api/client';
 import { RootStackParamList } from '../navigation/types';
-import { useAuth } from '../state/AuthContext';
+import { KYC_REQUIRED, useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
 import * as walletService from '../services/walletService';
 import { colors, gradients, radius, shadow, spacing, typography } from '../theme';
@@ -40,7 +40,7 @@ export default function WithdrawScreen() {
   const [ifscInput, setIfscInput] = useState('');
   const [savingBank, setSavingBank] = useState(false);
 
-  const kycApproved = backendUser?.kycStatus === 'APPROVED';
+  const kycApproved = !KYC_REQUIRED || backendUser?.kycStatus === 'APPROVED';
   const maxWithdraw = Math.min(withdrawable, remainingWithdrawalLimit);
   const amount = Number(amountText);
   const isValidAmount = amountText.trim().length > 0 && amount >= MIN_WITHDRAW && amount <= maxWithdraw;

@@ -84,6 +84,11 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+// KYC gate is off while the app is in testing (the backend's check in
+// responsibleGamblingService.ts is off too). Set back to true — and
+// re-enable the backend check — before real money goes live.
+export const KYC_REQUIRED = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);

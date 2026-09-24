@@ -7,7 +7,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import ScreenContainer from '../components/ScreenContainer';
 import { BottomTabParamList, RootStackParamList } from '../navigation/types';
-import { useAuth } from '../state/AuthContext';
+import { KYC_REQUIRED, useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
 import { colors, gradients, radius, spacing, typography } from '../theme';
 
@@ -19,7 +19,7 @@ export default function WalletScreen() {
   const { coins } = useGameState();
   const { backendUser } = useAuth();
 
-  const kycApproved = backendUser?.kycStatus === 'APPROVED';
+  const kycApproved = !KYC_REQUIRED || backendUser?.kycStatus === 'APPROVED';
 
   return (
     <ScreenContainer contentStyle={styles.content}>
