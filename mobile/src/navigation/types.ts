@@ -30,4 +30,5 @@ export type RootStackParamList = {
   SevenUpDown: undefined;
   Plinko: undefined;
   DragonTiger: undefined;
+  Vortex: undefined;
 };

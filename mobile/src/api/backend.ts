@@ -776,3 +776,74 @@ export function fetchDragonTigerMyRound(periodNumber?: string) {
   const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
   return apiFetch<{ periodNumber: string | null; bets: DragonTigerBet[] }>(`/dragon-tiger/my-round${q}`);
 }
+
+export type VortexElement = 'WATER' | 'EARTH' | 'FIRE';
+export type VortexOutcome = VortexElement | 'CRASH';
+
+export interface VortexElementConfig {
+  element: VortexElement;
+  factor: number;
+  sections: number;
+  chancePercent: number;
+  ladder: number[];
+}
+
+export interface VortexConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  wheel: VortexOutcome[];
+  elements: VortexElementConfig[];
+  crashChancePercent: number;
+}
+
+export interface VortexRound {
+  id: string;
+  userId: string;
+  stake: string;
+  water: number;
+  earth: number;
+  fire: number;
+  spins: number;
+  segments: number[];
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  endReason: string | null;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export interface VortexSpinResult {
+  round: VortexRound;
+  segment: number;
+  outcome: VortexOutcome;
+}
+
+export function fetchVortexConfig() {
+  return apiFetch<VortexConfig>('/vortex/config');
+}
+
+export function fetchVortexCurrent() {
+  return apiFetch<VortexRound | null>('/vortex/current');
+}
+
+export function fetchVortexHistory(limit = 30) {
+  return apiFetch<VortexRound[]>(`/vortex/my-history?limit=${limit}`);
+}
+
+export function startVortexRound(stake: number) {
+  return apiFetch<VortexSpinResult>('/vortex/start', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function spinVortexRound(roundId: string) {
+  return apiFetch<VortexSpinResult>('/vortex/spin', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
+export function cashOutVortexRound(roundId: string) {
+  return apiFetch<VortexRound>('/vortex/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}

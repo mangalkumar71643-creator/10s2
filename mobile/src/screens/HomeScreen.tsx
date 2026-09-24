@@ -1,3 +1,4 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -80,6 +81,8 @@ export default function HomeScreen() {
   const plinkoTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const dragonTigerTileTop = 3 * GAME_GRID_CELL;
   const dragonTigerTileLeft = GAME_GRID_LEFT;
+  const vortexTileTop = 3 * GAME_GRID_CELL;
+  const vortexTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 4;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -323,6 +326,30 @@ export default function HomeScreen() {
         <View style={{ position: 'absolute', bottom: 8, left: 0, right: 0, alignItems: 'center' }}>
           <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1 }}>DRAGON TIGER</Text>
         </View>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Vortex')}
+        style={{
+          position: 'absolute',
+          top: vortexTileTop,
+          left: vortexTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          backgroundColor: '#1A0038',
+          borderWidth: 2,
+          borderColor: '#B24DFF',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <MaterialCommunityIcons name="weather-hurricane" size={GAME_ICON_SIZE * 0.42} color="#D08CFF" />
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+          <MaterialCommunityIcons name="water" size={16} color="#3FA2FF" />
+          <MaterialCommunityIcons name="leaf" size={16} color="#39D67A" />
+          <MaterialCommunityIcons name="fire" size={16} color="#FF8A2A" />
+        </View>
+        <Text style={{ color: '#FFD66B', fontSize: 18, fontWeight: '900', letterSpacing: 3, marginTop: 2 }}>VORTEX</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
