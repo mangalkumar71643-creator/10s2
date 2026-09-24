@@ -511,3 +511,63 @@ export function cashOutChickenRoadRound(roundId: string) {
     body: JSON.stringify({ roundId }),
   });
 }
+
+export interface MinesConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  tiles: number;
+  minMines: number;
+  maxMines: number;
+  // multipliers[mineCount][safeTilesRevealed]
+  multipliers: Record<string, number[]>;
+}
+
+export interface MinesRound {
+  id: string;
+  userId: string;
+  stake: string;
+  mineCount: number;
+  revealed: number[];
+  // Only present once the round has ended.
+  minePositions?: number[];
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  serverSeedHash: string;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export function fetchMinesConfig() {
+  return apiFetch<MinesConfig>('/mines/config');
+}
+
+export function fetchMinesCurrent() {
+  return apiFetch<MinesRound | null>('/mines/current');
+}
+
+export function fetchMinesHistory(limit = 30) {
+  return apiFetch<MinesRound[]>(`/mines/my-history?limit=${limit}`);
+}
+
+export function startMinesRound(stake: number, mineCount: number) {
+  return apiFetch<MinesRound>('/mines/start', {
+    method: 'POST',
+    body: JSON.stringify({ stake, mineCount }),
+  });
+}
+
+export function revealMinesTile(roundId: string, tile: number) {
+  return apiFetch<{ round: MinesRound; hitMine: boolean }>('/mines/reveal', {
+    method: 'POST',
+    body: JSON.stringify({ roundId, tile }),
+  });
+}
+
+export function cashOutMinesRound(roundId: string) {
+  return apiFetch<MinesRound>('/mines/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ roundId }),
+  });
+}

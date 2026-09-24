@@ -70,6 +70,8 @@ export default function HomeScreen() {
   // Chicken Road sits directly below Win Go — same column, next row down.
   const chickenRoadTileTop = gameGridTop + GAME_GRID_CELL;
   const chickenRoadTileLeft = GAME_GRID_LEFT;
+  const minesTileTop = gameGridTop + GAME_GRID_CELL;
+  const minesTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -220,6 +222,22 @@ export default function HomeScreen() {
         }}
       >
         <Text style={{ fontSize: GAME_ICON_SIZE * 0.5 }}>🐔</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Mines')}
+        style={{
+          position: 'absolute',
+          top: minesTileTop,
+          left: minesTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          backgroundColor: '#0B4FB8',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: GAME_ICON_SIZE * 0.5 }}>💣</Text>
       </Pressable>
     </ScreenContainer>
   );

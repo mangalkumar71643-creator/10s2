@@ -26,4 +26,5 @@ export type RootStackParamList = {
   ColorPredict: undefined;
   Aviator: undefined;
   ChickenRoad: undefined;
+  Mines: undefined;
 };
