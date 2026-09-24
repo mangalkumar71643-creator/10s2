@@ -178,6 +178,7 @@ model User {
   minesRounds          MinesRound[]
   sevenUpDownBets      SevenUpDownBet[]
   plinkoBets           PlinkoBet[]
+  dragonTigerBets      DragonTigerBet[]
 }
 
 model KycVerification {
@@ -546,4 +547,47 @@ model PlinkoBet {
   createdAt      DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// "Dragon Tiger" — one card each to Dragon and Tiger per shared,
+// slot-aligned round (see dragonTigerService.ts). Cards are stored as
+// 0..51 (rank = index % 13 + 1, suit = index / 13), fixed from serverSeed
+// when the round is created and only exposed once resultTime has passed.
+model DragonTigerRound {
+  id             String           @id @default(uuid())
+  periodNumber   String           @unique
+  startTime      DateTime
+  betEndTime     DateTime
+  resultTime     DateTime
+  endTime        DateTime
+  dragonCard     Int
+  tigerCard      Int
+  serverSeed     String
+  serverSeedHash String
+  settled        Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  bets           DragonTigerBet[]
+
+  @@index([startTime])
+  @@index([settled, resultTime])
+}
+
+// area is DRAGON | TIE | TIGER | SUITED_TIE; multiplier is the total return
+// locked in when the bet was placed. VOID marks a bet taken back (undo /
+// clear) during the betting window.
+model DragonTigerBet {
+  id         String           @id @default(uuid())
+  roundId    String
+  round      DragonTigerRound @relation(fields: [roundId], references: [id])
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  area       String
+  amount     Decimal          @db.Decimal(12, 2)
+  multiplier Decimal          @db.Decimal(8, 2)
+  status     BetStatus        @default(PENDING)
+  payout     Decimal          @db.Decimal(12, 2) @default(0)
+  createdAt  DateTime         @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
 }

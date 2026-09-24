@@ -692,3 +692,87 @@ export function dropPlinkoBall(stake: number, rows: number, risk: PlinkoRisk) {
 export function fetchPlinkoHistory(limit = 30) {
   return apiFetch<PlinkoBet[]>(`/plinko/my-history?limit=${limit}`);
 }
+
+// ---- Dragon Tiger ----
+
+export type DragonTigerArea = 'DRAGON' | 'TIE' | 'TIGER' | 'SUITED_TIE';
+export type CardSuit = 'S' | 'H' | 'C' | 'D';
+export interface PlayingCard {
+  rank: number; // 1 = A ... 13 = K
+  suit: CardSuit;
+}
+
+export interface DragonTigerConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  roundSeconds: number;
+  betSeconds: number;
+  resultAtSeconds: number;
+  rtpPercent: number;
+  multipliers: Record<DragonTigerArea, number>;
+}
+
+export interface DragonTigerRoundView {
+  periodNumber: string;
+  startTime: string;
+  betEndTime: string;
+  resultTime: string;
+  endTime: string;
+  serverTime: string;
+  phase: 'BETTING' | 'DEALING' | 'RESULT';
+  serverSeedHash: string;
+  dragon: PlayingCard | null;
+  tiger: PlayingCard | null;
+  winner: 'DRAGON' | 'TIGER' | 'TIE' | null;
+  suitedTie: boolean | null;
+  serverSeed: string | null;
+}
+
+export interface DragonTigerBet {
+  id: string;
+  area: DragonTigerArea;
+  amount: string;
+  multiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+}
+
+export interface DragonTigerHistoryEntry {
+  periodNumber: string;
+  dragon: PlayingCard;
+  tiger: PlayingCard;
+  winner: 'DRAGON' | 'TIGER' | 'TIE';
+  suitedTie: boolean;
+}
+
+export function fetchDragonTigerConfig() {
+  return apiFetch<DragonTigerConfig>('/dragon-tiger/config');
+}
+
+export function fetchDragonTigerCurrent() {
+  return apiFetch<DragonTigerRoundView>('/dragon-tiger/current');
+}
+
+export function fetchDragonTigerHistory(limit = 100) {
+  return apiFetch<DragonTigerHistoryEntry[]>(`/dragon-tiger/history?limit=${limit}`);
+}
+
+export function placeDragonTigerBets(bets: { area: DragonTigerArea; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: DragonTigerBet[] }>('/dragon-tiger/bet', {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function cancelDragonTigerBets(betIds?: string[]) {
+  return apiFetch<{ cancelled: string[]; refund: number }>('/dragon-tiger/cancel', {
+    method: 'POST',
+    body: JSON.stringify(betIds ? { betIds } : {}),
+  });
+}
+
+export function fetchDragonTigerMyRound(periodNumber?: string) {
+  const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
+  return apiFetch<{ periodNumber: string | null; bets: DragonTigerBet[] }>(`/dragon-tiger/my-round${q}`);
+}
