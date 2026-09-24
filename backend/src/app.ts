@@ -18,6 +18,7 @@ import minesRoutes from "./routes/mines.routes";
 import sevenUpDownRoutes from "./routes/sevenUpDown.routes";
 import plinkoRoutes from "./routes/plinko.routes";
 import dragonTigerRoutes from "./routes/dragonTiger.routes";
+import vortexRoutes from "./routes/vortex.routes";
 
 export const app = express();
 
@@ -42,5 +43,6 @@ app.use("/mines", minesRoutes);
 app.use("/seven-up-down", sevenUpDownRoutes);
 app.use("/plinko", plinkoRoutes);
 app.use("/dragon-tiger", dragonTigerRoutes);
+app.use("/vortex", vortexRoutes);
 
 app.use(errorHandler);

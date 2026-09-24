@@ -108,41 +108,41 @@ enum ChickenRoadDifficulty {
 }
 
 model User {
-  id                   String    @id @default(uuid())
+  id           String    @id @default(uuid())
   // Short public-facing account number shown to the player (mobile UI's
   // "UID") — kept separate from `id` (the internal uuid every other
   // table's foreign keys point at) so this can be short/numeric without
   // touching any relation. Nullable so `prisma db push` can add the
   // column without a default; every create path generates one, and any
   // pre-existing row without one gets backfilled by prisma/seed.ts.
-  uid                  Int?      @unique
-  email                String?   @unique
-  passwordHash         String?
-  phone                String?   @unique
-  firstName            String
-  lastName             String
-  dateOfBirth          DateTime
-  country              String
-  role                 Role      @default(USER)
-  kycStatus            KycStatus @default(NOT_STARTED)
+  uid          Int?      @unique
+  email        String?   @unique
+  passwordHash String?
+  phone        String?   @unique
+  firstName    String
+  lastName     String
+  dateOfBirth  DateTime
+  country      String
+  role         Role      @default(USER)
+  kycStatus    KycStatus @default(NOT_STARTED)
 
   // Admin-initiated ban (distinct from the user's own isSelfExcluded) —
   // for rule violations. Checked in middleware/auth.ts's requireAuth so a
   // ban takes effect immediately, not just on the next login.
-  isBanned             Boolean   @default(false)
-  banReason            String?
-  bannedAt             DateTime?
+  isBanned  Boolean   @default(false)
+  banReason String?
+  bannedAt  DateTime?
 
   // Responsible gambling
-  isSelfExcluded       Boolean   @default(false)
-  selfExclusionUntil   DateTime?
-  depositLimitDaily    Decimal?  @db.Decimal(12, 2)
-  depositLimitWeekly   Decimal?  @db.Decimal(12, 2)
-  depositLimitMonthly  Decimal?  @db.Decimal(12, 2)
+  isSelfExcluded      Boolean   @default(false)
+  selfExclusionUntil  DateTime?
+  depositLimitDaily   Decimal?  @db.Decimal(12, 2)
+  depositLimitWeekly  Decimal?  @db.Decimal(12, 2)
+  depositLimitMonthly Decimal?  @db.Decimal(12, 2)
 
   // Daily login bonus (server-authoritative — see gameEngineService)
-  dailyStreak          Int       @default(0)
-  lastDailyClaimAt     DateTime?
+  dailyStreak      Int       @default(0)
+  lastDailyClaimAt DateTime?
 
   // Provably-fair game RNG state — see fairnessService.ts. serverSeed is
   // never exposed to the client until rotated; serverSeedHash is shown
@@ -151,7 +151,7 @@ model User {
   fairnessServerSeed     String?
   fairnessServerSeedHash String?
   fairnessClientSeed     String?
-  fairnessNonce          Int      @default(0)
+  fairnessNonce          Int     @default(0)
 
   // Payout bank account for withdrawals. Required before a withdrawal is
   // accepted — see the check in wallet.routes.ts POST /withdraw.
@@ -162,23 +162,24 @@ model User {
   // One-time first-deposit bonus, see paymentService.ts / wallet.routes.ts.
   firstDepositBonusClaimed Boolean @default(false)
 
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  wallet               Wallet?
-  revealedSeeds        RevealedServerSeed[]
-  transactions         Transaction[]
-  bets                 Bet[]
-  gameRounds           GameRound[]
-  kycVerifications     KycVerification[]
-  supportTickets       SupportTicket[]
-  colorGameBets        ColorGameBet[]
-  aviatorBets          AviatorBet[]
-  chickenRoadRounds    ChickenRoadRound[]
-  minesRounds          MinesRound[]
-  sevenUpDownBets      SevenUpDownBet[]
-  plinkoBets           PlinkoBet[]
-  dragonTigerBets      DragonTigerBet[]
+  wallet            Wallet?
+  revealedSeeds     RevealedServerSeed[]
+  transactions      Transaction[]
+  bets              Bet[]
+  gameRounds        GameRound[]
+  kycVerifications  KycVerification[]
+  supportTickets    SupportTicket[]
+  colorGameBets     ColorGameBet[]
+  aviatorBets       AviatorBet[]
+  chickenRoadRounds ChickenRoadRound[]
+  minesRounds       MinesRound[]
+  sevenUpDownBets   SevenUpDownBet[]
+  plinkoBets        PlinkoBet[]
+  dragonTigerBets   DragonTigerBet[]
+  vortexRounds      VortexRound[]
 }
 
 model KycVerification {
@@ -194,20 +195,20 @@ model KycVerification {
 }
 
 model Wallet {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-  balance   Decimal  @default(0) @db.Decimal(12, 2)
-  currency  String   @default("GBP")
+  id       String  @id @default(uuid())
+  userId   String  @unique
+  user     User    @relation(fields: [userId], references: [id])
+  balance  Decimal @default(0) @db.Decimal(12, 2)
+  currency String  @default("GBP")
 
   // Bonus funds already added to `balance` (so they're immediately
   // playable) but not yet withdrawable until `wageringProgress` reaches
   // `wageringRequired` — standard "wagering requirement" mechanic. Both
   // reset to 0 once met. See paymentService.ts (grant) and
   // gameEngineService.ts (progress) and wallet.routes.ts (withdraw gate).
-  lockedBonus       Decimal @default(0) @db.Decimal(12, 2)
-  wageringRequired  Decimal @default(0) @db.Decimal(12, 2)
-  wageringProgress  Decimal @default(0) @db.Decimal(12, 2)
+  lockedBonus      Decimal @default(0) @db.Decimal(12, 2)
+  wageringRequired Decimal @default(0) @db.Decimal(12, 2)
+  wageringProgress Decimal @default(0) @db.Decimal(12, 2)
 
   updatedAt DateTime @updatedAt
 }
@@ -255,13 +256,13 @@ model Market {
 }
 
 model Selection {
-  id        String   @id @default(uuid())
-  marketId  String
-  market    Market   @relation(fields: [marketId], references: [id])
-  name      String
-  odds      Decimal  @db.Decimal(8, 2)
-  isWinner  Boolean?
-  bets      Bet[]
+  id       String   @id @default(uuid())
+  marketId String
+  market   Market   @relation(fields: [marketId], references: [id])
+  name     String
+  odds     Decimal  @db.Decimal(8, 2)
+  isWinner Boolean?
+  bets     Bet[]
 }
 
 // One round of a real-money "game" (see gameEngineService.ts). Outcomes
@@ -276,8 +277,8 @@ model GameRound {
   userId         String
   user           User     @relation(fields: [userId], references: [id])
   gameKey        String
-  gameType       String   // "coinflip" | "dice"
-  target         Int?     // dice only: the roll-under target the player chose
+  gameType       String // "coinflip" | "dice"
+  target         Int? // dice only: the roll-under target the player chose
   stake          Decimal  @db.Decimal(12, 2)
   multiplier     Decimal  @db.Decimal(8, 4)
   payout         Decimal  @db.Decimal(12, 2)
@@ -350,7 +351,7 @@ model Bet {
 // mod 10 — deterministic and independently recomputable once serverSeed
 // is revealed at settlement.
 model ColorGameRound {
-  id              String          @id @default(uuid())
+  id              String         @id @default(uuid())
   durationSeconds Int
   // periodNumber (YYMMDD + that duration's 1-based round index for the
   // day — see periodNumberFor) is only unique WITHIN a duration: e.g.
@@ -366,8 +367,8 @@ model ColorGameRound {
   serverSeedHash  String
   resultNumber    Int?
   resultSize      ColorGameSize?
-  settled         Boolean         @default(false)
-  createdAt       DateTime        @default(now())
+  settled         Boolean        @default(false)
+  createdAt       DateTime       @default(now())
   bets            ColorGameBet[]
 
   @@unique([durationSeconds, periodNumber])
@@ -381,11 +382,11 @@ model ColorGameBet {
   userId           String
   user             User             @relation(fields: [userId], references: [id])
   betType          ColorGameBetType
-  betValue         String           // "0".."9" | "GREEN"/"RED"/"VIOLET" | "BIG"/"SMALL"
+  betValue         String // "0".."9" | "GREEN"/"RED"/"VIOLET" | "BIG"/"SMALL"
   amount           Decimal          @db.Decimal(12, 2)
   payoutMultiplier Decimal          @db.Decimal(6, 2)
   status           BetStatus        @default(PENDING)
-  payout           Decimal          @db.Decimal(12, 2) @default(0)
+  payout           Decimal          @default(0) @db.Decimal(12, 2)
   createdAt        DateTime         @default(now())
 
   @@index([userId])
@@ -426,7 +427,7 @@ model AviatorBet {
   autoCashoutAt     Decimal?     @db.Decimal(10, 2)
   cashoutMultiplier Decimal?     @db.Decimal(10, 2)
   status            BetStatus    @default(PENDING)
-  payout            Decimal      @db.Decimal(12, 2) @default(0)
+  payout            Decimal      @default(0) @db.Decimal(12, 2)
   createdAt         DateTime     @default(now())
 
   @@index([userId])
@@ -445,8 +446,8 @@ model ChickenRoadRound {
   difficulty     ChickenRoadDifficulty
   stake          Decimal               @db.Decimal(12, 2)
   currentStep    Int                   @default(0)
-  multiplier     Decimal               @db.Decimal(10, 2) @default(1)
-  payout         Decimal               @db.Decimal(12, 2) @default(0)
+  multiplier     Decimal               @default(1) @db.Decimal(10, 2)
+  payout         Decimal               @default(0) @db.Decimal(12, 2)
   status         BetStatus             @default(PENDING)
   serverSeed     String
   serverSeedHash String
@@ -471,8 +472,8 @@ model MinesRound {
   mineCount      Int
   minePositions  Int[]
   revealed       Int[]     @default([])
-  multiplier     Decimal   @db.Decimal(14, 2) @default(1)
-  payout         Decimal   @db.Decimal(12, 2) @default(0)
+  multiplier     Decimal   @default(1) @db.Decimal(14, 2)
+  payout         Decimal   @default(0) @db.Decimal(12, 2)
   status         BetStatus @default(PENDING)
   serverSeed     String
   serverSeedHash String
@@ -519,7 +520,7 @@ model SevenUpDownBet {
   amount     Decimal          @db.Decimal(12, 2)
   multiplier Decimal          @db.Decimal(8, 2)
   status     BetStatus        @default(PENDING)
-  payout     Decimal          @db.Decimal(12, 2) @default(0)
+  payout     Decimal          @default(0) @db.Decimal(12, 2)
   createdAt  DateTime         @default(now())
 
   @@index([userId])
@@ -585,9 +586,38 @@ model DragonTigerBet {
   amount     Decimal          @db.Decimal(12, 2)
   multiplier Decimal          @db.Decimal(8, 2)
   status     BetStatus        @default(PENDING)
-  payout     Decimal          @db.Decimal(12, 2) @default(0)
+  payout     Decimal          @default(0) @db.Decimal(12, 2)
   createdAt  DateTime         @default(now())
 
   @@index([userId])
   @@index([roundId, userId])
+}
+
+// One private Vortex round. Every spin lands the wheel on Water, Earth,
+// Fire or the vortex (crash). Each element fills a section of its ring and
+// raises the multiplier; the player cashes out whenever they like, a full
+// ring cashes out on its own, and the vortex loses the stake. `segments`
+// keeps every landed wheel segment so the round can be replayed/verified.
+model VortexRound {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  stake          Decimal   @db.Decimal(12, 2)
+  water          Int       @default(0)
+  earth          Int       @default(0)
+  fire           Int       @default(0)
+  spins          Int       @default(0)
+  segments       Int[]
+  multiplier     Decimal   @default(0) @db.Decimal(12, 2)
+  payout         Decimal   @default(0) @db.Decimal(12, 2)
+  status         BetStatus @default(PENDING)
+  endReason      String?
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime  @default(now())
+  settledAt      DateTime?
+
+  @@index([userId])
 }
