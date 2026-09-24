@@ -2,7 +2,19 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Dimensions, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Animated,
+  Dimensions,
+  Easing,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -106,6 +118,14 @@ const CAR_WIDTH = CAR_HEIGHT * (267 / 429);
 const CAR_DRIVE_MS = 210;
 const CAR_HIT_HOLD_MS = 1000;
 
+// The bust-hit car swoops in from 1.5 car-lengths above the chicken's row,
+// drives straight through it and off the bottom, at the same pace as the
+// ambient traffic.
+const CAR_SPEED = (LANE_Y + CAR_HEIGHT) / CAR_DRIVE_MS; // px/ms
+const HIT_CAR_APPROACH = CAR_HEIGHT * 1.5;
+const HIT_CAR_START_Y = LANE_Y - HIT_CAR_APPROACH;
+const HIT_CAR_TRAVEL = PANEL_HEIGHT + CAR_HEIGHT - HIT_CAR_START_Y;
+
 // Ambient background traffic — independent of round state. Every lane runs
 // its own nonstop stream of cars: as soon as one clears the panel, a new
 // (randomly different) one starts down the same lane after a short gap.
@@ -143,66 +163,72 @@ type ResultBanner = { kind: 'won'; payout: number };
 // fixed x (content-space, same as the lane markers, so it never drifts
 // into a neighbouring column), and the moment it clears the panel a new,
 // randomly different car starts down the same lane after a short gap —
-// so every lane always has something driving through it.
-function LaneTraffic({ x }: { x: number }) {
-  const [state, setState] = useState<{ y: number; source: number } | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+// so every lane always has something driving through it. The motion runs
+// on the native driver, so ~20 lanes of traffic don't re-render anything
+// per frame; React only re-renders once per car to swap the sprite.
+const AMBIENT_TRAVEL = PANEL_HEIGHT + 2 * CAR_HEIGHT;
+
+const LaneTraffic = React.memo(function LaneTraffic({ x }: { x: number }) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const [source, setSource] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const startY = -CAR_HEIGHT;
-    const endY = PANEL_HEIGHT + CAR_HEIGHT;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
 
     const drive = () => {
       if (cancelled) return;
-      const source = randomCarSource();
-      const start = Date.now();
-      const tick = () => {
-        if (cancelled) return;
-        const t = Math.min(1, (Date.now() - start) / AMBIENT_DRIVE_MS);
-        setState({ y: startY + (endY - startY) * t, source });
-        if (t < 1) {
-          rafRef.current = requestAnimationFrame(tick);
-          return;
-        }
-        timeoutRef.current = setTimeout(drive, AMBIENT_GAP_MS);
-      };
-      rafRef.current = requestAnimationFrame(tick);
+      setSource(randomCarSource());
+      translateY.setValue(0);
+      Animated.timing(translateY, {
+        toValue: AMBIENT_TRAVEL,
+        duration: AMBIENT_DRIVE_MS,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(({ finished }) => {
+        if (finished && !cancelled) timeout = setTimeout(drive, AMBIENT_GAP_MS);
+      });
     };
 
     // Stagger each lane's first car by a random amount so all lanes don't
     // spawn in lockstep, while still running nonstop afterwards.
-    timeoutRef.current = setTimeout(drive, Math.random() * AMBIENT_DRIVE_MS);
+    timeout = setTimeout(drive, Math.random() * AMBIENT_DRIVE_MS);
     return () => {
       cancelled = true;
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+      if (timeout !== null) clearTimeout(timeout);
+      translateY.stopAnimation();
     };
-  }, [x]);
+  }, [x, translateY]);
 
-  if (state === null) return null;
+  if (source === null) return null;
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
       style={{
         position: 'absolute',
         left: x - CAR_WIDTH / 2,
-        top: state.y - CAR_HEIGHT / 2,
+        top: -CAR_HEIGHT * 1.5,
         width: CAR_WIDTH,
         height: CAR_HEIGHT,
+        transform: [{ translateY }],
       }}
     >
-      <Image source={state.source} style={{ width: CAR_WIDTH, height: CAR_HEIGHT }} resizeMode="contain" />
-    </View>
+      <Image source={source} style={{ width: CAR_WIDTH, height: CAR_HEIGHT }} resizeMode="contain" />
+    </Animated.View>
   );
-}
+});
 
 // Every lane ahead of the chicken gets its own perpetual traffic stream.
 // Its current lane and every lane it has already crossed are held by stop
 // barriers instead (see below) — no ambient car ever runs there, so
 // there's no coincidental collision with a lane that's already decided.
-function AmbientTraffic({ maxSteps, blockedUpToStep }: { maxSteps: number; blockedUpToStep: number | null }) {
+const AmbientTraffic = React.memo(function AmbientTraffic({
+  maxSteps,
+  blockedUpToStep,
+}: {
+  maxSteps: number;
+  blockedUpToStep: number | null;
+}) {
   const steps = useMemo(() => Array.from({ length: maxSteps + 1 }, (_, i) => i), [maxSteps]);
   return (
     <>
@@ -213,7 +239,7 @@ function AmbientTraffic({ maxSteps, blockedUpToStep }: { maxSteps: number; block
       )}
     </>
   );
-}
+});
 
 const DASH_COUNT = Math.ceil(PANEL_HEIGHT / (DASH_LEN + GAP_LEN)) + 1;
 
@@ -272,8 +298,7 @@ export default function ChickenRoadScreen() {
   const [history, setHistory] = useState<ChickenRoadRound[]>([]);
   const [banner, setBanner] = useState<ResultBanner | null>(null);
   const [busy, setBusy] = useState(false);
-  const [hopOffset, setHopOffset] = useState(0);
-  const [carY, setCarY] = useState<number | null>(null);
+  const [carVisible, setCarVisible] = useState(false);
   const [carLaneX, setCarLaneX] = useState(0);
   const [carSource, setCarSource] = useState(CAR_SOURCES[0]);
   const [carPhase, setCarPhase] = useState<'none' | 'driving' | 'hit'>('none');
@@ -282,8 +307,15 @@ export default function ChickenRoadScreen() {
   // The backend doesn't advance currentStep on a bust, so the lane the
   // chicken was stepping into (where it actually gets hit) is tracked here.
   const [bustStep, setBustStep] = useState<number | null>(null);
-  const hopRafRef = useRef<number | null>(null);
-  const carRafRef = useRef<number | null>(null);
+  // Set the instant GO is tapped: whether the lane turns out safe or a bust,
+  // the chicken ends up in the next lane, so it moves there straight away
+  // instead of waiting on the server round trip.
+  const [pendingStep, setPendingStep] = useState<number | null>(null);
+  // Native-driven so the hop and the hit car never re-render the screen
+  // every frame.
+  const hopAnim = useRef(new Animated.Value(0)).current;
+  const carAnim = useRef(new Animated.Value(0)).current;
+  const hitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roadScrollRef = useRef<ScrollView | null>(null);
 
   const loadHistory = useCallback(() => {
@@ -325,18 +357,22 @@ export default function ChickenRoadScreen() {
 
   useEffect(() => {
     return () => {
-      if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
-      if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
+      hopAnim.stopAnimation();
+      carAnim.stopAnimation();
+      if (hitTimeoutRef.current !== null) clearTimeout(hitTimeoutRef.current);
     };
-  }, []);
+  }, [hopAnim, carAnim]);
+
+  // The lane the chicken is standing in (or stepping into) right now.
+  const chickenStep = round ? pendingStep ?? bustStep ?? round.currentStep : null;
 
   // Keep the chicken's current lane comfortably in view as the round
   // advances, without blocking the player from scrolling ahead manually.
   useEffect(() => {
     if (!round || chickenAtIdle) return;
-    const targetX = Math.max(0, laneX(bustStep ?? round.currentStep) - PANEL_WIDTH * 0.35);
+    const targetX = Math.max(0, laneX(chickenStep ?? 0) - PANEL_WIDTH * 0.35);
     roadScrollRef.current?.scrollTo({ x: targetX, animated: true });
-  }, [round?.currentStep, round, chickenAtIdle, bustStep]);
+  }, [round, chickenAtIdle, chickenStep]);
 
   // Once the chicken has snapped back to its starting spot after a bust,
   // scroll the road back to the start too so it's actually visible there.
@@ -350,21 +386,24 @@ export default function ChickenRoadScreen() {
   // nowhere further to walk to on this fixed image, so "moving forward"
   // reads as a little jump rather than a horizontal slide.
   const hop = useCallback(() => {
-    if (hopRafRef.current !== null) cancelAnimationFrame(hopRafRef.current);
-    const start = Date.now();
-    const step = () => {
-      const t = Math.min(1, (Date.now() - start) / HOP_DURATION_MS);
-      setHopOffset(-Math.sin(t * Math.PI) * (CHICKEN_HEIGHT * 0.22));
-      if (t < 1) {
-        hopRafRef.current = requestAnimationFrame(step);
-      } else {
-        hopRafRef.current = null;
-        setHopOffset(0);
-      }
-    };
-    hopRafRef.current = requestAnimationFrame(step);
-  }, []);
-
+    const lift = -CHICKEN_HEIGHT * 0.22;
+    hopAnim.stopAnimation();
+    hopAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(hopAnim, {
+        toValue: lift,
+        duration: HOP_DURATION_MS / 2,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(hopAnim, {
+        toValue: 0,
+        duration: HOP_DURATION_MS / 2,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [hopAnim]);
 
   // A car drives straight down from above onto the chicken's bust lane and
   // "hits" it — swaps to the dazed sprite for a couple seconds, then
@@ -378,45 +417,41 @@ export default function ChickenRoadScreen() {
   // "hit" (dazed sprite) triggers the instant it passes the chicken's
   // row, and a second later the chicken snaps back to its own starting
   // spot on its own, independent of the car (which keeps going either way).
-  const runCarHit = useCallback((toStep: number, onComplete: () => void) => {
-    if (carRafRef.current !== null) cancelAnimationFrame(carRafRef.current);
-    const carSpeed = (LANE_Y + CAR_HEIGHT) / CAR_DRIVE_MS; // px/ms, same pace as ambient traffic
-    const hitY = LANE_Y;
-    const startY = hitY - CAR_HEIGHT * 1.5;
-    const endY = PANEL_HEIGHT + CAR_HEIGHT;
-    const totalMs = (endY - startY) / carSpeed;
-    setCarLaneX(laneX(toStep));
-    setCarSource(randomCarSource());
-    setCarPhase('driving');
-    setCarY(startY);
-    let hitTriggered = false;
-    const start = Date.now();
-    const step = () => {
-      const t = Math.min(1, (Date.now() - start) / totalMs);
-      const y = startY + (endY - startY) * t;
-      setCarY(y);
-      if (!hitTriggered && y >= hitY) {
-        hitTriggered = true;
+  const runCarHit = useCallback(
+    (toStep: number, onComplete: () => void) => {
+      carAnim.stopAnimation();
+      carAnim.setValue(0);
+      if (hitTimeoutRef.current !== null) clearTimeout(hitTimeoutRef.current);
+      setCarLaneX(laneX(toStep));
+      setCarSource(randomCarSource());
+      setCarPhase('driving');
+      setCarVisible(true);
+
+      Animated.timing(carAnim, {
+        toValue: HIT_CAR_TRAVEL,
+        duration: HIT_CAR_TRAVEL / CAR_SPEED,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }).start(() => {
+        setCarPhase('none');
+        setCarVisible(false);
+      });
+
+      // The moment the car reaches the chicken's row.
+      hitTimeoutRef.current = setTimeout(() => {
         setCarPhase('hit');
         setIsChickenHit(true);
         // Play stays locked until the chicken is back at its start spot, so
         // a new round can't begin while this reset is still pending.
-        setTimeout(() => {
+        hitTimeoutRef.current = setTimeout(() => {
           setIsChickenHit(false);
           setChickenAtIdle(true);
           onComplete();
         }, CAR_HIT_HOLD_MS);
-      }
-      if (t < 1) {
-        carRafRef.current = requestAnimationFrame(step);
-        return;
-      }
-      carRafRef.current = null;
-      setCarPhase('none');
-      setCarY(null);
-    };
-    carRafRef.current = requestAnimationFrame(step);
-  }, []);
+      }, HIT_CAR_APPROACH / CAR_SPEED);
+    },
+    [carAnim]
+  );
 
   const setStakeValue = (value: number) => {
     setStake(value);
@@ -437,12 +472,13 @@ export default function ChickenRoadScreen() {
       const created = await startChickenRoadRound(stake, difficulty);
       setRound(created);
       setBanner(null);
-      setHopOffset(0);
-      setCarY(null);
+      hopAnim.setValue(0);
+      setCarVisible(false);
       setCarPhase('none');
       setIsChickenHit(false);
       setChickenAtIdle(false);
       setBustStep(null);
+      setPendingStep(null);
       refreshWallet();
     } catch (err) {
       Alert.alert('Could not start', err instanceof ApiClientError ? err.message : 'Please try again.');
@@ -454,19 +490,20 @@ export default function ChickenRoadScreen() {
   const advance = async () => {
     if (busy || !round) return;
     setBusy(true);
+    setPendingStep(round.currentStep + 1);
+    hop();
     try {
       const result = await advanceChickenRoadStep(round.id);
       setRound(result.round);
+      setPendingStep(null);
       if (result.busted) {
-        // Step into the next lane first, then the car hits it right there.
+        // The chicken is already in the next lane — the car hits it there.
         const hitStep = result.round.currentStep + 1;
         setBustStep(hitStep);
-        hop();
         runCarHit(hitStep, () => setBusy(false));
         refreshWallet();
         loadHistory();
       } else {
-        hop();
         setBusy(false);
         if (result.round.status === 'WON') {
           setBanner({ kind: 'won', payout: Number(result.round.payout) });
@@ -475,6 +512,7 @@ export default function ChickenRoadScreen() {
         }
       }
     } catch (err) {
+      setPendingStep(null);
       Alert.alert('Could not advance', err instanceof ApiClientError ? err.message : 'Please try again.');
       setBusy(false);
     }
@@ -612,7 +650,7 @@ export default function ChickenRoadScreen() {
           // Stays blocked through a bust/cash-out too (not just while
           // PENDING) — the lane the chicken died on shouldn't reopen to
           // traffic until the player actually starts a new round.
-          blockedUpToStep={round ? bustStep ?? round.currentStep : null}
+          blockedUpToStep={chickenStep}
         />
 
         {isPlaying &&
@@ -644,16 +682,17 @@ export default function ChickenRoadScreen() {
             );
           })}
 
-        <View
+        <Animated.View
           style={[
             styles.chickenOverlay,
             {
               width: CHICKEN_WIDTH,
               height: CHICKEN_HEIGHT,
               left:
-                (round && !chickenAtIdle ? laneX(bustStep ?? round.currentStep) : CHICKEN_IDLE_SPOT.xFrac * PANEL_WIDTH) -
+                (chickenStep !== null && !chickenAtIdle ? laneX(chickenStep) : CHICKEN_IDLE_SPOT.xFrac * PANEL_WIDTH) -
                 CHICKEN_WIDTH / 2,
-              top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - CHICKEN_HEIGHT + hopOffset,
+              top: NEAR_MANHOLE.yFrac * PANEL_HEIGHT - CHICKEN_HEIGHT,
+              transform: [{ translateY: hopAnim }],
             },
           ]}
           pointerEvents="none"
@@ -667,21 +706,22 @@ export default function ChickenRoadScreen() {
             style={{ width: CHICKEN_WIDTH, height: CHICKEN_HEIGHT }}
             resizeMode="contain"
           />
-        </View>
+        </Animated.View>
 
-        {carY !== null && (
-          <View
+        {carVisible && (
+          <Animated.View
             pointerEvents="none"
             style={{
               position: 'absolute',
               left: carLaneX - CAR_WIDTH / 2,
-              top: carY - CAR_HEIGHT / 2,
+              top: HIT_CAR_START_Y - CAR_HEIGHT / 2,
               width: CAR_WIDTH,
               height: CAR_HEIGHT,
+              transform: [{ translateY: carAnim }],
             }}
           >
             <Image source={carSource} style={{ width: CAR_WIDTH, height: CAR_HEIGHT }} resizeMode="contain" />
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
       </View>
