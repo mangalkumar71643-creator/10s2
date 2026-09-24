@@ -543,7 +543,9 @@ export default function PlinkoScreen() {
             >
               <LinearGradient colors={c.button} style={[styles.colorBtn, { borderColor: c.border }]}>
                 <LinearGradient colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']} style={styles.colorShine} />
-                <Text style={styles.colorText}>{c.label}</Text>
+                <Text style={styles.colorText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} allowFontScaling={false}>
+                  {c.label}
+                </Text>
               </LinearGradient>
             </Pressable>
           ))}
@@ -836,8 +838,8 @@ const styles = StyleSheet.create({
   },
   pinsText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
   panel: {
-    marginHorizontal: 8,
-    paddingHorizontal: 12,
+    marginHorizontal: 6,
+    paddingHorizontal: 8,
     paddingTop: 12,
     paddingBottom: 14,
     borderTopLeftRadius: 18,
@@ -871,11 +873,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(8,70,80,0.9)',
   },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   autoBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#1E6FE0',
@@ -887,9 +889,9 @@ const styles = StyleSheet.create({
   autoBadge: { position: 'absolute', top: -4, right: -6, minWidth: 24, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFD23F' },
   autoBadgeText: { color: '#1A2B55', fontSize: 11, fontWeight: '900' },
   colorBtnWrap: { flex: 1 },
-  colorBtn: { height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', borderWidth: 3, overflow: 'hidden' },
+  colorBtn: { height: 64, borderRadius: 32, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 3, overflow: 'hidden' },
   colorShine: { position: 'absolute', top: 0, left: 0, right: 0, height: '50%' },
-  colorText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 2, textShadowOffset: { width: 0, height: 1 } },
+  colorText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', letterSpacing: 0.3, textShadowColor: 'rgba(0,0,0,0.35)', textShadowRadius: 2, textShadowOffset: { width: 0, height: 1 } },
   pressed: { transform: [{ scale: 0.96 }] },
   dim: { opacity: 0.5 },
   bottomBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingTop: 8, backgroundColor: 'rgba(10,90,110,0.55)' },
