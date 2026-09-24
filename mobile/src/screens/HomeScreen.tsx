@@ -76,6 +76,8 @@ export default function HomeScreen() {
   const minesTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const sevenUpDownTileTop = 2 * GAME_GRID_CELL;
   const sevenUpDownTileLeft = GAME_GRID_LEFT;
+  const plinkoTileTop = 2 * GAME_GRID_CELL;
+  const plinkoTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 3;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -267,6 +269,33 @@ export default function HomeScreen() {
       >
         <Text style={{ fontSize: GAME_ICON_SIZE * 0.36 }}>🎲</Text>
         <Text style={{ color: '#FFD66B', fontSize: 18, fontWeight: '900', marginTop: 2 }}>7 UP DOWN</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Plinko')}
+        style={{
+          position: 'absolute',
+          top: plinkoTileTop,
+          left: plinkoTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          backgroundColor: '#1B0B45',
+          borderWidth: 2,
+          borderColor: '#8A4DFF',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {/* A tiny pin pyramid with a ball, drawn instead of an emoji. */}
+        {[1, 2, 3, 4].map((n) => (
+          <View key={n} style={{ flexDirection: 'row', gap: 9, marginBottom: 7 }}>
+            {Array.from({ length: n }, (_, i) => (
+              <View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#E9D8FF' }} />
+            ))}
+          </View>
+        ))}
+        <View style={{ position: 'absolute', top: 22, right: 44, width: 14, height: 14, borderRadius: 7, backgroundColor: '#FF3D9A' }} />
+        <Text style={{ color: '#FFD66B', fontSize: 20, fontWeight: '900', marginTop: 2, letterSpacing: 2 }}>PLINKO</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

@@ -28,4 +28,5 @@ export type RootStackParamList = {
   ChickenRoad: undefined;
   Mines: undefined;
   SevenUpDown: undefined;
+  Plinko: undefined;
 };
