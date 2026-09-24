@@ -19,6 +19,9 @@ import {
   rotateFairnessSeed,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import { useAuth } from '../state/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 // The three risk levels are played as coloured tile rows, top to bottom.
 const COLORS: { risk: PlinkoRisk; label: string; tile: [string, string]; button: [string, string]; border: string; ball: [string, string, string] }[] = [
@@ -37,7 +40,72 @@ const AUTO_OPTIONS = [10, 25, 50, 100];
 const AUTO_GAP_MS = 320;
 const BIG_WIN_MULTIPLIER = 10;
 const BIG_WIN_MS = 3000;
-const HISTORY_LEN = 10;
+const HISTORY_LEN = 30;
+const SOUND_KEY = 'novaplay:plinko:sound:v1';
+const LANG_KEY = 'novaplay:plinko:lang:v1';
+const TICK_MIN_GAP_MS = 35;
+
+type Lang = 'en' | 'hi';
+const TEXT = {
+  en: {
+    sound: 'Sound',
+    betsHistory: 'Bets History',
+    gameRules: 'Game Rules',
+    gameLimits: 'Game Limits',
+    language: 'Language',
+    howToPlay: 'HOW TO PLAY',
+    limitsTitle: 'GAME LIMITS',
+    myBets: 'MY BETS',
+    lastResults: 'LAST RESULTS',
+    noResults: 'Drop a ball to see results here',
+    pins: 'Pins',
+    bet: 'Bet',
+    rules1: 'The disc will land on one of the tiles at the bottom.',
+    rules2:
+      'Choose from different pins options, and from either red, yellow or green tiles for higher odds as your bet multiplier increases!',
+    rules3:
+      'Every bounce comes from your provably-fair seeds — the Encrypted Result at the top is the hash of the server seed, and the ⟳ button reveals it and starts a new one.',
+    limitsIntro: 'Game limits are managed by operator. Current game limits for this game are below:',
+    maxBet: 'Maximum bet INR:',
+    minBet: 'Minimum bet INR:',
+    maxWin: 'Maximum win for one bet INR:',
+    rtp: 'Return to player:',
+    noBets: 'No balls dropped yet.',
+    autoColour: 'Auto play colour',
+    autoBalls: 'Number of balls',
+    insufficient: 'Insufficient balance',
+    waitBalls: 'Wait for the balls to land',
+  },
+  hi: {
+    sound: 'आवाज़',
+    betsHistory: 'बेट हिस्ट्री',
+    gameRules: 'गेम के नियम',
+    gameLimits: 'गेम लिमिट',
+    language: 'भाषा',
+    howToPlay: 'कैसे खेलें',
+    limitsTitle: 'गेम लिमिट',
+    myBets: 'मेरी बेट',
+    lastResults: 'पिछले नतीजे',
+    noResults: 'नतीजे देखने के लिए बॉल गिराएँ',
+    pins: 'पिन',
+    bet: 'बेट',
+    rules1: 'डिस्क नीचे की किसी एक टाइल पर गिरेगी।',
+    rules2: 'पिन की संख्या चुनें और हरी, पीली या लाल टाइल चुनें — ज़्यादा जोखिम पर मल्टीप्लायर भी ज़्यादा मिलता है!',
+    rules3:
+      'हर उछाल आपके provably-fair seeds से तय होता है — ऊपर दिखा Encrypted Result सर्वर seed का hash है, और ⟳ बटन उसे दिखाकर नया seed शुरू करता है।',
+    limitsIntro: 'गेम लिमिट ऑपरेटर तय करता है। इस गेम की मौजूदा लिमिट नीचे हैं:',
+    maxBet: 'अधिकतम बेट INR:',
+    minBet: 'न्यूनतम बेट INR:',
+    maxWin: 'एक बेट पर अधिकतम जीत INR:',
+    rtp: 'खिलाड़ी को वापसी (RTP):',
+    noBets: 'अभी तक कोई बॉल नहीं गिराई।',
+    autoColour: 'ऑटो प्ले रंग',
+    autoBalls: 'बॉल की संख्या',
+    insufficient: 'बैलेंस कम है',
+    waitBalls: 'बॉल गिरने का इंतज़ार करें',
+  },
+};
+const LANG_NAMES: Record<Lang, string> = { en: 'English', hi: 'हिंदी' };
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -142,12 +210,14 @@ const Board = memo(function Board({ g, width }: { g: Geometry; width: number }) 
 
 type Ball = { id: number; risk: PlinkoRisk; payout: number; multiplier: number; anim: Animated.Value; frames: ReturnType<typeof ballKeyframes> };
 type Floater = { id: number; x: number; y: number; text: string; anim: Animated.Value };
-type Popover = 'pins' | 'stake' | 'auto' | null;
+type Popover = 'pins' | 'stake' | 'auto' | 'menu' | null;
+type Sheet = 'rules' | 'limits' | null;
 
 export default function PlinkoScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { coins, refreshWallet } = useGameState();
+  const { backendUser } = useAuth();
 
   const [config, setConfig] = useState<PlinkoConfig | null>(null);
   const [rows, setRows] = useState(DEFAULT_ROWS);
@@ -162,7 +232,11 @@ export default function PlinkoScreen() {
   const [popover, setPopover] = useState<Popover>(null);
   const [autoRisk, setAutoRisk] = useState<PlinkoRisk>('LOW');
   const [autoLeft, setAutoLeft] = useState(0);
-  const [rulesOpen, setRulesOpen] = useState(false);
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const [lastResultsOpen, setLastResultsOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
+  const [lang, setLang] = useState<Lang>('en');
+  const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<PlinkoBet[]>([]);
   const [seedHash, setSeedHash] = useState<string | null>(null);
@@ -174,6 +248,12 @@ export default function PlinkoScreen() {
   const autoLeftRef = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const soundRef = useRef(true);
+  soundRef.current = soundOn;
+  const playersRef = useRef<{ tick: AudioPlayer; land: AudioPlayer; win: AudioPlayer } | null>(null);
+  const lastTickRef = useRef(0);
+  const soundTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const t = TEXT[lang];
 
   const minStake = config?.minStake ?? 1;
   const maxStake = config?.maxStake ?? 500;
@@ -188,8 +268,30 @@ export default function PlinkoScreen() {
     fetchFairnessStatus()
       .then((f) => setSeedHash(f.serverSeedHash))
       .catch(() => {});
+    AsyncStorage.multiGet([SOUND_KEY, LANG_KEY])
+      .then(([[, snd], [, lng]]) => {
+        if (snd === 'off') setSoundOn(false);
+        if (lng === 'hi' || lng === 'en') setLang(lng);
+      })
+      .catch(() => {});
+    try {
+      setAudioModeAsync({ playsInSilentMode: false }).catch(() => {});
+      playersRef.current = {
+        tick: createAudioPlayer(require('../../assets/sounds/plinko-tick.wav')),
+        land: createAudioPlayer(require('../../assets/sounds/plinko-land.wav')),
+        win: createAudioPlayer(require('../../assets/sounds/plinko-win.wav')),
+      };
+    } catch {
+      playersRef.current = null;
+    }
+    const timers = soundTimers.current;
     return () => {
       mountedRef.current = false;
+      timers.forEach(clearTimeout);
+      timers.clear();
+      const players = playersRef.current;
+      playersRef.current = null;
+      if (players) Object.values(players).forEach((pl) => pl.remove());
       if (autoTimer.current) clearTimeout(autoTimer.current);
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
@@ -212,6 +314,35 @@ export default function PlinkoScreen() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 1600);
   }, []);
+
+  const play = useCallback((name: 'tick' | 'land' | 'win') => {
+    if (!soundRef.current) return;
+    const player = playersRef.current?.[name];
+    if (!player) return;
+    if (name === 'tick') {
+      const now = Date.now();
+      if (now - lastTickRef.current < TICK_MIN_GAP_MS) return;
+      lastTickRef.current = now;
+    }
+    try {
+      player.seekTo(0);
+      player.play();
+    } catch {
+      // A missed sound effect is harmless.
+    }
+  }, []);
+
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    AsyncStorage.setItem(SOUND_KEY, next ? 'on' : 'off').catch(() => {});
+  };
+
+  const chooseLang = (l: Lang) => {
+    setLang(l);
+    setLangPickerOpen(false);
+    AsyncStorage.setItem(LANG_KEY, l).catch(() => {});
+  };
 
   const geometry: Geometry | null = useMemo(() => {
     if (!boardSize) return null;
@@ -263,13 +394,16 @@ export default function PlinkoScreen() {
         );
       }
       if (ball.multiplier >= BIG_WIN_MULTIPLIER) setBigWin({ m: ball.multiplier, amount: ball.payout });
+      play(ball.multiplier > 1 ? 'win' : 'land');
       inFlightRef.current -= 1;
       setInFlight(inFlightRef.current);
       if (inFlightRef.current === 0) refreshWallet();
     },
-    [refreshWallet]
+    [refreshWallet, play]
   );
 
+  const langRef = useRef(lang);
+  langRef.current = lang;
   const localBalanceRef = useRef(localBalance);
   localBalanceRef.current = localBalance;
   const stakeRef = useRef(stake);
@@ -281,7 +415,7 @@ export default function PlinkoScreen() {
       const amount = stakeRef.current;
       if (!g) return false;
       if (amount > localBalanceRef.current) {
-        showToast('Insufficient balance');
+        showToast(TEXT[langRef.current].insufficient);
         return false;
       }
       setPopover(null);
@@ -308,6 +442,14 @@ export default function PlinkoScreen() {
           easing: Easing.linear,
           useNativeDriver: true,
         }).start(() => onLand(ball));
+        // A tick each time the ball meets a pin (points 1..rows).
+        for (let i = 1; i < frames.segments; i++) {
+          const timer = setTimeout(() => {
+            soundTimers.current.delete(timer);
+            play('tick');
+          }, i * SEGMENT_MS);
+          soundTimers.current.add(timer);
+        }
         return true;
       } catch (err) {
         inFlightRef.current -= 1;
@@ -317,7 +459,7 @@ export default function PlinkoScreen() {
         return false;
       }
     },
-    [onLand, showToast]
+    [onLand, showToast, play]
   );
 
   const dropRef = useRef(drop);
@@ -354,7 +496,7 @@ export default function PlinkoScreen() {
     );
 
   const rotateSeed = () => {
-    if (busy) return showToast('Wait for the balls to land');
+    if (busy) return showToast(t.waitBalls);
     rotateFairnessSeed()
       .then((r) => {
         setSeedHash(r.newServerSeedHash);
@@ -389,17 +531,34 @@ export default function PlinkoScreen() {
             <MaterialCommunityIcons name="autorenew" size={20} color="#CFF3FF" />
           </Pressable>
         </View>
-        <View style={styles.recentRow}>
-          <View style={styles.recentStrip}>
-            {recent.map((r) => (
-              <LinearGradient key={r.id} colors={COLORS[RISK_INDEX[r.risk]].tile} style={styles.recentChip}>
-                <Text style={styles.recentText}>{formatMult(r.m)}x</Text>
-              </LinearGradient>
-            ))}
-          </View>
-          <Pressable onPress={openHistory} style={styles.historyBtn} hitSlop={6}>
+        <View style={[styles.recentRow, lastResultsOpen && styles.recentPanel]}>
+          {lastResultsOpen ? (
+            <View style={styles.recentPanelBody}>
+              <Text style={styles.recentTitle}>{t.lastResults}</Text>
+              <View style={styles.recentWrap}>
+                {recent.length === 0 ? (
+                  <Text style={styles.recentEmpty}>{t.noResults}</Text>
+                ) : (
+                  recent.map((r) => (
+                    <LinearGradient key={r.id} colors={COLORS[RISK_INDEX[r.risk]].tile} style={styles.recentChip}>
+                      <Text style={styles.recentText}>{formatMult(r.m)}x</Text>
+                    </LinearGradient>
+                  ))
+                )}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.recentStrip}>
+              {recent.map((r) => (
+                <LinearGradient key={r.id} colors={COLORS[RISK_INDEX[r.risk]].tile} style={styles.recentChip}>
+                  <Text style={styles.recentText}>{formatMult(r.m)}x</Text>
+                </LinearGradient>
+              ))}
+            </View>
+          )}
+          <Pressable onPress={() => setLastResultsOpen((o) => !o)} style={[styles.historyBtn, lastResultsOpen && styles.historyBtnOpen]} hitSlop={6}>
             <MaterialCommunityIcons name="history" size={20} color="#CFF3FF" />
-            <MaterialCommunityIcons name="chevron-down" size={16} color="#CFF3FF" />
+            <MaterialCommunityIcons name={lastResultsOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#CFF3FF" />
           </Pressable>
         </View>
       </View>
@@ -498,13 +657,13 @@ export default function PlinkoScreen() {
       </View>
 
       <Pressable onPress={() => !busy && setPopover(popover === 'pins' ? null : 'pins')} style={[styles.pinsPill, busy && styles.dim]}>
-        <Text style={styles.pinsText}>Pins: {rows}</Text>
+        <Text style={styles.pinsText}>{t.pins}: {rows}</Text>
       </Pressable>
 
       <View style={styles.panel}>
         <View style={styles.stakeRow}>
           <View style={styles.stakeBox}>
-            <Text style={styles.stakeLabel}>Bet</Text>
+            <Text style={styles.stakeLabel}>{t.bet}</Text>
             <View style={styles.stakeValueBox}>
               <Text style={styles.stakeValue}>{stake.toFixed(2)} INR</Text>
             </View>
@@ -557,14 +716,20 @@ export default function PlinkoScreen() {
           <MaterialCommunityIcons name="chevron-left" size={20} color="#FFFFFF" />
           <Text style={styles.gamePillText}>PLINKO</Text>
         </Pressable>
-        <Pressable onPress={() => setRulesOpen(true)} style={styles.helpBtn}>
+        <Pressable onPress={() => setSheet('rules')} style={styles.helpBtn}>
           <Text style={styles.helpText}>?</Text>
         </Pressable>
         <View style={{ flex: 1 }} />
         <Text style={styles.balanceText}>
           {localBalance.toFixed(2)} <Text style={styles.balanceUnit}>INR</Text>
         </Text>
-        <Pressable onPress={openHistory} style={styles.menuBtn}>
+        <Pressable
+          onPress={() => {
+            setLangPickerOpen(false);
+            setPopover(popover === 'menu' ? null : 'menu');
+          }}
+          style={styles.menuBtn}
+        >
           <MaterialCommunityIcons name="menu" size={20} color="#FFFFFF" />
         </Pressable>
       </View>
@@ -573,7 +738,7 @@ export default function PlinkoScreen() {
       {popover !== null && <Pressable style={StyleSheet.absoluteFill} onPress={() => setPopover(null)} />}
       {popover === 'pins' && (
         <View style={[styles.popover, { bottom: insets.bottom + 200 }]}>
-          <Text style={styles.popoverTitle}>Pins</Text>
+          <Text style={styles.popoverTitle}>{t.pins}</Text>
           <View style={styles.popoverGrid}>
             {Array.from({ length: 9 }, (_, i) => 8 + i).map((n) => (
               <Pressable
@@ -615,7 +780,7 @@ export default function PlinkoScreen() {
       )}
       {popover === 'auto' && (
         <View style={[styles.popover, { bottom: insets.bottom + 140 }]}>
-          <Text style={styles.popoverTitle}>Auto play colour</Text>
+          <Text style={styles.popoverTitle}>{t.autoColour}</Text>
           <View style={styles.popoverGrid}>
             {COLORS.map((c) => (
               <Pressable key={c.risk} onPress={() => setAutoRisk(c.risk)} style={[styles.popoverOption, styles.popoverThird, autoRisk === c.risk && { backgroundColor: c.tile[1], borderColor: '#FFFFFF' }]}>
@@ -623,7 +788,7 @@ export default function PlinkoScreen() {
               </Pressable>
             ))}
           </View>
-          <Text style={[styles.popoverTitle, { marginTop: 12 }]}>Number of balls</Text>
+          <Text style={[styles.popoverTitle, { marginTop: 12 }]}>{t.autoBalls}</Text>
           <View style={styles.popoverGrid}>
             {AUTO_OPTIONS.map((n) => (
               <Pressable key={n} onPress={() => startAuto(n)} style={[styles.popoverOption, styles.popoverQuarter]}>
@@ -634,18 +799,80 @@ export default function PlinkoScreen() {
         </View>
       )}
 
-      <Modal visible={rulesOpen} transparent animationType="fade" onRequestClose={() => setRulesOpen(false)}>
+      {popover === 'menu' && (
+        <View style={[styles.menu, { bottom: insets.bottom + 56 }]}>
+          <Text style={styles.menuUser} numberOfLines={1}>
+            {backendUser ? `${backendUser.firstName}${backendUser.uid ? ` · UID ${backendUser.uid}` : ''}` : 'Player'}
+          </Text>
+          <Pressable onPress={toggleSound} style={styles.menuItem}>
+            <MaterialCommunityIcons name={soundOn ? 'volume-high' : 'volume-off'} size={22} color="#FFFFFF" />
+            <Text style={styles.menuLabel}>{t.sound}</Text>
+            <View style={[styles.switchTrack, soundOn && styles.switchTrackOn]}>
+              <View style={[styles.switchKnob, soundOn && styles.switchKnobOn]} />
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setPopover(null);
+              openHistory();
+            }}
+            style={styles.menuItem}
+          >
+            <MaterialCommunityIcons name="history" size={22} color="#FFFFFF" />
+            <Text style={styles.menuLabel}>{t.betsHistory}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setPopover(null);
+              setSheet('rules');
+            }}
+            style={styles.menuItem}
+          >
+            <MaterialCommunityIcons name="text-box-outline" size={22} color="#FFFFFF" />
+            <Text style={styles.menuLabel}>{t.gameRules}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setPopover(null);
+              setSheet('limits');
+            }}
+            style={styles.menuItem}
+          >
+            <MaterialCommunityIcons name="cash" size={22} color="#FFFFFF" />
+            <Text style={styles.menuLabel}>{t.gameLimits}</Text>
+          </Pressable>
+          <Pressable onPress={() => setLangPickerOpen((o) => !o)} style={styles.menuItem}>
+            <MaterialCommunityIcons name="web" size={22} color="#FFFFFF" />
+            <Text style={styles.menuLabel}>{t.language}</Text>
+            <Text style={styles.menuValue}>{LANG_NAMES[lang]}</Text>
+            <MaterialCommunityIcons name={langPickerOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#C9CBD0" />
+          </Pressable>
+          {langPickerOpen && (
+            <View style={styles.langRow}>
+              {(Object.keys(LANG_NAMES) as Lang[]).map((l) => (
+                <Pressable key={l} onPress={() => chooseLang(l)} style={[styles.langOption, l === lang && styles.langOptionActive]}>
+                  <Text style={styles.langText}>{LANG_NAMES[l]}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      <Modal visible={sheet !== null} transparent animationType="fade" onRequestClose={() => setSheet(null)}>
         <View style={styles.backdrop}>
           {/* Sibling, not parent, of the sheet so its ScrollView can scroll. */}
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setRulesOpen(false)} />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setSheet(null)} />
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>HOW TO PLAY</Text>
-              <Pressable onPress={() => setRulesOpen(false)} style={styles.sheetClose} hitSlop={8}>
+              <Text style={styles.sheetTitle}>{sheet === 'limits' ? t.limitsTitle : t.howToPlay}</Text>
+              <Pressable onPress={() => setSheet(null)} style={styles.sheetClose} hitSlop={8}>
                 <MaterialCommunityIcons name="close" size={22} color="#FFFFFF" />
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.sheetBody}>
+              {sheet === 'rules' && (
+              <>
               <View style={styles.logoRow}>
                 <MaterialCommunityIcons name="triangle-outline" size={40} color="#22D3D8" />
                 <Text style={styles.logoText}>PLINKO</Text>
@@ -671,30 +898,27 @@ export default function PlinkoScreen() {
                   <LinearGradient colors={COLORS[1].ball} style={{ flex: 1, borderRadius: 16 }} />
                 </View>
               </View>
-              <Text style={styles.sheetText}>The disc will land on one of the tiles at the bottom.</Text>
-              <Text style={styles.sheetText}>
-                Choose from different pins options, and from either red, yellow or green tiles for higher odds as your bet
-                multiplier increases!
-              </Text>
-              <Text style={styles.sheetText}>
-                Every bounce comes from your provably-fair seeds — the Encrypted Result at the top is the hash of the
-                server seed, and the ⟳ button reveals it and starts a new one.
-              </Text>
-              <Text style={styles.limitsTitle}>GAME LIMITS</Text>
+              <Text style={styles.sheetText}>{t.rules1}</Text>
+              <Text style={styles.sheetText}>{t.rules2}</Text>
+              <Text style={styles.sheetText}>{t.rules3}</Text>
+              <Text style={styles.limitsTitle}>{t.limitsTitle}</Text>
+              </>
+              )}
+              {sheet === 'limits' && <Text style={styles.limitsIntro}>{t.limitsIntro}</Text>}
               <View style={styles.limitRow}>
-                <Text style={styles.limitLabel}>Maximum bet INR:</Text>
+                <Text style={styles.limitLabel}>{t.maxBet}</Text>
                 <Text style={styles.limitValue}>{maxStake.toFixed(2)}</Text>
               </View>
               <View style={styles.limitRow}>
-                <Text style={styles.limitLabel}>Minimum bet INR:</Text>
+                <Text style={styles.limitLabel}>{t.minBet}</Text>
                 <Text style={styles.limitValue}>{minStake.toFixed(2)}</Text>
               </View>
               <View style={styles.limitRow}>
-                <Text style={styles.limitLabel}>Maximum win for one bet INR:</Text>
+                <Text style={styles.limitLabel}>{t.maxWin}</Text>
                 <Text style={styles.limitValue}>{maxPayout.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</Text>
               </View>
               <View style={styles.limitRow}>
-                <Text style={styles.limitLabel}>Return to player:</Text>
+                <Text style={styles.limitLabel}>{t.rtp}</Text>
                 <Text style={styles.limitValue}>{config?.rtpPercent ?? 90}%</Text>
               </View>
             </ScrollView>
@@ -708,14 +932,14 @@ export default function PlinkoScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setHistoryOpen(false)} />
           <View style={[styles.sheet, { maxHeight: '70%' }]}>
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>MY BETS</Text>
+              <Text style={styles.sheetTitle}>{t.myBets}</Text>
               <Pressable onPress={() => setHistoryOpen(false)} style={styles.sheetClose} hitSlop={8}>
                 <MaterialCommunityIcons name="close" size={22} color="#FFFFFF" />
               </Pressable>
             </View>
             <ScrollView contentContainerStyle={styles.sheetBody}>
               {history.length === 0 ? (
-                <Text style={styles.sheetText}>No balls dropped yet.</Text>
+                <Text style={styles.sheetText}>{t.noBets}</Text>
               ) : (
                 history.map((h) => {
                   const c = COLORS[RISK_INDEX[h.risk]];
@@ -723,7 +947,7 @@ export default function PlinkoScreen() {
                   return (
                     <View key={h.id} style={styles.historyRow}>
                       <View style={[styles.historyDot, { backgroundColor: c.tile[0] }]} />
-                      <Text style={styles.historyPins}>{h.rows} pins</Text>
+                      <Text style={styles.historyPins}>{h.rows} {t.pins}</Text>
                       <Text style={styles.historyStake}>₹{Number(h.stake).toFixed(2)}</Text>
                       <Text style={[styles.historyResult, { color: won ? '#7CFFB2' : '#FF8A95' }]}>
                         {Number(h.multiplier)}x · ₹{Number(h.payout).toFixed(2)}
@@ -759,6 +983,48 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(160,230,255,0.35)',
   },
   recentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recentPanel: {
+    alignItems: 'flex-start',
+    padding: 8,
+    borderRadius: 14,
+    backgroundColor: 'rgba(8,90,110,0.85)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(8,60,80,0.9)',
+  },
+  recentPanelBody: { flex: 1, paddingLeft: 6 },
+  recentTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', marginTop: 5, marginBottom: 8 },
+  recentWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, maxHeight: 60, overflow: 'hidden' },
+  recentEmpty: { color: 'rgba(230,247,255,0.7)', fontSize: 12 },
+  historyBtnOpen: { backgroundColor: 'rgba(8,60,80,0.9)' },
+  menu: {
+    position: 'absolute',
+    right: 10,
+    width: '64%',
+    padding: 10,
+    gap: 8,
+    borderRadius: 16,
+    backgroundColor: '#2A2B2F',
+    borderWidth: 1,
+    borderColor: '#3A3C42',
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  menuUser: { color: '#E6E7EA', fontSize: 16, paddingHorizontal: 6, paddingVertical: 4 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, backgroundColor: '#1D1E21' },
+  menuLabel: { flex: 1, color: '#FFFFFF', fontSize: 15 },
+  menuValue: { color: '#C9CBD0', fontSize: 13 },
+  switchTrack: { width: 42, height: 22, borderRadius: 11, padding: 3, justifyContent: 'center', backgroundColor: '#5D6270' },
+  switchTrackOn: { backgroundColor: '#5FB012' },
+  switchKnob: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFFFFF' },
+  switchKnobOn: { alignSelf: 'flex-end' },
+  langRow: { flexDirection: 'row', gap: 8 },
+  langOption: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: '#1D1E21', borderWidth: 1, borderColor: '#3A3C42' },
+  langOptionActive: { borderColor: '#5FB012', backgroundColor: '#23301A' },
+  langText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  limitsIntro: { color: '#B9BBC1', fontSize: 14, lineHeight: 20 },
   recentStrip: {
     flex: 1,
     height: 32,
