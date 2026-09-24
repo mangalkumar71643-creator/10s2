@@ -1,10 +1,20 @@
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Dimensions, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Text as SvgText } from 'react-native-svg';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient as SvgLinearGradient,
+  Path,
+  Polygon,
+  RadialGradient,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -22,8 +32,7 @@ import {
   placeDragonTigerBets,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
-
-const W = Dimensions.get('window').width;
+import { useAuth } from '../state/AuthContext';
 
 const CHIP_VALUES = [10, 20, 50, 100, 200, 500, 1000];
 const CHIP_COLORS: Record<number, string> = {
@@ -40,12 +49,10 @@ const FALLBACK_MULTIPLIERS: Record<DragonTigerArea, number> = { DRAGON: 1.95, TI
 
 const WIN_CARD_MS = 3000;
 const TOAST_MS = 1600;
-const BANNER_MS = 1300;
+const BANNER_MS = 1400;
 const VS_MS = 2900;
-const ROAD_LEN = 24;
-
-const CARD_W = Math.min(64, W * 0.15);
-const CARD_H = CARD_W * 1.4;
+const ROAD_LEN = 40;
+const GOLD = '#FFD66B';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -74,7 +81,131 @@ function areaWins(area: DragonTigerArea, winner: string | null, suitedTie: boole
 const RANK_LABEL = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const SUIT_SYMBOL: Record<string, string> = { S: '♠', H: '♥', C: '♣', D: '♦' };
 
-// ---------- visual pieces ----------
+// ---------- art ----------
+
+const PALETTES = {
+  DRAGON: ['#06163F', '#0C2F7A', '#1A56C4', '#4E93FF', '#BFDBFF'],
+  TIGER: ['#3F0704', '#86170D', '#CF3B1A', '#FF8436', '#FFDFA3'],
+};
+
+/** A faceted crystal medallion with the Chinese character for dragon (龍)
+ * or tiger (虎) in gold — every facet is shaded by its angle to a light
+ * from the top-left, which is what gives it the cut-crystal look. */
+const CrystalEmblem = memo(function CrystalEmblem({ side, size }: { side: 'DRAGON' | 'TIGER'; size: number }) {
+  const s = size;
+  const pal = PALETTES[side];
+  const cx = s / 2;
+  const cy = s / 2;
+  const R = s * 0.47;
+  const verts = Array.from({ length: 6 }, (_, i) => {
+    const a = (-90 + i * 60) * (Math.PI / 180);
+    return [cx + R * Math.cos(a), cy + R * Math.sin(a)];
+  });
+  const light = (-135 * Math.PI) / 180;
+  const facets: React.ReactElement[] = [];
+  for (let i = 0; i < 6; i++) {
+    const a = verts[i];
+    const b = verts[(i + 1) % 6];
+    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const inner = [cx + (m[0] - cx) * 0.42, cy + (m[1] - cy) * 0.42];
+    const tris = [
+      [a, m, inner],
+      [m, b, inner],
+      [[cx, cy], a, inner],
+      [[cx, cy], inner, b],
+    ];
+    tris.forEach((t, k) => {
+      const mx = (t[0][0] + t[1][0] + t[2][0]) / 3 - cx;
+      const my = (t[0][1] + t[1][1] + t[2][1]) / 3 - cy;
+      const ang = Math.atan2(my, mx);
+      const lit = 0.5 + 0.5 * Math.cos(ang - light) + (k % 2 === 0 ? 0.12 : -0.12) - (k >= 2 ? 0.15 : 0);
+      const idx = Math.max(0, Math.min(4, Math.round(lit * 4)));
+      facets.push(
+        <Polygon
+          key={`${i}-${k}`}
+          points={t.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}
+          fill={pal[idx]}
+          stroke={pal[Math.min(4, idx + 1)]}
+          strokeOpacity={0.35}
+          strokeWidth={0.6}
+        />
+      );
+    });
+  }
+  const outline = verts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const inset = verts.map((p) => `${(cx + (p[0] - cx) * 0.9).toFixed(1)},${(cy + (p[1] - cy) * 0.9).toFixed(1)}`).join(' ');
+  const glyph = side === 'DRAGON' ? '龍' : '虎';
+  const fs = s * 0.42;
+  const id = side === 'DRAGON' ? 'dg' : 'tg';
+  return (
+    <Svg width={s} height={s}>
+      <Defs>
+        <SvgLinearGradient id={`${id}Gold`} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#FFF4C2" />
+          <Stop offset="0.45" stopColor="#F2BE45" />
+          <Stop offset="0.7" stopColor="#B27416" />
+          <Stop offset="1" stopColor="#FFE9A0" />
+        </SvgLinearGradient>
+      </Defs>
+      {facets}
+      <Polygon points={outline} fill="none" stroke={`url(#${id}Gold)`} strokeWidth={s * 0.045} strokeLinejoin="round" />
+      <Polygon points={inset} fill="none" stroke="#FFE7A0" strokeOpacity={0.55} strokeWidth={1} strokeLinejoin="round" />
+      {/* Solid colours (not a gradient fill) so the glyph renders the same
+          on every device: a dark drop shadow, then the gold character. */}
+      <SvgText x={cx + s * 0.012} y={cy + fs * 0.36 + s * 0.02} fontSize={fs} fontWeight="900" textAnchor="middle" fill="#1A0A00" fillOpacity={0.7}>
+        {glyph}
+      </SvgText>
+      <SvgText x={cx} y={cy + fs * 0.36} fontSize={fs} fontWeight="900" textAnchor="middle" fill="#FFD866" stroke="#7A4A08" strokeWidth={s * 0.012}>
+        {glyph}
+      </SvgText>
+    </Svg>
+  );
+});
+
+/** Emblem plus a breathing glow behind it and a gold name plate. */
+function Emblem({ side, size, dim }: { side: 'DRAGON' | 'TIGER'; size: number; dim?: boolean }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  const glowColor = side === 'DRAGON' ? '#3D86FF' : '#FF5A2A';
+  return (
+    <View style={{ alignItems: 'center', opacity: dim ? 0.45 : 1 }}>
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          width: size * 1.35,
+          height: size * 1.35,
+          top: -size * 0.175,
+          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0.9] }),
+          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1.06] }) }],
+        }}
+      >
+        <Svg width={size * 1.35} height={size * 1.35}>
+          <Defs>
+            <RadialGradient id={`glow${side}`} cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor={glowColor} stopOpacity={0.75} />
+              <Stop offset="1" stopColor={glowColor} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Circle cx={size * 0.675} cy={size * 0.675} r={size * 0.675} fill={`url(#glow${side})`} />
+        </Svg>
+      </Animated.View>
+      <CrystalEmblem side={side} size={size} />
+      <LinearGradient colors={['#FFE9A0', '#C98A1C']} style={styles.namePlate}>
+        <Text style={styles.nameText}>{side}</Text>
+      </LinearGradient>
+    </View>
+  );
+}
 
 const Chip = memo(function Chip({ value, size, label }: { value: number; size: number; label?: string }) {
   const color = CHIP_COLORS[value] ?? chipColorFor(value);
@@ -99,28 +230,28 @@ function CardFace({ card, w }: { card: PlayingCard; w: number }) {
   const red = card.suit === 'H' || card.suit === 'D';
   const color = red ? '#D0142C' : '#16161C';
   return (
-    <LinearGradient colors={['#FFFFFF', '#ECECF1']} style={[styles.card, { width: w, height: w * 1.4, borderRadius: w * 0.1 }]}>
+    <LinearGradient colors={['#FFFFFF', '#E9E9F0']} style={[styles.card, { width: w, height: w * 1.4, borderRadius: w * 0.1 }]}>
       <View style={styles.cardCorner}>
         <Text style={[styles.cardRank, { color, fontSize: w * 0.28 }]}>{RANK_LABEL[card.rank]}</Text>
-        <Text style={[styles.cardSuitSmall, { color, fontSize: w * 0.22 }]}>{SUIT_SYMBOL[card.suit]}</Text>
+        <Text style={{ color, fontSize: w * 0.22, marginTop: -3 }}>{SUIT_SYMBOL[card.suit]}</Text>
       </View>
-      <Text style={[styles.cardSuitBig, { color, fontSize: w * 0.62 }]}>{SUIT_SYMBOL[card.suit]}</Text>
+      <Text style={{ color, fontSize: w * 0.62, marginTop: w * 0.12 }}>{SUIT_SYMBOL[card.suit]}</Text>
     </LinearGradient>
   );
 }
 
 function CardBack({ w }: { w: number }) {
   return (
-    <LinearGradient colors={['#6B1F2E', '#3A0B16']} style={[styles.card, styles.cardBack, { width: w, height: w * 1.4, borderRadius: w * 0.1 }]}>
+    <LinearGradient colors={['#5A1A0E', '#2A0A04']} style={[styles.card, styles.cardBack, { width: w, height: w * 1.4, borderRadius: w * 0.1 }]}>
       <View style={[styles.cardBackInner, { borderRadius: w * 0.07 }]}>
-        <View style={[styles.cardBackDiamond, { width: w * 0.38, height: w * 0.38 }]} />
+        <View style={[styles.cardBackDiamond, { width: w * 0.42, height: w * 0.42 }]} />
         <Text style={[styles.cardBackMark, { fontSize: w * 0.2 }]}>NP</Text>
       </View>
     </LinearGradient>
   );
 }
 
-/** A card that flips from its back to `card` whenever `card` is set. */
+/** A card that flips from its back to `card` whenever the card changes. */
 function FlipCard({ card, w, delay = 0 }: { card: PlayingCard | null; w: number; delay?: number }) {
   const flip = useRef(new Animated.Value(0)).current;
   const [shown, setShown] = useState<PlayingCard | null>(card);
@@ -155,23 +286,109 @@ function FlipCard({ card, w, delay = 0 }: { card: PlayingCard | null; w: number;
   );
 }
 
-function Emblem({ side, size }: { side: 'DRAGON' | 'TIGER'; size: number }) {
-  const dragon = side === 'DRAGON';
+/** Stage card slot: empty while betting, dealt face-down while dealing,
+ * flipped on the reveal. */
+function DealtCard({ phase, card, w, from }: { phase: string; card: PlayingCard | null; w: number; from: 1 | -1 }) {
+  const deal = useRef(new Animated.Value(phase === 'BETTING' ? 0 : 1)).current;
+  useEffect(() => {
+    if (phase === 'BETTING') {
+      deal.setValue(0);
+    } else {
+      Animated.timing(deal, { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    }
+  }, [phase, deal]);
   return (
-    <View style={{ alignItems: 'center' }}>
-      <LinearGradient
-        colors={dragon ? ['#7FB2FF', '#2F5FD0', '#12275E'] : ['#FFB36B', '#E0342F', '#5E0E12']}
-        style={[styles.emblem, { width: size, height: size, borderRadius: size / 2, shadowColor: dragon ? '#4C8DFF' : '#FF5A3C' }]}
+    <View style={[styles.cardSlot, { width: w + 6, height: w * 1.4 + 6, borderRadius: w * 0.12 }]}>
+      <Animated.View
+        style={{
+          opacity: deal,
+          transform: [
+            { translateX: deal.interpolate({ inputRange: [0, 1], outputRange: [from * 140, 0] }) },
+            { translateY: deal.interpolate({ inputRange: [0, 1], outputRange: [-60, 0] }) },
+            { rotate: deal.interpolate({ inputRange: [0, 1], outputRange: [`${from * 35}deg`, '0deg'] }) },
+          ],
+        }}
       >
-        <View style={[styles.emblemRing, { width: size - 8, height: size - 8, borderRadius: (size - 8) / 2 }]} />
-        <Text style={{ fontSize: size * 0.52 }}>{dragon ? '🐉' : '🐯'}</Text>
-      </LinearGradient>
-      <Text style={[styles.emblemLabel, { color: dragon ? '#9CC3FF' : '#FFB199' }]}>{side}</Text>
+        <FlipCard card={card} w={w} />
+      </Animated.View>
+    </View>
+  );
+}
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+function Clock({ secs, fraction, size }: { secs: number; fraction: Animated.Value; size: number }) {
+  const r = size / 2 - 4;
+  const c = 2 * Math.PI * r;
+  const urgent = secs <= 3;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgLinearGradient id="clockGold" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#FFF1B8" />
+            <Stop offset="1" stopColor="#C98A1C" />
+          </SvgLinearGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={r + 2} fill="#2A0C06" />
+        <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#4A2412" strokeWidth={5} />
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={urgent ? '#FF4B3E' : 'url(#clockGold)'}
+          strokeWidth={5}
+          strokeLinecap="round"
+          strokeDasharray={`${c} ${c}`}
+          strokeDashoffset={fraction.interpolate({ inputRange: [0, 1], outputRange: [c, 0] })}
+          rotation={-90}
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+      <Text style={[styles.clockText, { fontSize: size * 0.4 }, urgent && { color: '#FF5A4E' }]}>{secs}</Text>
+    </View>
+  );
+}
+
+/** Gold coins bursting out of a winning box. */
+function WinBurst() {
+  const t = useRef(new Animated.Value(0)).current;
+  const pop = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(t, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.spring(pop, { toValue: 1, friction: 4, tension: 90, useNativeDriver: true }).start();
+  }, [t, pop]);
+  return (
+    <View pointerEvents="none" style={styles.burstWrap}>
+      {Array.from({ length: 10 }, (_, i) => {
+        const a = (i / 10) * Math.PI * 2;
+        return (
+          <Animated.View
+            key={i}
+            style={[
+              styles.coin,
+              {
+                opacity: t.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] }),
+                transform: [
+                  { translateX: t.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(a) * 70] }) },
+                  { translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(a) * 45] }) },
+                ],
+              },
+            ]}
+          />
+        );
+      })}
+      <Animated.Text style={[styles.winText, { transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]}>
+        WIN
+      </Animated.Text>
     </View>
   );
 }
 
 type AreaState = 'normal' | 'win' | 'lose';
+
+const SUIT_ROW = '♠ ♥ ♣ ♦ ♠ ♥ ♣ ♦ ♠ ♥ ♣ ♦';
 
 const BetBox = memo(function BetBox({
   area,
@@ -183,6 +400,7 @@ const BetBox = memo(function BetBox({
   big,
   onPress,
   glow,
+  boxRef,
 }: {
   area: DragonTigerArea;
   title: string;
@@ -193,40 +411,124 @@ const BetBox = memo(function BetBox({
   big: boolean;
   onPress: (area: DragonTigerArea) => void;
   glow: Animated.Value;
+  boxRef: (v: View | null) => void;
 }) {
   return (
     <Pressable onPress={() => onPress(area)} style={({ pressed }) => [styles.boxOuter, pressed && styles.pressed]}>
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 0.4, y: 1 }} style={[styles.boxFill, state === 'win' && styles.boxWin]}>
-        <LinearGradient colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0)']} style={styles.boxShine} pointerEvents="none" />
-        <Text style={[styles.boxTitle, big && styles.boxTitleBig]} numberOfLines={1} adjustsFontSizeToFit>
-          {title}
-        </Text>
-        <Text style={[styles.boxMult, big && styles.boxMultBig]}>{multiplier}x</Text>
-        <Text style={styles.boxMine}>₹{round2(total)}</Text>
-        {total > 0 && (
-          <View style={big ? styles.boxChipBig : styles.boxChip} pointerEvents="none">
-            <Chip value={total} size={big ? 40 : 32} label={shortAmount(total)} />
+      <View ref={boxRef} collapsable={false} style={{ flex: 1 }}>
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 0.35, y: 1 }} style={[styles.boxFill, state === 'win' && styles.boxWin]}>
+          <View pointerEvents="none" style={styles.suitPattern}>
+            {Array.from({ length: 5 }, (_, i) => (
+              <Text key={i} style={styles.suitRow} numberOfLines={1}>
+                {SUIT_ROW}
+              </Text>
+            ))}
           </View>
-        )}
-        {state === 'win' && (
-          <Animated.View pointerEvents="none" style={[styles.winOverlay, { opacity: glow }]}>
-            <Text style={styles.winText}>WIN</Text>
-          </Animated.View>
-        )}
-        {state === 'lose' && <View pointerEvents="none" style={styles.loseShade} />}
-      </LinearGradient>
+          <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']} style={styles.boxShine} pointerEvents="none" />
+          <Text style={[styles.boxTitle, big && styles.boxTitleBig]} numberOfLines={1} adjustsFontSizeToFit>
+            {title}
+          </Text>
+          <Text style={[styles.boxMult, big && styles.boxMultBig]}>{multiplier}x</Text>
+          <Text style={styles.boxMine}>₹{round2(total)}</Text>
+          {total > 0 && (
+            <View style={big ? styles.boxChipBig : styles.boxChip} pointerEvents="none">
+              <Chip value={total} size={big ? 38 : 30} label={shortAmount(total)} />
+            </View>
+          )}
+          {state === 'win' && (
+            <>
+              <Animated.View pointerEvents="none" style={[styles.winGlow, { opacity: glow }]} />
+              <WinBurst />
+            </>
+          )}
+          {state === 'lose' && <View pointerEvents="none" style={styles.loseShade} />}
+        </LinearGradient>
+      </View>
     </Pressable>
   );
 });
 
+/** Golden light rays for the VS scene. */
+function Rays({ size }: { size: number }) {
+  const c = size / 2;
+  const rays = Array.from({ length: 18 }, (_, i) => {
+    const a0 = ((i * 20 - 4) * Math.PI) / 180;
+    const a1 = ((i * 20 + 4) * Math.PI) / 180;
+    return `M ${c} ${c} L ${c + c * Math.cos(a0)} ${c + c * Math.sin(a0)} L ${c + c * Math.cos(a1)} ${c + c * Math.sin(a1)} Z`;
+  });
+  return (
+    <Svg width={size} height={size}>
+      <Defs>
+        <RadialGradient id="rayFade" cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor="#FFE9A0" stopOpacity={0.55} />
+          <Stop offset="1" stopColor="#FFB020" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      {rays.map((d, i) => (
+        <Path key={i} d={d} fill="url(#rayFade)" />
+      ))}
+    </Svg>
+  );
+}
+
+/** Crystal shards flying out of an emblem when it lands. */
+function Shards({ side, trigger }: { side: 'DRAGON' | 'TIGER'; trigger: Animated.Value }) {
+  const pal = PALETTES[side];
+  const shards = useMemo(
+    () =>
+      Array.from({ length: 9 }, (_, i) => {
+        const a = (i / 9) * Math.PI * 2 + (side === 'DRAGON' ? 0.3 : 0.9);
+        return { dx: Math.cos(a) * (70 + (i % 3) * 25), dy: Math.sin(a) * (55 + (i % 2) * 20), rot: (i % 2 ? 1 : -1) * (120 + i * 20), s: 10 + (i % 3) * 6 };
+      }),
+    [side]
+  );
+  return (
+    <View pointerEvents="none" style={styles.shardWrap}>
+      {shards.map((sh, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: 'absolute',
+            opacity: trigger.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 1, 0] }),
+            transform: [
+              { translateX: trigger.interpolate({ inputRange: [0, 1], outputRange: [0, sh.dx] }) },
+              { translateY: trigger.interpolate({ inputRange: [0, 1], outputRange: [0, sh.dy] }) },
+              { rotate: trigger.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${sh.rot}deg`] }) },
+            ],
+          }}
+        >
+          <Svg width={sh.s} height={sh.s * 1.6}>
+            <Polygon points={`${sh.s / 2},0 ${sh.s},${sh.s * 0.6} ${sh.s / 2},${sh.s * 1.6} 0,${sh.s * 0.6}`} fill={pal[3]} stroke={pal[4]} strokeWidth={0.8} />
+          </Svg>
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
 // ---------- screen ----------
 
 type PlacedChip = { key: number; area: DragonTigerArea; amount: number; id?: string };
+type Flight = { id: number; value: number; area: DragonTigerArea; from: { x: number; y: number }; to: { x: number; y: number }; anim: Animated.Value };
 
 export default function DragonTigerScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
+  const { width: W, height: H } = useWindowDimensions();
+  const landscape = W > H;
   const { coins, refreshWallet } = useGameState();
+  const { backendUser } = useAuth();
+
+  // Played sideways: lock landscape while this screen is focused and hand
+  // the rest of the app back its portrait lock on the way out.
+  useFocusEffect(
+    useCallback(() => {
+      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
+      return () => {
+        ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+      };
+    }, [])
+  );
 
   const [config, setConfig] = useState<DragonTigerConfig | null>(null);
   const [view, setView] = useState<DragonTigerRoundView | null>(null);
@@ -235,8 +537,10 @@ export default function DragonTigerScreen() {
   const [selectedChip, setSelectedChip] = useState(DEFAULT_CHIP);
   const [win, setWin] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ text: string; start: boolean } | null>(null);
   const [vsOpen, setVsOpen] = useState(false);
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const [flying, setFlying] = useState<Partial<Record<DragonTigerArea, number>>>({});
   const [, setPhaseTick] = useState(0);
 
   const offsetRef = useRef(0);
@@ -251,10 +555,19 @@ export default function DragonTigerScreen() {
   const mountedRef = useRef(true);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rootRef = useRef<View>(null);
+  const chipRefs = useRef<Record<number, View | null>>({});
+  const boxRefs = useRef<Partial<Record<DragonTigerArea, View | null>>>({});
+  const flightId = useRef(1);
+
   const bannerAnim = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0.4)).current;
   const vsAnim = useRef(new Animated.Value(0)).current;
+  const vsSlide = useRef(new Animated.Value(0)).current;
+  const vsShards = useRef(new Animated.Value(0)).current;
   const vsResult = useRef(new Animated.Value(0)).current;
+  const vsRays = useRef(new Animated.Value(0)).current;
+  const clockFraction = useRef(new Animated.Value(1)).current;
 
   const multipliers = config?.multipliers ?? FALLBACK_MULTIPLIERS;
   const minStake = config?.minStake ?? 1;
@@ -267,13 +580,15 @@ export default function DragonTigerScreen() {
   }, []);
 
   const showBanner = useCallback(
-    (text: string) => {
-      setBanner(text);
+    (text: string, start: boolean) => {
+      setBanner({ text, start });
       bannerAnim.setValue(0);
-      Animated.spring(bannerAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true }).start();
+      Animated.timing(bannerAnim, { toValue: 1, duration: 420, easing: Easing.out(Easing.back(1.4)), useNativeDriver: true }).start();
       if (bannerTimer.current) clearTimeout(bannerTimer.current);
       bannerTimer.current = setTimeout(() => {
-        Animated.timing(bannerAnim, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setBanner(null));
+        Animated.timing(bannerAnim, { toValue: 2, duration: 320, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(
+          () => mountedRef.current && setBanner(null)
+        );
       }, BANNER_MS);
     },
     [bannerAnim]
@@ -360,10 +675,24 @@ export default function DragonTigerScreen() {
       setChips([]);
       idMapRef.current.clear();
       setVsOpen(false);
-      showBanner('Start Betting');
+      showBanner('Start Betting', true);
     }
     periodRef.current = view.periodNumber;
   }, [view, showBanner]);
+
+  // Countdown ring for this round's betting window.
+  useEffect(() => {
+    if (!view) return;
+    const betEnd = new Date(view.betEndTime).getTime();
+    const total = Math.max(1, betEnd - new Date(view.startTime).getTime());
+    const remaining = Math.max(0, betEnd - (Date.now() + offsetRef.current));
+    clockFraction.setValue(remaining / total);
+    const anim = Animated.timing(clockFraction, { toValue: 0, duration: remaining, easing: Easing.linear, useNativeDriver: false });
+    anim.start();
+    return () => anim.stop();
+    // Restart only when the round (not every poll) changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view?.periodNumber, clockFraction]);
 
   // Re-render exactly when betting closes / the cards are due.
   useEffect(() => {
@@ -376,7 +705,7 @@ export default function DragonTigerScreen() {
       ids.push(
         setTimeout(() => {
           setPhaseTick((x) => x + 1);
-          showBanner('Stop Betting');
+          showBanner('Stop Betting', false);
         }, betWait + 20)
       );
     if (resWait > 0) ids.push(setTimeout(() => setPhaseTick((x) => x + 1), resWait + 20));
@@ -394,8 +723,14 @@ export default function DragonTigerScreen() {
         ? 'RESULT'
         : 'DEALING';
   const revealed = phase === 'RESULT' && view?.dragon && view?.tiger ? view : null;
-  // The board only lights up once the VS reveal has finished.
+  // The board only lights up once the VS scene has finished.
   const boardResult = revealed && !vsOpen ? revealed : null;
+
+  useEffect(() => {
+    if (phase !== 'BETTING') return;
+    const id = setInterval(() => setPhaseTick((x) => x + 1), 250);
+    return () => clearInterval(id);
+  }, [phase]);
 
   // Reveal: VS scene, road update, then this player's winnings.
   useEffect(() => {
@@ -403,12 +738,19 @@ export default function DragonTigerScreen() {
     const period = view.periodNumber;
     resultHandledRef.current = period;
     setVsOpen(true);
-    vsAnim.setValue(0);
-    vsResult.setValue(0);
-    Animated.timing(vsAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
-    Animated.timing(vsResult, { toValue: 1, duration: 400, delay: 1500, useNativeDriver: true }).start();
+    [vsAnim, vsSlide, vsShards, vsResult, vsRays].forEach((v) => v.setValue(0));
+    Animated.timing(vsAnim, { toValue: 1, duration: 260, useNativeDriver: true }).start();
+    Animated.loop(Animated.timing(vsRays, { toValue: 1, duration: 9000, easing: Easing.linear, useNativeDriver: true })).start();
+    Animated.sequence([
+      Animated.timing(vsSlide, { toValue: 1, duration: 520, easing: Easing.out(Easing.back(1.3)), useNativeDriver: true }),
+      Animated.timing(vsShards, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+    Animated.timing(vsResult, { toValue: 1, duration: 450, delay: 1900, useNativeDriver: true }).start();
     const closeTimer = setTimeout(() => {
-      Animated.timing(vsAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => mountedRef.current && setVsOpen(false));
+      Animated.timing(vsAnim, { toValue: 0, duration: 280, useNativeDriver: true }).start(() => {
+        vsRays.stopAnimation();
+        if (mountedRef.current) setVsOpen(false);
+      });
     }, VS_MS);
     const entry: DragonTigerHistoryEntry = {
       periodNumber: period,
@@ -423,7 +765,7 @@ export default function DragonTigerScreen() {
         try {
           const res = await fetchDragonTigerMyRound(period);
           const won = round2(res.bets.reduce((sum, b) => sum + Number(b.payout), 0));
-          if (won > 0) setTimeout(() => mountedRef.current && setWin(won), VS_MS + 700);
+          if (won > 0) setTimeout(() => mountedRef.current && setWin(won), VS_MS + 1100);
         } catch {
           // Winnings still land in the wallet; only the card is skipped.
         }
@@ -431,7 +773,7 @@ export default function DragonTigerScreen() {
       });
     }
     return () => clearTimeout(closeTimer);
-  }, [view, enqueue, refreshWallet, vsAnim, vsResult]);
+  }, [view, enqueue, refreshWallet, vsAnim, vsSlide, vsShards, vsResult, vsRays]);
 
   useEffect(() => {
     if (win === null) return;
@@ -443,8 +785,8 @@ export default function DragonTigerScreen() {
     if (!boardResult) return;
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 450, useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0.45, duration: 450, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0.9, duration: 450, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0.3, duration: 450, useNativeDriver: true }),
       ])
     );
     pulse.start();
@@ -472,15 +814,24 @@ export default function DragonTigerScreen() {
   selectedChipRef.current = selectedChip;
 
   const placeChips = useCallback(
-    (entries: { area: DragonTigerArea; amount: number }[]) => {
-      if (entries.length === 0) return;
-      if (!bettingOpenRef.current) return showToast('Betting closed — wait for the next round');
+    (entries: { area: DragonTigerArea; amount: number }[]): boolean => {
+      if (entries.length === 0) return false;
+      if (!bettingOpenRef.current) {
+        showToast('Betting closed — wait for the next round');
+        return false;
+      }
       const cost = round2(entries.reduce((s, e) => s + e.amount, 0));
-      if (cost > displayBalanceRef.current) return showToast('Insufficient balance');
+      if (cost > displayBalanceRef.current) {
+        showToast('Insufficient balance');
+        return false;
+      }
       const totals = { ...areaTotalsRef.current };
       for (const e of entries) {
         totals[e.area] = round2((totals[e.area] ?? 0) + e.amount);
-        if ((totals[e.area] ?? 0) > maxStakeRef.current) return showToast(`Max bet per box is ₹${maxStakeRef.current}`);
+        if ((totals[e.area] ?? 0) > maxStakeRef.current) {
+          showToast(`Max bet per box is ₹${maxStakeRef.current}`);
+          return false;
+        }
       }
       const added: PlacedChip[] = entries.map((e) => ({ key: keyRef.current++, area: e.area, amount: e.amount }));
       const keys = new Set(added.map((c) => c.key));
@@ -500,24 +851,50 @@ export default function DragonTigerScreen() {
           }
         }
       });
+      return true;
     },
     [enqueue, refreshWallet, showToast]
   );
 
-  const onAreaPress = useCallback((area: DragonTigerArea) => placeChips([{ area, amount: selectedChipRef.current }]), [placeChips]);
-
-  const cancel = (betIds?: string[]) =>
-    enqueue(async () => {
-      try {
-        await cancelDragonTigerBets(betIds);
-        refreshWallet();
-      } catch (err) {
-        if (mountedRef.current) {
-          showToast(errorMessage(err));
-          syncMyRound();
-        }
-      }
+  // A chip flies from the rail to the box; the box counts it once it lands.
+  const launchFlight = useCallback((area: DragonTigerArea, value: number) => {
+    const chipView = chipRefs.current[value];
+    const boxView = boxRefs.current[area];
+    const root = rootRef.current;
+    if (!chipView || !boxView || !root) return;
+    root.measureInWindow((rx, ry) => {
+      chipView.measureInWindow((cx, cy, cw, ch) => {
+        boxView.measureInWindow((bx, by, bw, bh) => {
+          if (!mountedRef.current) return;
+          const id = flightId.current++;
+          const anim = new Animated.Value(0);
+          const flight: Flight = {
+            id,
+            value,
+            area,
+            from: { x: cx - rx + cw / 2, y: cy - ry + ch / 2 },
+            to: { x: bx - rx + bw / 2 + (Math.random() - 0.5) * bw * 0.3, y: by - ry + bh / 2 + (Math.random() - 0.5) * bh * 0.2 },
+            anim,
+          };
+          setFlights((prev) => [...prev, flight]);
+          setFlying((prev) => ({ ...prev, [area]: round2((prev[area] ?? 0) + value) }));
+          Animated.timing(anim, { toValue: 1, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => {
+            if (!mountedRef.current) return;
+            setFlights((prev) => prev.filter((f) => f.id !== id));
+            setFlying((prev) => ({ ...prev, [area]: Math.max(0, round2((prev[area] ?? 0) - value)) }));
+          });
+        });
+      });
     });
+  }, []);
+
+  const onAreaPress = useCallback(
+    (area: DragonTigerArea) => {
+      const value = selectedChipRef.current;
+      if (placeChips([{ area, amount: value }])) launchFlight(area, value);
+    },
+    [placeChips, launchFlight]
+  );
 
   const undo = () => {
     const last = chips[chips.length - 1];
@@ -526,12 +903,16 @@ export default function DragonTigerScreen() {
     setChips((prev) => prev.slice(0, -1));
     enqueue(async () => {
       const id = idMapRef.current.get(last.key);
-      if (id) await cancelDragonTigerBets([id]).then(() => refreshWallet(), (err) => {
+      if (!id) return;
+      try {
+        await cancelDragonTigerBets([id]);
+        refreshWallet();
+      } catch (err) {
         if (mountedRef.current) {
           showToast(errorMessage(err));
           syncMyRound();
         }
-      });
+      }
     });
   };
 
@@ -539,7 +920,17 @@ export default function DragonTigerScreen() {
     if (chips.length === 0) return;
     if (!bettingOpen) return showToast('Betting closed');
     setChips([]);
-    cancel();
+    enqueue(async () => {
+      try {
+        await cancelDragonTigerBets();
+        refreshWallet();
+      } catch (err) {
+        if (mountedRef.current) {
+          showToast(errorMessage(err));
+          syncMyRound();
+        }
+      }
+    });
   };
 
   const repeat = () => {
@@ -555,168 +946,324 @@ export default function DragonTigerScreen() {
     if (!n) return null;
     const d = history.filter((h) => h.winner === 'DRAGON').length;
     const t = history.filter((h) => h.winner === 'TIGER').length;
-    return { d: Math.round((d / n) * 100), t: Math.round((t / n) * 100), tie: Math.round(((n - d - t) / n) * 100) };
+    return { d: Math.round((d / n) * 100), t: Math.round((t / n) * 100), tie: Math.round(((n - d - t) / n) * 100), n };
   }, [history]);
 
   const areaState = (area: DragonTigerArea): AreaState =>
     !boardResult ? 'normal' : areaWins(area, boardResult.winner, boardResult.suitedTie) ? 'win' : 'lose';
+  const shownTotal = (area: DragonTigerArea) => Math.max(0, round2((areaTotals[area] ?? 0) - (flying[area] ?? 0)));
 
   const secsLeft = Math.max(0, Math.ceil((betEndMs - srvNow) / 1000));
-  const statusText = phase === 'BETTING' ? 'PLACE YOUR BETS' : phase === 'DEALING' ? 'DEALING' : boardResult ? `${boardResult.winner} WINS` : 'REVEAL';
+  const statusText =
+    phase === 'BETTING' ? 'PLACE YOUR BETS' : phase === 'DEALING' ? 'DEALING…' : boardResult ? `${boardResult.winner === 'TIE' ? 'TIE' : `${boardResult.winner} WINS`}` : 'REVEAL';
 
-  // Tick the countdown once a second during betting.
-  useEffect(() => {
-    if (phase !== 'BETTING') return;
-    const id = setInterval(() => setPhaseTick((x) => x + 1), 500);
-    return () => clearInterval(id);
-  }, [phase]);
+  if (!landscape) {
+    return (
+      <View style={[styles.root, styles.rotating]}>
+        <MaterialCommunityIcons name="phone-rotate-landscape" size={48} color={GOLD} />
+        <Text style={styles.rotatingText}>Turning to landscape…</Text>
+      </View>
+    );
+  }
 
-  const bannerScale = bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
-  const vsScale = vsAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
+  // ---- landscape sizes ----
+  const padL = Math.max(insets.left, 10);
+  const padR = Math.max(insets.right, 10);
+  const topH = 34;
+  const stageH = Math.max(90, H * 0.26);
+  const roadH = 26;
+  const bottomH = 58 + Math.max(insets.bottom, 4);
+  const emblemSize = stageH * 0.84;
+  const cardW = Math.min(stageH * 0.48, 58);
+  const sideW = Math.max(96, W * 0.12);
+  const chipSize = Math.min(42, (W * 0.5) / 8.2);
   const winnerSide = revealed?.winner;
-  const sideStyle = (side: 'DRAGON' | 'TIGER') => ({
-    opacity:
-      winnerSide === 'TIE' || winnerSide === side
-        ? 1
-        : vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, 0.35] }),
-    transform: [
-      {
-        scale:
-          winnerSide === side || winnerSide === 'TIE'
-            ? vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, 1.12] })
-            : vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, 0.92] }),
-      },
-    ],
-  });
+  const vsEmblem = Math.min(H * 0.46, W * 0.2);
+
+  const sideStyle = (side: 'DRAGON' | 'TIGER') => {
+    const winnerOrTie = winnerSide === 'TIE' || winnerSide === side;
+    return {
+      opacity: winnerOrTie ? 1 : vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] }),
+      transform: [
+        { translateX: vsSlide.interpolate({ inputRange: [0, 1], outputRange: [side === 'DRAGON' ? -W * 0.5 : W * 0.5, 0] }) },
+        { scale: vsResult.interpolate({ inputRange: [0, 1], outputRange: [1, winnerOrTie ? 1.1 : 0.9] }) },
+      ],
+    };
+  };
+
+  const bannerStart = banner?.start ?? true;
 
   return (
-    <View style={styles.root}>
-      <LinearGradient colors={['#4A1119', '#2A070C']} style={[styles.header, { paddingTop: insets.top + 6 }]}>
+    <View ref={rootRef} collapsable={false} style={[styles.root, { paddingLeft: padL, paddingRight: padR }]}>
+      {/* Top bar */}
+      <LinearGradient colors={['#4A1119', '#2A070C']} style={[styles.topBar, { height: topH, marginHorizontal: -padL, paddingLeft: padL, paddingRight: padR }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={8}>
-          <MaterialCommunityIcons name="chevron-left" size={30} color="#F5B942" />
+          <MaterialCommunityIcons name="chevron-left" size={26} color="#F5B942" />
           <Text style={styles.title}>DRAGON TIGER</Text>
         </Pressable>
+        <Text style={styles.topStatus}>
+          #{view?.periodNumber.slice(-5) ?? '-----'} · {statusText}
+        </Text>
         <Pressable onPress={() => navigation.navigate('Deposit')} style={styles.depositPill}>
-          <MaterialCommunityIcons name="wallet-plus" size={20} color="#F5B942" />
+          <MaterialCommunityIcons name="wallet-plus" size={16} color="#F5B942" />
           <Text style={styles.depositText}>Deposit</Text>
         </Pressable>
       </LinearGradient>
 
-      <LinearGradient colors={['#2B0A2E', '#1A0620']} style={styles.stage}>
-        <View style={styles.stageSide}>
-          <Emblem side="DRAGON" size={58} />
-          <FlipCard card={revealed?.dragon ?? null} w={CARD_W} />
-        </View>
+      {/* Stage: Dragon · cards & clock · Tiger */}
+      <LinearGradient colors={['#1A3C8F33', '#2A0A2E', '#8F1A1A33']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={[styles.stage, { height: stageH }]}>
+        <Emblem side="DRAGON" size={emblemSize} dim={!!boardResult && boardResult.winner === 'TIGER'} />
         <View style={styles.stageCenter}>
-          {phase === 'BETTING' ? (
-            <LinearGradient colors={['#FFE08A', '#D99A1E']} style={styles.clock}>
-              <View style={styles.clockInner}>
-                <Text style={[styles.clockText, secsLeft <= 3 && styles.clockUrgent]}>{secsLeft}</Text>
-              </View>
-            </LinearGradient>
-          ) : (
-            <Text style={styles.vsSmall}>VS</Text>
-          )}
-          <Text style={styles.stageStatus} numberOfLines={2}>
-            {statusText}
-          </Text>
+          <DealtCard phase={phase} card={revealed?.dragon ?? null} w={cardW} from={-1} />
+          <View style={styles.clockWrap}>
+            {phase === 'BETTING' ? (
+              <Clock secs={secsLeft} fraction={clockFraction} size={stageH * 0.56} />
+            ) : (
+              <Text style={styles.vsSmall}>VS</Text>
+            )}
+          </View>
+          <DealtCard phase={phase} card={revealed?.tiger ?? null} w={cardW} from={1} />
         </View>
-        <View style={styles.stageSide}>
-          <FlipCard card={revealed?.tiger ?? null} w={CARD_W} />
-          <Emblem side="TIGER" size={58} />
-        </View>
+        <Emblem side="TIGER" size={emblemSize} dim={!!boardResult && boardResult.winner === 'DRAGON'} />
       </LinearGradient>
 
-      <View style={styles.roadWrap}>
+      {/* Road */}
+      <View style={[styles.roadWrap, { height: roadH }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.road}>
           {road.map((h, i) => {
             const latest = i === road.length - 1;
-            const bg = h.winner === 'DRAGON' ? '#2F6BE0' : h.winner === 'TIGER' ? '#D93A4A' : '#23A05A';
+            const colors: [string, string] =
+              h.winner === 'DRAGON' ? ['#6FA0FF', '#1D4FC4'] : h.winner === 'TIGER' ? ['#FF8A94', '#C21F31'] : ['#7CE3A4', '#1C8A48'];
             return (
-              <View key={h.periodNumber} style={[styles.roadDot, { backgroundColor: bg }, latest && styles.roadLatest]}>
-                <Text style={styles.roadText}>{h.winner === 'DRAGON' ? 'D' : h.winner === 'TIGER' ? 'T' : '='}</Text>
-              </View>
+              <LinearGradient key={h.periodNumber} colors={colors} style={[styles.bead, latest && styles.beadLatest]}>
+                <Text style={styles.beadText}>{h.winner === 'DRAGON' ? 'D' : h.winner === 'TIGER' ? 'T' : '='}</Text>
+              </LinearGradient>
             );
           })}
         </ScrollView>
-        {stats && (
-          <Text style={styles.roadStats}>
-            <Text style={{ color: '#8FB6FF' }}>D {stats.d}%</Text> <Text style={{ color: '#FF9AA4' }}>T {stats.t}%</Text>{' '}
-            <Text style={{ color: '#7EE2A3' }}>= {stats.tie}%</Text>
-          </Text>
-        )}
       </View>
 
-      <LinearGradient colors={['#5B1F6E', '#3A0F4A']} style={styles.table}>
-        <View style={styles.bigRow}>
-          <BetBox area="DRAGON" title="DRAGON" multiplier={multipliers.DRAGON} colors={['#3569DA', '#172C74']} total={areaTotals.DRAGON ?? 0} state={areaState('DRAGON')} big onPress={onAreaPress} glow={glow} />
-          <BetBox area="TIGER" title="TIGER" multiplier={multipliers.TIGER} colors={['#D93A48', '#6E0F1E']} total={areaTotals.TIGER ?? 0} state={areaState('TIGER')} big onPress={onAreaPress} glow={glow} />
-        </View>
-        <View style={styles.smallRow}>
-          <BetBox area="TIE" title="TIE" multiplier={multipliers.TIE} colors={['#159C8C', '#0A4E48']} total={areaTotals.TIE ?? 0} state={areaState('TIE')} big={false} onPress={onAreaPress} glow={glow} />
-          <BetBox area="SUITED_TIE" title="SUITED TIE" multiplier={multipliers.SUITED_TIE} colors={['#43A83E', '#1B5519']} total={areaTotals.SUITED_TIE ?? 0} state={areaState('SUITED_TIE')} big={false} onPress={onAreaPress} glow={glow} />
-        </View>
-        <Text style={styles.tableNote}>Higher card wins · A is low · Dragon & Tiger bets lose on a tie</Text>
-      </LinearGradient>
-
-      <View style={styles.chipRail}>
-        {CHIP_VALUES.map((v) => {
-          const allowed = v >= minStake && v <= maxStake;
-          const active = v === selectedChip;
-          return (
-            <Pressable key={v} disabled={!allowed} onPress={() => setSelectedChip(v)} style={[styles.chipBtn, active && styles.chipActive, !allowed && styles.dim]}>
-              <Chip value={v} size={42} />
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <LinearGradient colors={['#2A0A2E', '#14041A']} style={[styles.controls, { paddingBottom: insets.bottom + 10 }]}>
-        <View style={styles.balanceCol}>
-          <Text style={styles.balanceLabel}>Balance</Text>
-          <Text style={styles.balanceValue}>₹{displayBalance.toFixed(2)}</Text>
-          <Text style={styles.balanceLabel}>
-            Your bet <Text style={styles.betValue}>₹{myTotal.toFixed(2)}</Text>
+      {/* Table */}
+      <LinearGradient colors={['#5E1F70', '#3A0F4A']} style={styles.table}>
+        <View style={[styles.sidePanel, { width: sideW }]}>
+          <MaterialCommunityIcons name="account-circle" size={30} color={GOLD} />
+          <Text style={styles.sideName} numberOfLines={1}>
+            {backendUser?.firstName ?? 'Player'}
           </Text>
+          <Text style={styles.sideLabel}>Balance</Text>
+          <Text style={styles.sideValue}>₹{displayBalance.toFixed(2)}</Text>
+          <Text style={styles.sideLabel}>Your bet</Text>
+          <Text style={styles.sideValueWhite}>₹{myTotal.toFixed(2)}</Text>
         </View>
-        <Pressable onPress={undo} style={styles.ctrlBtn}>
-          <MaterialCommunityIcons name="undo-variant" size={22} color="#F2E6FF" />
-          <Text style={styles.ctrlLabel}>UNDO</Text>
-        </Pressable>
-        <Pressable onPress={repeat} style={styles.ctrlBtn}>
-          <MaterialCommunityIcons name="repeat" size={22} color="#F2E6FF" />
-          <Text style={styles.ctrlLabel}>REPEAT</Text>
-        </Pressable>
-        <Pressable onPress={clearAll} style={styles.ctrlBtn}>
-          <MaterialCommunityIcons name="close-thick" size={22} color="#FF6B6B" />
-          <Text style={styles.ctrlLabel}>CLEAR</Text>
-        </Pressable>
+        <View style={styles.boxes}>
+          <View style={{ flex: 1.35 }}>
+            <BetBox area="DRAGON" title="DRAGON" multiplier={multipliers.DRAGON} colors={['#3A6FE0', '#162A70']} total={shownTotal('DRAGON')} state={areaState('DRAGON')} big onPress={onAreaPress} glow={glow} boxRef={(v) => {
+              boxRefs.current.DRAGON = v;
+            }} />
+          </View>
+          <View style={styles.centerCol}>
+            <BetBox area="TIE" title="TIE" multiplier={multipliers.TIE} colors={['#169C8C', '#0A4C46']} total={shownTotal('TIE')} state={areaState('TIE')} big={false} onPress={onAreaPress} glow={glow} boxRef={(v) => {
+              boxRefs.current.TIE = v;
+            }} />
+            <BetBox area="SUITED_TIE" title="SUITED TIE" multiplier={multipliers.SUITED_TIE} colors={['#46AB40', '#1A5418']} total={shownTotal('SUITED_TIE')} state={areaState('SUITED_TIE')} big={false} onPress={onAreaPress} glow={glow} boxRef={(v) => {
+              boxRefs.current.SUITED_TIE = v;
+            }} />
+          </View>
+          <View style={{ flex: 1.35 }}>
+            <BetBox area="TIGER" title="TIGER" multiplier={multipliers.TIGER} colors={['#DE3C4A', '#6C0E1C']} total={shownTotal('TIGER')} state={areaState('TIGER')} big onPress={onAreaPress} glow={glow} boxRef={(v) => {
+              boxRefs.current.TIGER = v;
+            }} />
+          </View>
+        </View>
+        <View style={[styles.sidePanel, { width: sideW }]}>
+          <Text style={styles.sideLabel}>Last {stats?.n ?? 0}</Text>
+          <Text style={[styles.statLine, { color: '#8FB6FF' }]}>Dragon {stats?.d ?? 0}%</Text>
+          <Text style={[styles.statLine, { color: '#FF9AA4' }]}>Tiger {stats?.t ?? 0}%</Text>
+          <Text style={[styles.statLine, { color: '#7EE2A3' }]}>Tie {stats?.tie ?? 0}%</Text>
+          <Text style={styles.sideHint}>A low · K high{'\n'}D/T lose on tie</Text>
+        </View>
       </LinearGradient>
 
-      {banner && (
-        <Animated.View pointerEvents="none" style={[styles.bannerWrap, { opacity: bannerAnim, transform: [{ scale: bannerScale }] }]}>
-          <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(20,4,26,0.85)', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.banner}>
-            <Text style={styles.bannerText}>{banner}</Text>
-          </LinearGradient>
+      {/* Chips + actions */}
+      <LinearGradient
+        colors={['#2A0A2E', '#14041A']}
+        style={[styles.bottomBar, { height: bottomH, paddingBottom: Math.max(insets.bottom, 4), marginHorizontal: -padL, paddingLeft: padL, paddingRight: padR }]}
+      >
+        <View style={styles.chipRail}>
+          {CHIP_VALUES.map((v) => {
+            const allowed = v >= minStake && v <= maxStake;
+            const active = v === selectedChip;
+            return (
+              <Pressable key={v} disabled={!allowed} onPress={() => setSelectedChip(v)} style={[styles.chipBtn, active && styles.chipActive, !allowed && styles.dim]}>
+                <View ref={(r) => {
+                  chipRefs.current[v] = r;
+                }} collapsable={false}>
+                  <Chip value={v} size={chipSize} />
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={styles.actions}>
+          <Pressable onPress={undo} style={styles.ctrlBtn}>
+            <MaterialCommunityIcons name="undo-variant" size={20} color="#F2E6FF" />
+            <Text style={styles.ctrlLabel}>UNDO</Text>
+          </Pressable>
+          <Pressable onPress={repeat} style={styles.ctrlBtn}>
+            <MaterialCommunityIcons name="repeat" size={20} color="#F2E6FF" />
+            <Text style={styles.ctrlLabel}>REPEAT</Text>
+          </Pressable>
+          <Pressable onPress={clearAll} style={styles.ctrlBtn}>
+            <MaterialCommunityIcons name="close-thick" size={20} color="#FF6B6B" />
+            <Text style={styles.ctrlLabel}>CLEAR</Text>
+          </Pressable>
+        </View>
+      </LinearGradient>
+
+      {/* Chips in flight */}
+      {flights.map((f) => (
+        <Animated.View
+          key={f.id}
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: -chipSize / 2,
+            top: -chipSize / 2,
+            transform: [
+              { translateX: f.anim.interpolate({ inputRange: [0, 1], outputRange: [f.from.x, f.to.x] }) },
+              {
+                translateY: f.anim.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [f.from.y, Math.min(f.from.y, f.to.y) - 40, f.to.y],
+                }),
+              },
+              { scale: f.anim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.2, 0.85] }) },
+            ],
+          }}
+        >
+          <Chip value={f.value} size={chipSize} />
         </Animated.View>
+      ))}
+
+      {/* Start / Stop Betting */}
+      {banner && (
+        <View pointerEvents="none" style={styles.bannerLayer}>
+          <Animated.View
+            style={[
+              styles.bannerBar,
+              {
+                top: H * 0.3,
+                height: H * 0.26,
+                width: W * 0.75,
+                left: -W * 0.1,
+                opacity: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 0.95, 0] }),
+                transform: [
+                  { translateX: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [-W * 0.8, 0, -W * 0.2] }) },
+                  { skewX: '-22deg' },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={bannerStart ? ['rgba(40,90,230,0)', 'rgba(40,90,230,0.85)', 'rgba(120,170,255,0.9)'] : ['rgba(90,20,20,0)', 'rgba(120,30,30,0.85)', 'rgba(200,80,40,0.9)']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.bannerBar,
+              {
+                top: H * 0.3,
+                height: H * 0.26,
+                width: W * 0.75,
+                right: -W * 0.1,
+                opacity: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 0.95, 0] }),
+                transform: [
+                  { translateX: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [W * 0.8, 0, W * 0.2] }) },
+                  { skewX: '-22deg' },
+                ],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={bannerStart ? ['rgba(255,110,110,0.9)', 'rgba(220,40,40,0.85)', 'rgba(220,40,40,0)'] : ['rgba(200,80,40,0.9)', 'rgba(120,30,30,0.85)', 'rgba(90,20,20,0)']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+          <Animated.Text
+            style={[
+              styles.bannerText,
+              {
+                top: H * 0.3 + H * 0.13 - 30,
+                opacity: bannerAnim.interpolate({ inputRange: [0, 0.6, 1, 2], outputRange: [0, 1, 1, 0] }),
+                transform: [{ scale: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [2.2, 1, 1.15] }) }],
+              },
+            ]}
+          >
+            {banner.text}
+          </Animated.Text>
+        </View>
       )}
 
+      {/* VS reveal */}
       {vsOpen && revealed && (
         <Animated.View style={[styles.vsOverlay, { opacity: vsAnim }]}>
-          <Animated.View style={[styles.vsRow, { transform: [{ scale: vsScale }] }]}>
-            <Animated.View style={[styles.vsSide, sideStyle('DRAGON')]}>
-              <Emblem side="DRAGON" size={110} />
-              <FlipCard card={revealed.dragon} w={CARD_W * 1.35} delay={300} />
-            </Animated.View>
-            <LinearGradient colors={['#FFE9A8', '#C98A1C']} style={styles.vsBadge}>
-              <Text style={styles.vsText}>VS</Text>
-            </LinearGradient>
-            <Animated.View style={[styles.vsSide, sideStyle('TIGER')]}>
-              <Emblem side="TIGER" size={110} />
-              <FlipCard card={revealed.tiger} w={CARD_W * 1.35} delay={850} />
-            </Animated.View>
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              transform: [{ rotate: vsRays.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
+            }}
+          >
+            <Rays size={Math.max(W, H) * 1.1} />
           </Animated.View>
-          <Animated.Text style={[styles.vsResult, { opacity: vsResult }]}>
+          <View style={styles.vsRow}>
+            <Animated.View style={[styles.vsSide, sideStyle('DRAGON')]}>
+              <View>
+                <Emblem side="DRAGON" size={vsEmblem} />
+                <Shards side="DRAGON" trigger={vsShards} />
+              </View>
+              <FlipCard card={revealed.dragon} w={Math.min(70, vsEmblem * 0.5)} delay={650} />
+            </Animated.View>
+            <Animated.View style={{ transform: [{ scale: vsSlide.interpolate({ inputRange: [0, 1], outputRange: [2.4, 1] }) }], opacity: vsSlide }}>
+              <Svg width={vsEmblem * 0.95} height={vsEmblem * 0.85}>
+                <Defs>
+                  <SvgLinearGradient id="vsGold" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0" stopColor="#FFF4C2" />
+                    <Stop offset="0.5" stopColor="#E9A92E" />
+                    <Stop offset="1" stopColor="#8A5A10" />
+                  </SvgLinearGradient>
+                </Defs>
+                <Polygon
+                  points={`${vsEmblem * 0.475},4 ${vsEmblem * 0.93},${vsEmblem * 0.82} 4,${vsEmblem * 0.82}`}
+                  fill="rgba(40,20,4,0.55)"
+                  stroke="url(#vsGold)"
+                  strokeWidth={4}
+                  strokeLinejoin="round"
+                />
+                <SvgText x={vsEmblem * 0.475} y={vsEmblem * 0.66} fontSize={vsEmblem * 0.34} fontWeight="900" fontStyle="italic" textAnchor="middle" fill="url(#vsGold)" stroke="#3A1E00" strokeWidth={1.5}>
+                  VS
+                </SvgText>
+              </Svg>
+            </Animated.View>
+            <Animated.View style={[styles.vsSide, sideStyle('TIGER')]}>
+              <FlipCard card={revealed.tiger} w={Math.min(70, vsEmblem * 0.5)} delay={1200} />
+              <View>
+                <Emblem side="TIGER" size={vsEmblem} />
+                <Shards side="TIGER" trigger={vsShards} />
+              </View>
+            </Animated.View>
+          </View>
+          <Animated.Text
+            style={[
+              styles.vsResult,
+              { opacity: vsResult, transform: [{ scale: vsResult.interpolate({ inputRange: [0, 1], outputRange: [1.8, 1] }) }] },
+            ]}
+          >
             {revealed.winner === 'TIE' ? (revealed.suitedTie ? 'SUITED TIE!' : 'TIE!') : `${revealed.winner} WINS`}
           </Animated.Text>
         </Animated.View>
@@ -743,161 +1290,108 @@ export default function DragonTigerScreen() {
   );
 }
 
-const GOLD = '#FFD66B';
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#14041A' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#7A2A33',
-  },
-  backBtn: { flexDirection: 'row', alignItems: 'center' },
-  title: { color: '#E7D9D2', fontSize: 19, fontWeight: '900', letterSpacing: 1.5, marginLeft: 2 },
-  depositPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: '#3A0A10',
-    borderWidth: 1.5,
-    borderColor: '#8A2E38',
-  },
-  depositText: { color: '#F5B942', fontSize: 15, fontWeight: '700' },
+  root: { flex: 1, backgroundColor: '#12040F' },
+  rotating: { alignItems: 'center', justifyContent: 'center', gap: 12 },
+  rotatingText: { color: GOLD, fontSize: 16, fontWeight: '700' },
 
-  stage: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 14 },
-  stageSide: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  stageCenter: { alignItems: 'center', gap: 6, flex: 1 },
-  clock: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-  clockInner: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3A1206' },
-  clockText: { color: GOLD, fontSize: 24, fontWeight: '900' },
-  clockUrgent: { color: '#FF5A4E' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#7A2A33' },
+  backBtn: { flexDirection: 'row', alignItems: 'center' },
+  title: { color: '#E7D9D2', fontSize: 15, fontWeight: '900', letterSpacing: 1.5 },
+  topStatus: { color: GOLD, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  depositPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16, backgroundColor: '#3A0A10', borderWidth: 1, borderColor: '#8A2E38' },
+  depositText: { color: '#F5B942', fontSize: 13, fontWeight: '700' },
+
+  stage: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', paddingHorizontal: 12 },
+  stageCenter: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  clockWrap: { minWidth: 60, alignItems: 'center', justifyContent: 'center' },
+  clockText: { color: GOLD, fontWeight: '900' },
   vsSmall: { color: GOLD, fontSize: 30, fontWeight: '900', fontStyle: 'italic', textShadowColor: '#C98A1C', textShadowRadius: 8 },
-  stageStatus: { color: '#E9D8FF', fontSize: 10, fontWeight: '800', letterSpacing: 0.5, textAlign: 'center' },
-  emblem: { alignItems: 'center', justifyContent: 'center', elevation: 10, shadowOpacity: 0.9, shadowRadius: 14, shadowOffset: { width: 0, height: 0 } },
-  emblemRing: { position: 'absolute', borderWidth: 2, borderColor: 'rgba(255,255,255,0.45)' },
-  emblemLabel: { marginTop: 4, fontSize: 12, fontWeight: '900', letterSpacing: 2 },
+  namePlate: { marginTop: -8, paddingHorizontal: 10, paddingVertical: 1, borderRadius: 8, borderWidth: 1, borderColor: '#7A4A00' },
+  nameText: { color: '#3A1E00', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
 
   card: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C9C9D2', overflow: 'hidden' },
   cardCorner: { position: 'absolute', top: 3, left: 5, alignItems: 'center' },
-  cardRank: { fontWeight: '900', lineHeight: undefined },
-  cardSuitSmall: { marginTop: -3 },
-  cardSuitBig: { marginTop: 8 },
+  cardRank: { fontWeight: '900' },
   cardBack: { borderColor: '#D9A441', borderWidth: 2 },
-  cardBackInner: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    right: 4,
-    bottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(217,164,65,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  cardBackInner: { position: 'absolute', top: 4, left: 4, right: 4, bottom: 4, borderWidth: 1, borderColor: 'rgba(217,164,65,0.6)', alignItems: 'center', justifyContent: 'center' },
   cardBackDiamond: { position: 'absolute', borderWidth: 1.5, borderColor: 'rgba(217,164,65,0.7)', transform: [{ rotate: '45deg' }] },
   cardBackMark: { color: '#D9A441', fontWeight: '900' },
+  cardSlot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(255,214,107,0.35)', backgroundColor: 'rgba(0,0,0,0.25)' },
 
-  roadWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 6, backgroundColor: '#1F0826', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#5A2468', gap: 8 },
-  road: { gap: 4, alignItems: 'center' },
-  roadDot: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  roadLatest: { borderWidth: 2, borderColor: GOLD },
-  roadText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
-  roadStats: { fontSize: 11, fontWeight: '800' },
+  roadWrap: { justifyContent: 'center', backgroundColor: '#1F0826', borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#5A2468' },
+  road: { gap: 3, alignItems: 'center', paddingHorizontal: 4 },
+  bead: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  beadLatest: { borderWidth: 2, borderColor: GOLD },
+  beadText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
 
-  table: { flex: 1, marginHorizontal: 8, marginTop: 8, padding: 8, borderRadius: 18, borderWidth: 1.5, borderColor: '#B0468F', gap: 6 },
-  bigRow: { flexDirection: 'row', gap: 6, flex: 1.6 },
-  smallRow: { flexDirection: 'row', gap: 6, flex: 1 },
-  tableNote: { color: 'rgba(255,220,255,0.6)', fontSize: 10, textAlign: 'center' },
+  table: { flex: 1, flexDirection: 'row', marginTop: 6, marginBottom: 6, padding: 6, borderRadius: 26, borderWidth: 2, borderColor: '#B0468F', gap: 6 },
+  sidePanel: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, borderRadius: 18, backgroundColor: 'rgba(20,4,26,0.45)', gap: 1 },
+  sideName: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', marginBottom: 4 },
+  sideLabel: { color: '#C9B6EE', fontSize: 10 },
+  sideValue: { color: GOLD, fontSize: 14, fontWeight: '900', marginBottom: 3 },
+  sideValueWhite: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  statLine: { fontSize: 12, fontWeight: '800' },
+  sideHint: { color: 'rgba(255,220,255,0.55)', fontSize: 9, textAlign: 'center', marginTop: 6 },
+  boxes: { flex: 1, flexDirection: 'row', gap: 6 },
+  centerCol: { flex: 1, gap: 6 },
+
   boxOuter: { flex: 1 },
   pressed: { transform: [{ scale: 0.97 }] },
-  boxFill: { flex: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)' },
+  boxFill: { flex: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.18)' },
   boxWin: { borderColor: GOLD, borderWidth: 3 },
+  suitPattern: { position: 'absolute', top: -6, left: -20, right: -20, bottom: 0, opacity: 0.07, transform: [{ rotate: '-12deg' }] },
+  suitRow: { color: '#FFFFFF', fontSize: 20, letterSpacing: 6, marginBottom: 6 },
   boxShine: { position: 'absolute', top: 0, left: 0, right: 0, height: '45%' },
-  boxTitle: { color: 'rgba(255,255,255,0.92)', fontSize: 15, fontWeight: '900', letterSpacing: 1.5 },
-  boxTitleBig: { fontSize: 22, letterSpacing: 3 },
-  boxMult: { color: GOLD, fontSize: 18, fontWeight: '900', marginTop: 2 },
+  boxTitle: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '900', letterSpacing: 1.5 },
+  boxTitleBig: { fontSize: 24, letterSpacing: 4 },
+  boxMult: { color: GOLD, fontSize: 16, fontWeight: '900', marginTop: 1 },
   boxMultBig: { fontSize: 26 },
-  boxMine: { position: 'absolute', bottom: 6, left: 10, color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '700' },
-  boxChip: { position: 'absolute', right: 6, top: 6 },
-  boxChipBig: { position: 'absolute', right: 8, bottom: 8 },
-  winOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,214,107,0.18)' },
+  boxMine: { position: 'absolute', bottom: 5, left: 10, color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '700' },
+  boxChip: { position: 'absolute', right: 5, top: 5 },
+  boxChipBig: { position: 'absolute', right: 10, bottom: 8 },
+  winGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,214,107,0.2)' },
+  burstWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  coin: { position: 'absolute', width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFD23F', borderWidth: 1, borderColor: '#B7791F' },
   winText: { color: GOLD, fontSize: 30, fontWeight: '900', fontStyle: 'italic', textShadowColor: '#7A4A00', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
-  loseShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)' },
+  loseShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
 
-  chipRail: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 6, paddingTop: 12, paddingBottom: 6 },
-  chipBtn: { borderRadius: 24, padding: 2 },
-  chipActive: { backgroundColor: GOLD, transform: [{ translateY: -6 }], elevation: 8, shadowColor: GOLD, shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
+  bottomBar: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#5A2468' },
+  chipRail: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  chipBtn: { borderRadius: 30, padding: 2 },
+  chipActive: { backgroundColor: GOLD, transform: [{ translateY: -5 }], elevation: 8, shadowColor: GOLD, shadowOpacity: 0.9, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } },
   dim: { opacity: 0.35 },
+  actions: { flexDirection: 'row', gap: 8 },
+  ctrlBtn: { width: 58, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3A1648', borderWidth: 1.5, borderColor: '#7A3A8E' },
+  ctrlLabel: { color: '#F2E6FF', fontSize: 9, fontWeight: '800', marginTop: 1 },
 
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#5A2468' },
-  balanceCol: { flex: 1 },
-  balanceLabel: { color: '#C9B6EE', fontSize: 12 },
-  balanceValue: { color: GOLD, fontSize: 18, fontWeight: '900' },
-  betValue: { color: '#FFFFFF', fontWeight: '800' },
-  ctrlBtn: {
-    width: 62,
-    height: 54,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3A1648',
-    borderWidth: 1.5,
-    borderColor: '#7A3A8E',
-  },
-  ctrlLabel: { color: '#F2E6FF', fontSize: 10, fontWeight: '800', marginTop: 2 },
-
-  bannerWrap: { position: 'absolute', top: '32%', left: 0, right: 0, alignItems: 'center' },
-  banner: { width: '100%', paddingVertical: 14, alignItems: 'center' },
+  bannerLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  bannerBar: { position: 'absolute', overflow: 'hidden' },
   bannerText: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
     color: GOLD,
-    fontSize: 40,
+    fontSize: 48,
     fontWeight: '900',
     fontStyle: 'italic',
-    letterSpacing: 1,
-    textShadowColor: '#7A3A00',
-    textShadowRadius: 6,
-    textShadowOffset: { width: 0, height: 3 },
+    textShadowColor: '#6A3000',
+    textShadowRadius: 8,
+    textShadowOffset: { width: 0, height: 4 },
   },
 
-  vsOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(8,2,12,0.88)', alignItems: 'center', justifyContent: 'center' },
+  vsOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(8,2,12,0.9)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   vsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-evenly', width: '100%' },
-  vsSide: { alignItems: 'center', gap: 14 },
-  vsBadge: { width: 70, height: 70, borderRadius: 35, alignItems: 'center', justifyContent: 'center', elevation: 12, shadowColor: GOLD, shadowOpacity: 1, shadowRadius: 18, shadowOffset: { width: 0, height: 0 } },
-  vsText: { color: '#3A1E00', fontSize: 30, fontWeight: '900', fontStyle: 'italic' },
-  vsResult: { marginTop: 28, color: GOLD, fontSize: 30, fontWeight: '900', letterSpacing: 2, textShadowColor: '#7A3A00', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
+  vsSide: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  shardWrap: { position: 'absolute', top: '45%', left: '45%' },
+  vsResult: { marginTop: 14, color: GOLD, fontSize: 32, fontWeight: '900', letterSpacing: 2, textShadowColor: '#7A3A00', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
 
-  winWrap: { position: 'absolute', top: '30%', alignSelf: 'center', alignItems: 'center' },
-  winCard: { alignItems: 'center', paddingHorizontal: 34, paddingVertical: 14, borderRadius: 16, borderWidth: 2, borderColor: '#F5B942' },
-  winTitle: { color: '#FFE08A', fontSize: 16, fontWeight: '900', letterSpacing: 3 },
-  winAmount: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', marginTop: 2 },
-  winClose: {
-    marginTop: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1C0B02',
-    borderWidth: 2,
-    borderColor: '#F5B942',
-  },
-  toast: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: '46%',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    borderWidth: 1,
-    borderColor: '#B7791F',
-  },
+  winWrap: { position: 'absolute', top: '28%', alignSelf: 'center', alignItems: 'center' },
+  winCard: { alignItems: 'center', paddingHorizontal: 34, paddingVertical: 12, borderRadius: 16, borderWidth: 2, borderColor: '#F5B942' },
+  winTitle: { color: '#FFE08A', fontSize: 15, fontWeight: '900', letterSpacing: 3 },
+  winAmount: { color: '#FFFFFF', fontSize: 26, fontWeight: '900', marginTop: 2 },
+  winClose: { marginTop: 8, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1C0B02', borderWidth: 2, borderColor: '#F5B942' },
+  toast: { position: 'absolute', alignSelf: 'center', top: '42%', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 1, borderColor: '#B7791F' },
   toastText: { color: '#FFE08A', fontSize: 14, fontWeight: '700' },
 });
