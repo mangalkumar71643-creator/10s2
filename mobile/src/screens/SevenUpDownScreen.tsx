@@ -99,6 +99,16 @@ const BASE_H = CUP_W * 0.36;
 const DOME_W = CUP_W * 0.8;
 const DOME_H = CUP_W * 0.66;
 const DIE_SIZE = CUP_W * 0.22;
+// Cup dice: 3D cubes resting on the felt, circling it while they roll.
+const DIE3D_BOX = DIE_SIZE * 1.3 + DIE_SIZE * 0.14;
+const FELT_CY = CUP_H - BASE_H + BASE_H * 0.46;
+const DIE_REST = [
+  { x: -DIE_SIZE * 0.72, y: -DIE_SIZE * 0.05, tilt: '-9deg' },
+  { x: DIE_SIZE * 0.72, y: DIE_SIZE * 0.12, tilt: '7deg' },
+];
+const ORBIT_RX = CUP_W * 0.17;
+const ORBIT_RY = BASE_H * 0.16;
+const ORBIT_STEPS = Array.from({ length: 13 }, (_, i) => i / 12);
 
 const HISTORY_COLUMNS = 14;
 const WIN_CARD_MS = 3000;
@@ -173,6 +183,103 @@ const Die = memo(function Die({ value, size }: { value: number; size: number }) 
         />
       ))}
     </LinearGradient>
+  );
+});
+
+// Faces seen alongside each front face (top, right). Opposite faces sum to
+// 7, so every pair here is a real neighbouring pair on a die.
+const SIDE_FACES: Record<number, [number, number]> = {
+  1: [2, 3],
+  2: [3, 1],
+  3: [1, 2],
+  4: [1, 5],
+  5: [1, 3],
+  6: [2, 4],
+};
+const PIP_UV: Record<number, [number, number][]> = {
+  1: [[0.5, 0.5]],
+  2: [[0.27, 0.27], [0.73, 0.73]],
+  3: [[0.27, 0.27], [0.5, 0.5], [0.73, 0.73]],
+  4: [[0.27, 0.27], [0.73, 0.27], [0.27, 0.73], [0.73, 0.73]],
+  5: [[0.27, 0.27], [0.73, 0.27], [0.5, 0.5], [0.27, 0.73], [0.73, 0.73]],
+  6: [[0.27, 0.25], [0.73, 0.25], [0.27, 0.5], [0.73, 0.5], [0.27, 0.75], [0.73, 0.75]],
+};
+
+/** A die drawn as a cube with its front, top and right faces showing —
+ * each face's pips are projected onto that face, so it reads as 3D. */
+const Die3D = memo(function Die3D({ value, size }: { value: number; size: number }) {
+  const a = size;
+  const d = a * 0.3;
+  const pad = a * 0.07;
+  const W3 = a + d + pad * 2;
+  const [top, right] = SIDE_FACES[value];
+
+  type Pt = [number, number];
+  const front = (u: number, v: number): Pt => [pad + u * a, pad + d + v * a];
+  const rightF = (u: number, v: number): Pt => [pad + a + u * d, pad + d - u * d + v * a];
+  const poly = (pts: Pt[]) => `M ${pts.map((q) => `${q[0].toFixed(2)} ${q[1].toFixed(2)}`).join(' L ')} Z`;
+
+  // top face: u runs left->right, v runs back->front (v=1 meets the front face)
+  const topPt = (u: number, v: number): Pt => [pad + u * a + (1 - v) * d, pad + (1 - v) * d];
+
+  const pips = (face: (u: number, v: number) => Pt, n: number, shade: number) => {
+    const red = n === 1 || n === 4;
+    const r = n === 1 ? 0.13 : 0.085;
+    return PIP_UV[n].map(([cu, cv], i) => {
+      const pts: Pt[] = [];
+      for (let k = 0; k < 14; k++) {
+        const t = (k / 14) * Math.PI * 2;
+        pts.push(face(cu + r * Math.cos(t), cv + r * Math.sin(t)));
+      }
+      return (
+        <Path
+          key={i}
+          d={poly(pts)}
+          fill={red ? '#C8102E' : '#1B1B22'}
+          fillOpacity={shade}
+        />
+      );
+    });
+  };
+
+  const frontPts = [front(0, 0), front(1, 0), front(1, 1), front(0, 1)];
+  const topPts = [topPt(0, 0), topPt(1, 0), topPt(1, 1), topPt(0, 1)];
+  const rightPts = [rightF(0, 0), rightF(1, 0), rightF(1, 1), rightF(0, 1)];
+  const round = a * 0.07;
+
+  return (
+    <Svg width={W3} height={W3}>
+      <Defs>
+        <SvgLinearGradient id="d3front" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="1" stopColor="#E2E2E8" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="d3top" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="1" stopColor="#F1F1F5" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="d3right" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#CFCFD8" />
+          <Stop offset="1" stopColor="#A9A9B6" />
+        </SvgLinearGradient>
+      </Defs>
+      {/* Round the cube's corners by stroking each face in its own colour. */}
+      <Path d={poly(rightPts)} fill="url(#d3right)" stroke="#B9B9C4" strokeWidth={round} strokeLinejoin="round" strokeMiterlimit={1} />
+      <Path d={poly(topPts)} fill="url(#d3top)" stroke="#F4F4F8" strokeWidth={round} strokeLinejoin="round" strokeMiterlimit={1} />
+      <Path d={poly(frontPts)} fill="url(#d3front)" stroke="#EDEDF2" strokeWidth={round} strokeLinejoin="round" strokeMiterlimit={1} />
+      {pips(topPt, top, 0.75)}
+      {pips(rightF, right, 0.7)}
+      {pips(front, value, 1)}
+      {/* Bevel highlights along the two front edges. */}
+      <Path
+        d={`M ${front(0, 0)[0]} ${front(0, 0)[1]} L ${front(1, 0)[0]} ${front(1, 0)[1]} L ${rightF(1, 0)[0]} ${rightF(1, 0)[1]}`}
+        stroke="#FFFFFF"
+        strokeOpacity={0.9}
+        strokeWidth={1.2}
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
   );
 });
 
@@ -407,6 +514,10 @@ export default function SevenUpDownScreen() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const shake = useRef(new Animated.Value(0)).current;
+  const rollMode = useRef(new Animated.Value(0)).current;
+  const orbit = useRef(new Animated.Value(0)).current;
+  const spin = useRef(new Animated.Value(0)).current;
+  const hop = useRef(new Animated.Value(0)).current;
   const domeLift = useRef(new Animated.Value(0)).current;
   const totalPop = useRef(new Animated.Value(0)).current;
   const glow = useRef(new Animated.Value(0.2)).current;
@@ -573,6 +684,23 @@ export default function SevenUpDownScreen() {
         ])
       );
       loop.start();
+      // Dice tumble around the cup: circle it, spin, and hop.
+      Animated.timing(rollMode, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+      const orbitLoop = Animated.loop(
+        Animated.timing(orbit, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true })
+      );
+      const spinLoop = Animated.loop(
+        Animated.timing(spin, { toValue: 1, duration: 420, easing: Easing.linear, useNativeDriver: true })
+      );
+      const hopLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(hop, { toValue: 1, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(hop, { toValue: 0, duration: 110, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        ])
+      );
+      orbitLoop.start();
+      spinLoop.start();
+      hopLoop.start();
       const faces = setInterval(
         () => setRollFaces([1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)]),
         110
@@ -581,9 +709,18 @@ export default function SevenUpDownScreen() {
         loop.stop();
         shake.setValue(0);
         clearInterval(faces);
+        orbitLoop.stop();
+        spinLoop.stop();
+        hopLoop.stop();
+        // Settle: finish the current turn upright and roll back to rest.
+        Animated.parallel([
+          Animated.timing(spin, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+          Animated.spring(rollMode, { toValue: 0, friction: 6, tension: 70, useNativeDriver: true }),
+          Animated.timing(hop, { toValue: 0, duration: 120, useNativeDriver: true }),
+        ]).start(() => spin.setValue(0));
       };
     }
-  }, [phase, shake]);
+  }, [phase, shake, rollMode, orbit, spin, hop]);
 
   useEffect(() => {
     Animated.timing(domeLift, {
@@ -760,7 +897,6 @@ export default function SevenUpDownScreen() {
     resultTotal === null ? 'normal' : areaWins(area, resultTotal) ? 'win' : 'lose';
 
   const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-5, 5] });
-  const shakeR = shake.interpolate({ inputRange: [-1, 1], outputRange: ['-7deg', '7deg'] });
   const domeY = domeLift.interpolate({ inputRange: [0, 1], outputRange: [0, -CUP_W * 0.5] });
   const domeOpacity = domeLift.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
 
@@ -847,14 +983,43 @@ export default function SevenUpDownScreen() {
             <View style={styles.cupBase}>
               <CupBase />
             </View>
-            <Animated.View style={[styles.diceRow, { transform: [{ translateX: shakeX }, { rotate: shakeR }] }]}>
-              <View style={{ transform: [{ rotate: '-12deg' }] }}>
-                <Die value={shownDice[0]} size={DIE_SIZE} />
-              </View>
-              <View style={{ transform: [{ rotate: '9deg' }], marginTop: DIE_SIZE * 0.25 }}>
-                <Die value={shownDice[1]} size={DIE_SIZE} />
-              </View>
-            </Animated.View>
+            {[0, 1].map((i) => {
+              const rest = DIE_REST[i];
+              const phaseShift = i * 0.5;
+              const orbitX = orbit.interpolate({
+                inputRange: ORBIT_STEPS,
+                outputRange: ORBIT_STEPS.map((t) => ORBIT_RX * Math.cos(2 * Math.PI * (t + phaseShift))),
+              });
+              const orbitY = orbit.interpolate({
+                inputRange: ORBIT_STEPS,
+                outputRange: ORBIT_STEPS.map((t) => ORBIT_RY * Math.sin(2 * Math.PI * (t + phaseShift))),
+              });
+              const tx = Animated.add(
+                rollMode.interpolate({ inputRange: [0, 1], outputRange: [rest.x, 0] }),
+                Animated.multiply(orbitX, rollMode)
+              );
+              const ty = Animated.add(
+                rollMode.interpolate({ inputRange: [0, 1], outputRange: [rest.y, 0] }),
+                Animated.multiply(orbitY, rollMode)
+              );
+              const hopY = Animated.multiply(hop.interpolate({ inputRange: [0, 1], outputRange: [0, -DIE_SIZE * 0.22] }), rollMode);
+              const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', i === 0 ? '360deg' : '-360deg'] });
+              const squash = spin.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [1, 0.8, 1, 0.8, 1] });
+              return (
+                <Animated.View
+                  key={i}
+                  pointerEvents="none"
+                  style={[styles.dieSlot, { transform: [{ translateX: tx }, { translateY: ty }] }]}
+                >
+                  <View style={styles.dieShadow} />
+                  <Animated.View style={{ transform: [{ translateY: hopY }, { rotate }, { scaleX: squash }] }}>
+                    <View style={{ transform: [{ rotate: rest.tilt }] }}>
+                      <Die3D value={shownDice[i]} size={DIE_SIZE} />
+                    </View>
+                  </Animated.View>
+                </Animated.View>
+              );
+            })}
             <Animated.View
               pointerEvents="none"
               style={[styles.dome, { opacity: domeOpacity, transform: [{ translateY: domeY }, { translateX: shakeX }] }]}
@@ -1075,12 +1240,21 @@ const styles = StyleSheet.create({
   },
   cupBox: { width: CUP_W, height: CUP_H, alignItems: 'center' },
   cupBase: { position: 'absolute', bottom: 0 },
-  diceRow: {
+  dieSlot: {
     position: 'absolute',
-    bottom: BASE_H * 0.32,
-    flexDirection: 'row',
-    gap: DIE_SIZE * 0.3,
-    alignItems: 'flex-start',
+    width: DIE3D_BOX,
+    height: DIE3D_BOX,
+    left: CUP_W / 2 - DIE3D_BOX / 2,
+    top: FELT_CY - DIE3D_BOX * 0.8,
+  },
+  dieShadow: {
+    position: 'absolute',
+    left: DIE3D_BOX * 0.1,
+    top: DIE3D_BOX * 0.8,
+    width: DIE3D_BOX * 0.85,
+    height: DIE_SIZE * 0.26,
+    borderRadius: DIE_SIZE * 0.13,
+    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   dome: { position: 'absolute', bottom: BASE_H * 0.5 - DOME_H * 0.1 },
   totalBadgeWrap: { position: 'absolute', top: 0 },
