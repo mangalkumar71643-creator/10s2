@@ -21,8 +21,10 @@ export const env = {
     minStake: Number(process.env.GAME_MIN_STAKE ?? 1),
     maxStake: Number(process.env.GAME_MAX_STAKE ?? 500),
     // Return-to-player: long-run share of total stakes paid back as winnings
-    // (0.90 = a 10% house edge on Chicken Road, Mines, 7 Up Down and dice).
+    // (0.90 = a 10% house edge on Win Go, Aviator, Chicken Road, Mines and dice).
     rtp: Number(process.env.GAME_RTP ?? 0.9),
+    // 7 Up Down runs its own, higher edge (0.85 = 15%).
+    sevenUpDownRtp: Number(process.env.SEVEN_UP_DOWN_RTP ?? 0.85),
     // Win pays out at this multiple of the stake; win probability is derived
     // from rtp / winMultiplier so the long-run expected value matches rtp.
     winMultiplier: Number(process.env.GAME_WIN_MULTIPLIER ?? 2),

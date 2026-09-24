@@ -15,12 +15,28 @@ export const COLOR_GAME_DURATIONS = [30, 60, 180, 300, 600] as const;
  * everyone, including us, until settlement). */
 const LOCK_SECONDS = 5;
 
-/** Platform fee taken off every stake before the win multiplier is applied
- * (independent of the fixed odds table below) — e.g. a ₹100 bet at 2x pays
- * ₹100 * 0.98 * 2 = ₹196 on a win, ₹0 on a loss. This guarantees a positive
- * house edge on every bet type, including Big/Small, which would otherwise
- * be an exact 50/50 payout with zero edge. */
-const PLATFORM_FEE_RATE = 0.02;
+/** Fixed, published odds, each set so the bet returns exactly the shared
+ * rtp (90% = a 10% edge) with no separate fee:
+ *  - number: 1 in 10 -> 10 * rtp (9x)
+ *  - big/small: 5 in 10 -> 2 * rtp (1.8x)
+ *  - violet: 2 in 10 (0 and 5) -> 5 * rtp (4.5x)
+ *  - green/red: 4 plain numbers at `color` plus the mixed 5/0 at
+ *    `colorMixed` (0.5x less), so 4c + (c - 0.5) = 10 * rtp. */
+function floor2(n: number): number {
+  return Math.floor(n * 100 + 1e-9) / 100;
+}
+
+const PAYOUTS = (() => {
+  const rtp = env.games.rtp;
+  const color = floor2(2 * rtp + 0.1);
+  return {
+    number: floor2(10 * rtp),
+    size: floor2(2 * rtp),
+    violet: floor2(5 * rtp),
+    color,
+    colorMixed: floor2(color - 0.5),
+  };
+})();
 
 function assertValidDuration(durationSeconds: number) {
   if (!COLOR_GAME_DURATIONS.includes(durationSeconds as (typeof COLOR_GAME_DURATIONS)[number])) {
@@ -49,21 +65,21 @@ function colorsForNumber(n: number): Array<"GREEN" | "RED" | "VIOLET"> {
  * Nothing here depends on how much has been staked on each side. */
 function payoutMultiplierFor(betType: ColorGameBetType, betValue: string, resultNumber: number): number {
   if (betType === "NUMBER") {
-    return Number(betValue) === resultNumber ? 9 : 0;
+    return Number(betValue) === resultNumber ? PAYOUTS.number : 0;
   }
   if (betType === "SIZE") {
-    return sizeForNumber(resultNumber) === betValue ? 2 : 0;
+    return sizeForNumber(resultNumber) === betValue ? PAYOUTS.size : 0;
   }
   // betType === "COLOR"
   const colors = colorsForNumber(resultNumber);
-  if (betValue === "VIOLET") return colors.includes("VIOLET") ? 4.5 : 0;
+  if (betValue === "VIOLET") return colors.includes("VIOLET") ? PAYOUTS.violet : 0;
   if (betValue === "GREEN") {
-    if (resultNumber === 5) return 1.5; // mixed number, reduced payout
-    return colors.includes("GREEN") ? 2 : 0;
+    if (resultNumber === 5) return PAYOUTS.colorMixed; // mixed number, reduced payout
+    return colors.includes("GREEN") ? PAYOUTS.color : 0;
   }
   if (betValue === "RED") {
-    if (resultNumber === 0) return 1.5; // mixed number, reduced payout
-    return colors.includes("RED") ? 2 : 0;
+    if (resultNumber === 0) return PAYOUTS.colorMixed; // mixed number, reduced payout
+    return colors.includes("RED") ? PAYOUTS.color : 0;
   }
   return 0;
 }
@@ -150,7 +166,7 @@ async function settleRound(roundId: string) {
     if (bet.status !== "PENDING") continue;
     const multiplier = payoutMultiplierFor(bet.betType, bet.betValue, resultNumber);
     const won = multiplier > 0;
-    const payout = won ? round2(Number(bet.amount) * (1 - PLATFORM_FEE_RATE) * multiplier) : 0;
+    const payout = won ? round2(Number(bet.amount) * multiplier) : 0;
 
     const ops: Prisma.PrismaPromise<unknown>[] = [
       prisma.colorGameBet.update({
@@ -311,7 +327,7 @@ export function getColorGameConfig() {
     minStake: env.games.minStake,
     maxStake: env.games.maxStake,
     lockSeconds: LOCK_SECONDS,
-    payouts: { number: 9, color: 2, colorMixed: 1.5, violet: 4.5, size: 2 },
-    platformFeePercent: PLATFORM_FEE_RATE * 100,
+    payouts: PAYOUTS,
+    platformFeePercent: 0,
   };
 }

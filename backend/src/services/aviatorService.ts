@@ -21,9 +21,9 @@ const RESULT_PAUSE_SECONDS = 4;
 const GROWTH_RATE = Math.log(2) / 5;
 
 /** House edge baked into the crash-point distribution itself (see
- * crashMultiplierFromSeed) — independent of any platform fee, this alone
- * gives the house a positive long-run edge on every round. */
-const HOUSE_EDGE = 0.03;
+ * crashMultiplierFromSeed): cashing out at any target m succeeds with
+ * probability (1 - edge) / m, so every strategy returns the shared rtp. */
+const HOUSE_EDGE = 1 - env.games.rtp;
 
 const MIN_AUTO_CASHOUT = 1.01;
 

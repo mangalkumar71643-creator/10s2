@@ -764,7 +764,7 @@ export default function ColorPredictScreen() {
           {/* Category buttons */}
           <Pressable
             style={boxStyle(GREEN_BOX, scaleTop)}
-            onPress={() => setSelection({ betType: 'COLOR', betValue: 'GREEN', label: 'Green', multiplierLabel: `${config?.payouts.color ?? 2}X` })}
+            onPress={() => setSelection({ betType: 'COLOR', betValue: 'GREEN', label: 'Green', multiplierLabel: `${config?.payouts.color ?? 1.9}X` })}
           />
           <Pressable
             style={boxStyle(VIOLET_BOX, scaleTop)}
@@ -772,7 +772,7 @@ export default function ColorPredictScreen() {
           />
           <Pressable
             style={boxStyle(RED_BOX, scaleTop)}
-            onPress={() => setSelection({ betType: 'COLOR', betValue: 'RED', label: 'Red', multiplierLabel: `${config?.payouts.color ?? 2}X` })}
+            onPress={() => setSelection({ betType: 'COLOR', betValue: 'RED', label: 'Red', multiplierLabel: `${config?.payouts.color ?? 1.9}X` })}
           />
           {/* Number grid */}
           {[0, 1].map((row) =>
@@ -833,11 +833,11 @@ export default function ColorPredictScreen() {
           {/* Big / Small */}
           <Pressable
             style={boxStyle(BIG_BOX, scaleTop)}
-            onPress={() => setSelection({ betType: 'SIZE', betValue: 'BIG', label: 'Big', multiplierLabel: `${config?.payouts.size ?? 2}X` })}
+            onPress={() => setSelection({ betType: 'SIZE', betValue: 'BIG', label: 'Big', multiplierLabel: `${config?.payouts.size ?? 1.8}X` })}
           />
           <Pressable
             style={boxStyle(SMALL_BOX, scaleTop)}
-            onPress={() => setSelection({ betType: 'SIZE', betValue: 'SMALL', label: 'Small', multiplierLabel: `${config?.payouts.size ?? 2}X` })}
+            onPress={() => setSelection({ betType: 'SIZE', betValue: 'SMALL', label: 'Small', multiplierLabel: `${config?.payouts.size ?? 1.8}X` })}
           />
           {/* Betting locked in the closing seconds — gray out and block
               taps on the whole betting area, with a big countdown. */}
