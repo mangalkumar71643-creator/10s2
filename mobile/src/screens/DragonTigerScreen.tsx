@@ -36,7 +36,6 @@ import {
   placeDragonTigerBets,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
-import { useAuth } from '../state/AuthContext';
 
 const CHIP_VALUES = [10, 20, 50, 100, 200, 500, 1000];
 const CHIP_COLORS: Record<number, string> = {
@@ -573,6 +572,10 @@ const BetBox = memo(function BetBox({
 }) {
   const radius = 14 * k;
   const markSize = Math.min(frame.height * (big ? 0.62 : 0.5), frame.width * (mark.length > 2 ? 0.16 : 0.62));
+  // Sized to fit by arithmetic, not adjustsFontSizeToFit: with letter
+  // spacing, Android's auto-shrink could blank the whole box's text.
+  const spacing = (big ? 5 : 2) * k;
+  const titleSize = Math.min((big ? 26 : 15) * k, (frame.width * 0.86 - spacing * (title.length - 1)) / (title.length * 0.74));
   return (
     <Pressable
       onPress={() => onPress(area)}
@@ -582,7 +585,7 @@ const BetBox = memo(function BetBox({
         <Text pointerEvents="none" style={[styles.boxMark, { fontSize: markSize, lineHeight: markSize * 1.15 }]} numberOfLines={1}>
           {mark}
         </Text>
-        <Text style={[styles.boxTitle, { fontSize: (big ? 26 : 15) * k, letterSpacing: (big ? 5 : 2) * k }]} numberOfLines={1} adjustsFontSizeToFit>
+        <Text style={[styles.boxTitle, { fontSize: titleSize, letterSpacing: spacing }]} numberOfLines={1}>
           {title}
         </Text>
         <Text style={[styles.boxMult, { fontSize: (big ? 22 : 15) * k }]}>{multiplier}x</Text>
@@ -677,7 +680,6 @@ export default function DragonTigerScreen() {
   const { width: W, height: H } = useWindowDimensions();
   const landscape = W > H;
   const { coins, refreshWallet } = useGameState();
-  const { backendUser } = useAuth();
 
   // Played sideways: lock landscape while this screen is focused and hand
   // the rest of the app back its portrait lock on the way out.
@@ -1153,7 +1155,7 @@ export default function DragonTigerScreen() {
   const cardPos = (cx: number) => ({ left: X(cx) - (cardW + 6) / 2, top: Y(118) - (cardW * 1.4 + 6) / 2 });
   const clockSize = 98 * s;
   const chipSize = Math.min(48, 84 * sy, (880 * sx) / 9.5);
-  const ctrlW = Math.min(64, 150 * sx);
+  const ctrlW = Math.min(60, 124 * sx);
   const ctrlH = Math.min(46, 78 * sy);
   const glowSize = 330 * s;
 
@@ -1235,20 +1237,17 @@ export default function DragonTigerScreen() {
         <Text style={[styles.depositText, { fontSize: 13 * k }]}>Deposit</Text>
       </Pressable>
 
-      {/* Player panel in the left end of the table */}
-      <View style={[styles.abs, styles.sidePanel, leftPanel]}>
-        <MaterialCommunityIcons name="account-circle" size={30 * k} color={GOLD} />
-        <Text style={[styles.sideName, { fontSize: 12 * k }]} numberOfLines={1}>
-          {backendUser?.firstName ?? 'Player'}
+      {/* Limits and rules in the left end of the table */}
+      <View pointerEvents="none" style={[styles.abs, styles.sidePanel, leftPanel]}>
+        <MaterialCommunityIcons name="cards-playing-outline" size={26 * k} color={GOLD} />
+        <Text style={[styles.sideLabel, { fontSize: 10 * k, marginTop: 4 }]}>BET PER BOX</Text>
+        <Text style={[styles.sideValue, { fontSize: 14 * k }]} numberOfLines={1}>
+          ₹{minStake} – ₹{maxStake}
         </Text>
-        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>Balance</Text>
-        <Text style={[styles.sideValue, { fontSize: 14 * k }]} numberOfLines={1} adjustsFontSizeToFit>
-          ₹{displayBalance.toFixed(2)}
-        </Text>
-        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>Your bet</Text>
-        <Text style={[styles.sideValueWhite, { fontSize: 13 * k }]} numberOfLines={1} adjustsFontSizeToFit>
-          ₹{myTotal.toFixed(2)}
-        </Text>
+        <View style={styles.sideDivider} />
+        <Text style={[styles.sideRule, { fontSize: 10 * k }]}>A low · K high</Text>
+        <Text style={[styles.sideRule, { fontSize: 10 * k }]}>Tie: D/T lose</Text>
+        <Text style={[styles.sideRule, { fontSize: 10 * k }]}>Max win ₹{config?.maxPayout ?? 10000}</Text>
       </View>
 
       {/* Road in the right end of the table */}
@@ -1299,12 +1298,20 @@ export default function DragonTigerScreen() {
         />
       ))}
 
-      {/* Bottom rail: limits · chips · actions */}
-      <View pointerEvents="none" style={[styles.abs, { left: Math.max(X(40), leftEdge), top: Y(772) - lift }]}>
-        <Text style={[styles.railText, { fontSize: 10 * k }]}>
-          Bet ₹{minStake} – ₹{maxStake} per box
-        </Text>
-        <Text style={[styles.railHint, { fontSize: 9 * k }]}>A low · K high · Tie: D/T lose</Text>
+      {/* Bottom rail: actions · chips · balance */}
+      <View style={[styles.abs, styles.actions, { left: Math.max(X(24), leftEdge), top: Y(803) - ctrlH / 2 - lift }]}>
+        {(
+          [
+            { label: 'UNDO', icon: 'undo-variant', color: '#F2E6FF', onPress: undo },
+            { label: 'REPEAT', icon: 'repeat', color: '#F2E6FF', onPress: repeat },
+            { label: 'CLEAR', icon: 'close-thick', color: '#FF6B6B', onPress: clearAll },
+          ] as const
+        ).map((a) => (
+          <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [styles.ctrlBtn, { width: ctrlW, height: ctrlH }, pressed && styles.pressed]}>
+            <MaterialCommunityIcons name={a.icon} size={18 * k} color={a.color} />
+            <Text style={[styles.ctrlLabel, { fontSize: 9 * k }]}>{a.label}</Text>
+          </Pressable>
+        ))}
       </View>
       <View style={[styles.abs, styles.chipRail, { left: X(392), width: 896 * sx, top: Y(794) - chipSize / 2 - 2 - lift, gap: Math.max(4, 10 * sx) }]}>
         {CHIP_VALUES.map((v) => {
@@ -1324,19 +1331,16 @@ export default function DragonTigerScreen() {
           );
         })}
       </View>
-      <View style={[styles.abs, styles.actions, { right: Math.max(W - X(1834), rightInset), top: Y(803) - ctrlH / 2 - lift }]}>
-        {(
-          [
-            { label: 'UNDO', icon: 'undo-variant', color: '#F2E6FF', onPress: undo },
-            { label: 'REPEAT', icon: 'repeat', color: '#F2E6FF', onPress: repeat },
-            { label: 'CLEAR', icon: 'close-thick', color: '#FF6B6B', onPress: clearAll },
-          ] as const
-        ).map((a) => (
-          <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [styles.ctrlBtn, { width: ctrlW, height: ctrlH }, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name={a.icon} size={18 * k} color={a.color} />
-            <Text style={[styles.ctrlLabel, { fontSize: 9 * k }]}>{a.label}</Text>
-          </Pressable>
-        ))}
+      <View pointerEvents="none" style={[styles.abs, styles.balancePill, { right: Math.max(W - X(1834), rightInset), top: Y(803) - ctrlH / 2 - lift, height: ctrlH }]}>
+        <MaterialCommunityIcons name="wallet" size={20 * k} color={GOLD} />
+        <View style={{ marginLeft: 6 }}>
+          <Text style={[styles.balanceValue, { fontSize: 15 * k }]} numberOfLines={1}>
+            ₹{displayBalance.toFixed(2)}
+          </Text>
+          <Text style={[styles.balanceSub, { fontSize: 9 * k }]} numberOfLines={1}>
+            Bet ₹{myTotal.toFixed(2)}
+          </Text>
+        </View>
       </View>
 
       {/* Chips in flight */}
@@ -1551,6 +1555,11 @@ const styles = StyleSheet.create({
   winText: { color: GOLD, fontSize: 30, fontWeight: '900', fontStyle: 'italic', textShadowColor: '#7A4A00', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
   loseShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
 
+  sideDivider: { width: '60%', height: 1, backgroundColor: 'rgba(255,214,107,0.35)', marginVertical: 6 },
+  sideRule: { color: 'rgba(255,230,255,0.8)', fontWeight: '700', marginTop: 2, textAlign: 'center' },
+  balancePill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, borderRadius: 14, backgroundColor: 'rgba(40,12,50,0.92)', borderWidth: 1.5, borderColor: GOLD },
+  balanceValue: { color: GOLD, fontWeight: '900' },
+  balanceSub: { color: 'rgba(255,255,255,0.75)', fontWeight: '700' },
   railText: { color: GOLD, fontWeight: '800' },
   railHint: { color: 'rgba(255,220,255,0.6)', marginTop: 1 },
   chipRail: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
