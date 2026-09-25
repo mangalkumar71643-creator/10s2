@@ -1195,3 +1195,77 @@ export function fetchRouletteMyRound(periodNumber?: string) {
   const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
   return apiFetch<{ periodNumber: string | null; bets: RouletteBet[] }>(`/roulette/my-round${q}`);
 }
+
+// ---- K3 Lottery (three dice, Win Go style duration tracks) --------------------
+
+export type K3Duration = 60 | 180 | 300 | 600;
+
+export interface K3Config {
+  durations: K3Duration[];
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  lockSeconds: number;
+  rtpPercent: number;
+  /** Total return per unit staked, by bet key (e.g. "SUM:10", "BIG", "PAIR:3"). */
+  multipliers: Record<string, number>;
+}
+
+export interface K3RoundView {
+  periodNumber: string;
+  durationSeconds: K3Duration;
+  startTime: string;
+  endTime: string;
+  serverTime: string;
+  serverSeedHash: string;
+  locked: boolean;
+}
+
+export interface K3Result {
+  dice: number[];
+  sum: number;
+  size: 'BIG' | 'SMALL';
+  parity: 'ODD' | 'EVEN';
+}
+
+export interface K3HistoryEntry extends K3Result {
+  periodNumber: string;
+  serverSeed: string;
+  serverSeedHash: string;
+}
+
+export interface K3MyBet {
+  id: string;
+  area: string;
+  amount: string;
+  multiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+  createdAt: string;
+  periodNumber: string;
+  durationSeconds: K3Duration;
+  result: K3Result | null;
+}
+
+export function fetchK3Config() {
+  return apiFetch<K3Config>('/k3/config');
+}
+
+export function fetchK3Current(duration: K3Duration) {
+  return apiFetch<K3RoundView>(`/k3/${duration}/current`);
+}
+
+export function fetchK3History(duration: K3Duration, limit = 50) {
+  return apiFetch<K3HistoryEntry[]>(`/k3/${duration}/history?limit=${limit}`);
+}
+
+export function placeK3Bets(duration: K3Duration, bets: { area: string; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: K3MyBet[] }>(`/k3/${duration}/bet`, {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function fetchK3MyBets(limit = 50) {
+  return apiFetch<K3MyBet[]>(`/k3/my-bets?limit=${limit}`);
+}
