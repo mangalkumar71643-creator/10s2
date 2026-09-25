@@ -4,7 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
@@ -80,42 +80,22 @@ function areaWins(area: AndarBaharArea, winner: string | null, totalCards: numbe
   return totalCards >= lo && totalCards <= hi;
 }
 
-// ---------- table ----------
-
-// The table art is the Dragon Tiger table with the heads and boxes taken
-// out (1852×849). Everything is laid out in its pixel coordinates.
-const TABLE_BG = require('../../assets/andar-bahar/table.jpg');
-const IMG_W = 1852;
-const IMG_H = 849;
-
-type Rect = [number, number, number, number];
-const LANES: Record<'ANDAR' | 'BAHAR', Rect> = { ANDAR: [282, 206, 1500, 322], BAHAR: [282, 334, 1500, 450] };
-const LANE_LOOK: Record<'ANDAR' | 'BAHAR', { colors: [string, string]; letter: string }> = {
-  ANDAR: { colors: ['#2F6BE0', '#12287A'], letter: 'A' },
-  BAHAR: { colors: ['#E0303F', '#72101C'], letter: 'B' },
+const STAKE_STEPS = [10, 20, 50, 100, 200, 500];
+const SIDE_LOOK: Record<'ANDAR' | 'BAHAR', { felt: [string, string]; button: [string, string]; neon: string; label: string }> = {
+  ANDAR: { felt: ['#C23A66', '#7E1740'], button: ['#FF5A92', '#C2185B'], neon: '#FF6FA5', label: 'Andar' },
+  BAHAR: { felt: ['#1F6FCC', '#0D3C80'], button: ['#35C8F2', '#1466B8'], neon: '#4FC3FF', label: 'Bahar' },
 };
-const JOKER_AT = [855, 121] as const;
 
-type BoxDef = { area: AndarBaharArea; title: string; sub?: string; mark?: string; big: boolean; r: Rect; colors: [string, string] };
-const SIDE_COLORS: [string, string] = ['#8A4BE0', '#3A1370'];
-const SIDE_GRID: Rect = [712, 460, 1064, 664];
-function sideCell(i: number): Rect {
-  const [x0, y0, x1, y1] = SIDE_GRID;
-  const gap = 8;
-  const w = (x1 - x0 - 2 * gap) / 3;
-  const h = (y1 - y0 - gap) / 2;
-  const c = i % 3;
-  const r = Math.floor(i / 3);
-  return [x0 + c * (w + gap), y0 + r * (h + gap), x0 + c * (w + gap) + w, y0 + r * (h + gap) + h];
+/** Stable pseudo-random 0..1 for a chip key, so a chip keeps its spot. */
+function jitter(key: number, salt: number): number {
+  const x = Math.sin(key * 12.9898 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
 }
-const BOXES: BoxDef[] = [
-  { area: 'ANDAR', title: 'ANDAR', mark: 'A', big: true, r: [276, 460, 700, 664], colors: LANE_LOOK.ANDAR.colors },
-  ...(['C1_5', 'C6_10', 'C11_15', 'C16_25', 'C26_35', 'C36_49'] as AndarBaharArea[]).map((area, i) => {
-    const [lo, hi] = RANGES[area]!;
-    return { area, title: `${lo}-${hi}`, sub: 'CARDS', big: false, r: sideCell(i), colors: SIDE_COLORS };
-  }),
-  { area: 'BAHAR', title: 'BAHAR', mark: 'B', big: true, r: [1076, 460, 1503, 664], colors: LANE_LOOK.BAHAR.colors },
-];
+
+/** "1:0.74" — what one rupee wins on top of the stake. */
+function ratioLabel(multiplier: number): string {
+  return `1:${round2(multiplier - 1)}`;
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -138,42 +118,6 @@ function chipColorFor(amount: number): string {
 
 const RANK_LABEL = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const SUIT_SYMBOL: Record<string, string> = { S: '♠', H: '♥', C: '♣', D: '♦' };
-
-
-/** A band of light sweeping across the glass strip every few seconds. */
-function StripShine({ width, height }: { width: number; height: number }) {
-  const t = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(t, { toValue: 1, duration: 1700, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.delay(2800),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [t]);
-  const band = Math.max(40, height * 0.9);
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        top: -height * 0.2,
-        width: band,
-        height: height * 1.4,
-        transform: [{ translateX: t.interpolate({ inputRange: [0, 1], outputRange: [-band * 1.5, width + band * 0.5] }) }, { skewX: '-25deg' }],
-      }}
-    >
-      <LinearGradient
-        colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0)']}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={StyleSheet.absoluteFill}
-      />
-    </Animated.View>
-  );
-}
 
 
 const Chip = memo(function Chip({ value, size, label }: { value: number; size: number; label?: string }) {
@@ -357,87 +301,6 @@ function WinBurst() {
 
 type AreaState = 'normal' | 'win' | 'lose';
 
-/** One bet box: its own gradient body with a darker front lip, name,
- * payout, this player's stake and the win / lose lighting. */
-const BetBox = memo(function BetBox({
-  area,
-  title,
-  sub,
-  mark,
-  colors,
-  multiplier,
-  total,
-  state,
-  big,
-  onPress,
-  glow,
-  boxRef,
-  frame,
-  k,
-}: {
-  area: AndarBaharArea;
-  title: string;
-  sub?: string;
-  mark?: string;
-  colors: [string, string];
-  multiplier: number;
-  total: number;
-  state: AreaState;
-  big: boolean;
-  onPress: (area: AndarBaharArea) => void;
-  glow: Animated.Value;
-  boxRef: (v: View | null) => void;
-  frame: { left: number; top: number; width: number; height: number };
-  k: number;
-}) {
-  const radius = (big ? 14 : 10) * k;
-  return (
-    <Pressable onPress={() => onPress(area)} style={({ pressed }) => [styles.boxHit, frame, pressed && styles.boxPressed]}>
-      <View ref={boxRef} collapsable={false} style={[styles.boxInner, { borderRadius: radius }, !big && total > 0 && styles.boxHasBet, state === 'win' && styles.boxWin]}>
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 0.3, y: 1 }} style={StyleSheet.absoluteFill} />
-        <LinearGradient colors={['rgba(255,255,255,0.22)', 'rgba(255,255,255,0)']} style={styles.boxShine} pointerEvents="none" />
-        <View pointerEvents="none" style={[styles.boxLip, { height: frame.height * 0.1 }]} />
-        {mark && (
-          <Text pointerEvents="none" style={[styles.boxMark, { fontSize: frame.height * 0.72, lineHeight: frame.height * 0.85 }]}>
-            {mark}
-          </Text>
-        )}
-        <Text style={[styles.boxTitle, { fontSize: (big ? 24 : 13) * k, letterSpacing: (big ? 5 : 1) * k }]} numberOfLines={1} adjustsFontSizeToFit>
-          {title}
-        </Text>
-        {sub &&
-          (total > 0 && !big ? (
-            <Text style={[styles.boxSubBet, { fontSize: 9 * k }]}>₹{shortAmount(total)}</Text>
-          ) : (
-            <Text style={[styles.boxSub, { fontSize: 7 * k }]}>{sub}</Text>
-          ))}
-        <Text style={[styles.boxMult, { fontSize: (big ? 20 : 12) * k }]}>{multiplier}x</Text>
-        {total > 0 && (
-          <>
-            {big && (
-              <View style={[styles.boxBet, { left: 8 * k, bottom: 12 * k }]} pointerEvents="none">
-                <Text style={[styles.boxBetText, { fontSize: 11 * k }]}>₹{round2(total)}</Text>
-              </View>
-            )}
-            {big && (
-              <View style={{ position: 'absolute', right: 10 * k, bottom: 10 * k }} pointerEvents="none">
-                <Chip value={total} size={36 * k} label={shortAmount(total)} />
-              </View>
-            )}
-          </>
-        )}
-        {state === 'win' && (
-          <>
-            <Animated.View pointerEvents="none" style={[styles.winGlow, { opacity: glow }]} />
-            {big && <WinBurst />}
-          </>
-        )}
-        {state === 'lose' && <View pointerEvents="none" style={styles.loseShade} />}
-      </View>
-    </Pressable>
-  );
-});
-
 /** A dealt card flying from the Joker slot into its lane. `instant` skips
  * the flight for cards that were already down when the screen caught up. */
 function LaneCard({ card, w, from, instant, match }: { card: PlayingCard; w: number; from: { x: number; y: number }; instant: boolean; match: boolean }) {
@@ -505,7 +368,7 @@ export default function AndarBaharScreen() {
   const [view, setView] = useState<AndarBaharRoundView | null>(null);
   const [history, setHistory] = useState<AndarBaharHistoryEntry[]>([]);
   const [chips, setChips] = useState<PlacedChip[]>([]);
-  const [selectedChip, setSelectedChip] = useState(DEFAULT_CHIP);
+  const [amounts, setAmounts] = useState<Record<'ANDAR' | 'BAHAR', number>>({ ANDAR: DEFAULT_CHIP, BAHAR: DEFAULT_CHIP });
   const [win, setWin] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [banner, setBanner] = useState<{ text: string; start: boolean } | null>(null);
@@ -527,7 +390,7 @@ export default function AndarBaharScreen() {
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const winTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<View>(null);
-  const chipRefs = useRef<Record<number, View | null>>({});
+  const sideBtnRefs = useRef<Partial<Record<AndarBaharArea, View | null>>>({});
   const boxRefs = useRef<Partial<Record<AndarBaharArea, View | null>>>({});
   const flightId = useRef(1);
 
@@ -709,7 +572,7 @@ export default function AndarBaharScreen() {
   const bannerFor = boardResult ? boardResult.periodNumber : null;
   useEffect(() => {
     if (!bannerFor || !boardResult?.winner) return;
-    showBanner(`${boardResult.winner} WINS`, boardResult.winner === 'ANDAR');
+    showBanner(`${boardResult.winner === 'ANDAR' ? 'Andar' : 'Bahar'} Wins!`, boardResult.winner === 'ANDAR');
     // Once per round.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bannerFor, showBanner]);
@@ -780,8 +643,8 @@ export default function AndarBaharScreen() {
   areaTotalsRef.current = areaTotals;
   const maxStakeRef = useRef(maxStake);
   maxStakeRef.current = maxStake;
-  const selectedChipRef = useRef(selectedChip);
-  selectedChipRef.current = selectedChip;
+  const amountsRef = useRef(amounts);
+  amountsRef.current = amounts;
 
   const placeChips = useCallback(
     (entries: { area: AndarBaharArea; amount: number }[]): boolean => {
@@ -828,7 +691,7 @@ export default function AndarBaharScreen() {
 
   // A chip flies from the rail to the box; the box counts it once it lands.
   const launchFlight = useCallback((area: AndarBaharArea, value: number) => {
-    const chipView = chipRefs.current[value];
+    const chipView = sideBtnRefs.current[area];
     const boxView = boxRefs.current[area];
     const root = rootRef.current;
     if (!chipView || !boxView || !root) return;
@@ -860,7 +723,7 @@ export default function AndarBaharScreen() {
 
   const onAreaPress = useCallback(
     (area: AndarBaharArea) => {
-      const value = selectedChipRef.current;
+      const value = amountsRef.current[area as 'ANDAR' | 'BAHAR'] ?? DEFAULT_CHIP;
       if (placeChips([{ area, amount: value }])) launchFlight(area, value);
     },
     [placeChips, launchFlight]
@@ -936,234 +799,214 @@ export default function AndarBaharScreen() {
     );
   }
 
-  // ---- table art → screen ----
-  let sx = W / IMG_W;
-  let sy = H / IMG_H;
-  // Phones are within a few % of the art's shape, so it is stretched edge to
-  // edge; squarer screens (tablets) keep its aspect and letterbox instead.
-  if (sx / sy > 1.1 || sy / sx > 1.1) sx = sy = Math.min(sx, sy);
-  const ox = (W - IMG_W * sx) / 2;
-  const oy = (H - IMG_H * sy) / 2;
-  const s = Math.min(sx, sy);
-  const k = Math.max(0.75, Math.min(1.8, s / 0.485));
-  const X = (x: number) => ox + x * sx;
-  const Y = (y: number) => oy + y * sy;
-  const frameOf = ([x0, y0, x1, y1]: Rect) => ({ left: X(x0), top: Y(y0), width: (x1 - x0) * sx, height: (y1 - y0) * sy });
-  const leftEdge = insets.left + 6;
-  const rightInset = insets.right + 6;
-  // Keep the bottom-rail controls clear of a gesture bar.
-  const lift = Math.max(0, insets.bottom - (H - Y(IMG_H)));
+  // ---- layout ----
+  const padX = Math.max(insets.left, insets.right, 12);
+  const topH = 44;
+  const bottomH = 66 + Math.max(insets.bottom, 6);
+  const table = { left: padX, top: topH + 4, width: W - 2 * padX, height: H - topH - bottomH - 8 };
+  const rim = Math.max(6, table.height * 0.035);
+  const inner = { left: table.left + rim, top: table.top + rim, width: table.width - 2 * rim, height: table.height - 2 * rim };
+  const cx = inner.left + inner.width / 2;
+  const halfW = inner.width / 2;
+  const k = Math.max(0.8, Math.min(1.6, H / 412));
+  const cardW = Math.min(inner.height * 0.2, 54 * k);
+  const jokerBox = { w: cardW + 18, h: cardW * 1.4 + 18 };
+  const jokerTop = inner.top + 10;
+  const jokerCentre = { x: cx, y: jokerTop + jokerBox.h / 2 };
+  const fanTop = jokerTop + 9;
+  const clockSize = Math.min(58 * k, inner.height * 0.2);
+  const pileCY = inner.top + inner.height * 0.62;
+  const pileRX = halfW * 0.26;
+  const pileRY = inner.height * 0.13;
+  const pileChip = Math.min(30 * k, inner.height * 0.1);
 
-  const jokerW = Math.min(90 * sx, (120 * sy) / 1.4);
-  const clockSize = 96 * s;
-  const chipSize = Math.min(48, 84 * sy, (880 * sx) / 9.5);
-  const ctrlW = Math.min(64, 150 * sx);
-  const ctrlH = Math.min(46, 78 * sy);
+  // Cards run outwards from the Joker, overlapping so every rank corner
+  // (top-left) stays visible.
+  const sideCards = { ANDAR: dealCards.slice(0, dealtCount).filter((_, i) => i % 2 === 0), BAHAR: dealCards.slice(0, dealtCount).filter((_, i) => i % 2 === 1) };
+  const perSide = Math.max(1, Math.ceil(dealCards.length / 2));
+  // Keep clear of the table's rounded ends.
+  const fanRoom = halfW - jokerBox.w / 2 - 22 - cardW - inner.height * 0.3;
+  const spacing = Math.min(cardW * 0.72, perSide > 1 ? fanRoom / (perSide - 1) : cardW);
+  const cardLeft = (side: 'ANDAR' | 'BAHAR', j: number) =>
+    side === 'ANDAR' ? cx - jokerBox.w / 2 - 12 - cardW - j * spacing : cx + jokerBox.w / 2 + 12 + j * spacing;
 
-  const leftPanelL = Math.max(X(48), leftEdge);
-  const leftPanel = { left: leftPanelL, top: Y(262), width: X(266) - leftPanelL, height: 360 * sy };
-  const rightPanelR = Math.min(X(1806), W - rightInset);
-  const rightPanel = { left: X(1516), top: Y(236), width: rightPanelR - X(1516), height: 410 * sy };
-  const beadS = Math.max(8, Math.floor(Math.min(18 * k, (rightPanel.width - 14) / BEAD_COLS - 2, (rightPanel.height - 62 * k) / BEAD_ROWS - 2)));
-
-  // Lanes: label pill, then the card track. Cards overlap once a lane fills.
-  const laneH = (LANES.ANDAR[3] - LANES.ANDAR[1]) * sy;
-  const laneCardW = Math.min((laneH - 14 * sy) / 1.4, 80 * sx);
-  const trackX0 = X(440);
-  const trackW = X(1490) - trackX0;
-  const perLane = Math.max(1, Math.ceil(dealCards.length / 2));
-  const spacing = Math.min(laneCardW * 1.1, perLane > 1 ? (trackW - laneCardW) / (perLane - 1) : laneCardW);
-  const jokerCentre = { x: X(JOKER_AT[0]), y: Y(JOKER_AT[1]) };
-
-  const bannerStart = banner?.start ?? true;
-  const winnerLane = boardResult?.winner ?? null;
+  const winnerSide = boardResult?.winner ?? null;
+  const statusLabel =
+    phase === 'BETTING' ? 'Place Your Bets' : phase === 'DEALING' ? 'Dealing Card' : boardResult ? `${boardResult.winner === 'ANDAR' ? 'Andar' : 'Bahar'} Win` : 'Dealing Card';
+  const steps = STAKE_STEPS.filter((v) => v >= minStake && v <= maxStake);
+  const stepAmount = (side: 'ANDAR' | 'BAHAR', dir: 1 | -1) => {
+    const i = Math.max(0, steps.indexOf(amounts[side]));
+    const next = steps[Math.max(0, Math.min(steps.length - 1, i + dir))] ?? amounts[side];
+    setAmounts((a) => ({ ...a, [side]: next }));
+  };
+  const recent = history.slice(0, 16).reverse();
 
   return (
     <View ref={rootRef} collapsable={false} style={styles.root}>
-      <Image source={TABLE_BG} style={[styles.abs, frameOf([0, 0, IMG_W, IMG_H])]} resizeMode="stretch" />
+      <LinearGradient colors={['#3A0D16', '#1E060B']} style={StyleSheet.absoluteFill} />
 
-      {/* Glass strip: sweep, side names, Joker and clock */}
-      <View pointerEvents="none" style={[styles.abs, styles.stripClip, frameOf([410, 62, 1300, 180]), { borderRadius: 16 * k }]}>
-        <StripShine width={890 * sx} height={118 * sy} />
-      </View>
-      <View pointerEvents="none" style={[styles.abs, styles.center, frameOf([430, 62, 720, 180])]}>
-        <Text style={[styles.stripName, { fontSize: 30 * k, textShadowColor: '#3D86FF' }]}>ANDAR</Text>
-      </View>
-      <View pointerEvents="none" style={[styles.abs, styles.center, frameOf([1110, 62, 1290, 180])]}>
-        <Text style={[styles.stripName, { fontSize: 30 * k, textShadowColor: '#FF4A4A' }]}>BAHAR</Text>
-      </View>
-      <View pointerEvents="none" style={[styles.abs, styles.jokerTab, { left: X(JOKER_AT[0]) - 34 * k, top: Y(JOKER_AT[1]) + (jokerW * 1.4) / 2 - 6 * k, width: 68 * k, zIndex: 5, borderRadius: 8 * k }]}>
-        <Text style={[styles.jokerLabel, { fontSize: 10 * k }]}>JOKER</Text>
-      </View>
-      <View style={[styles.abs, styles.jokerSlot, { left: jokerCentre.x - jokerW / 2 - 3, top: jokerCentre.y - (jokerW * 1.4) / 2 - 3, borderRadius: jokerW * 0.12 }]}>
-        <FlipCard card={revealed?.joker ?? null} w={jokerW} />
-      </View>
-      <View style={[styles.abs, styles.center, { left: X(1000) - clockSize / 2, top: Y(JOKER_AT[1]) - clockSize / 2, width: clockSize, height: clockSize }]}>
-        {phase === 'BETTING' ? (
-          <Clock secs={secsLeft} fraction={clockFraction} size={clockSize} />
-        ) : (
-          <View style={[styles.countBadge, { width: clockSize, height: clockSize, borderRadius: clockSize / 2 }]}>
-            <Text style={[styles.countNum, { fontSize: 24 * k }]}>{dealtCount}</Text>
-            <Text style={[styles.countLbl, { fontSize: 8 * k }]}>CARDS</Text>
-          </View>
-        )}
+      {/* Top bar */}
+      <View style={[styles.topBar, { height: topH, paddingLeft: padX, paddingRight: padX }]}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={8}>
+          <MaterialCommunityIcons name="chevron-left" size={26} color="#F5B942" />
+          <Text style={styles.title}>ANDAR BAHAR</Text>
+        </Pressable>
+        <View style={styles.recentRow}>
+          {recent.map((h) => (
+            <View key={h.periodNumber} style={[styles.recentDot, { backgroundColor: h.winner === 'ANDAR' ? '#E0447A' : '#2E86DE' }]}>
+              <Text style={styles.recentText}>{h.winner === 'ANDAR' ? 'A' : 'B'}</Text>
+            </View>
+          ))}
+        </View>
+        <Pressable onPress={() => navigation.navigate('Deposit')} style={styles.depositPill}>
+          <MaterialCommunityIcons name="wallet-plus" size={16} color="#F5B942" />
+          <Text style={styles.depositText}>Deposit</Text>
+        </Pressable>
       </View>
 
-      {/* Top corners and status */}
-      <Pressable onPress={() => navigation.goBack()} style={[styles.abs, styles.backBtn, { left: Math.max(X(14), leftEdge), top: Y(10) }]} hitSlop={8}>
-        <MaterialCommunityIcons name="chevron-left" size={26 * k} color="#F5B942" />
-        <Text style={[styles.title, { fontSize: 15 * k }]}>ANDAR BAHAR</Text>
-      </Pressable>
-      <View pointerEvents="none" style={[styles.abs, styles.center, frameOf([600, 4, 1110, 58])]}>
-        <Text style={[styles.topStatus, { fontSize: 11 * k }]} numberOfLines={1}>
-          #{view?.periodNumber.slice(-5) ?? '-----'} · {statusText}
-        </Text>
+      {/* Table: dark rim, Andar half and Bahar half */}
+      <View style={[styles.abs, styles.tableRim, { left: table.left, top: table.top, width: table.width, height: table.height, borderRadius: table.height / 2 }]} />
+      <View style={[styles.abs, styles.feltWrap, { left: inner.left, top: inner.top, width: inner.width, height: inner.height, borderRadius: inner.height / 2 }]}>
+        {(['ANDAR', 'BAHAR'] as const).map((side) => (
+          <LinearGradient key={side} colors={SIDE_LOOK[side].felt} start={{ x: side === 'ANDAR' ? 1 : 0, y: 0 }} end={{ x: side === 'ANDAR' ? 0 : 1, y: 1 }} style={styles.feltHalf}>
+            <Text style={[styles.watermark, { fontSize: inner.height * 0.2, [side === 'ANDAR' ? 'left' : 'right']: inner.height * 0.28 }]}>{SIDE_LOOK[side].label}</Text>
+            {winnerSide && winnerSide !== side && <View style={styles.loseShade} />}
+          </LinearGradient>
+        ))}
       </View>
-      <Pressable
-        onPress={() => navigation.navigate('Deposit')}
-        style={[styles.abs, styles.depositPill, { right: Math.max(W - X(1836), rightInset), top: Y(12) }]}
-      >
-        <MaterialCommunityIcons name="wallet-plus" size={15 * k} color="#F5B942" />
-        <Text style={[styles.depositText, { fontSize: 13 * k }]}>Deposit</Text>
-      </Pressable>
+      {winnerSide && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.abs,
+            styles.winEdge,
+            {
+              left: winnerSide === 'ANDAR' ? inner.left : cx,
+              top: inner.top,
+              width: halfW,
+              height: inner.height,
+              borderColor: SIDE_LOOK[winnerSide].neon,
+              shadowColor: SIDE_LOOK[winnerSide].neon,
+              opacity: glow,
+              [winnerSide === 'ANDAR' ? 'borderTopLeftRadius' : 'borderTopRightRadius']: inner.height / 2,
+              [winnerSide === 'ANDAR' ? 'borderBottomLeftRadius' : 'borderBottomRightRadius']: inner.height / 2,
+            },
+          ]}
+        />
+      )}
 
-      {/* Andar / Bahar lanes with the dealt cards */}
+      {/* Payout and my stake per side, with my chip pile */}
       {(['ANDAR', 'BAHAR'] as const).map((side) => {
-        const f = frameOf(LANES[side]);
-        const look = LANE_LOOK[side];
-        const lit = winnerLane === side;
+        const pcx = side === 'ANDAR' ? cx - halfW * 0.48 : cx + halfW * 0.48;
+        const mine = chips.filter((c) => c.area === side).slice(-40);
         return (
-          <View key={side} pointerEvents="none" style={[styles.abs, styles.lane, f, { borderRadius: 14 * k }, lit && styles.laneWin, winnerLane && !lit && styles.laneLose]}>
-            <LinearGradient colors={[look.colors[0] + '55', look.colors[1] + '22']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-            <LinearGradient colors={look.colors} style={[styles.lanePill, { width: X(430) - X(292), height: f.height - 16 * sy, borderRadius: 10 * k }]}>
-              <Text style={[styles.laneLetter, { fontSize: 28 * k }]}>{look.letter}</Text>
-              <Text style={[styles.laneName, { fontSize: 11 * k }]}>{side}</Text>
-            </LinearGradient>
-          </View>
-        );
-      })}
-      {dealCards.slice(0, dealtCount).map((card, i) => {
-        const side = i % 2 === 0 ? 'ANDAR' : 'BAHAR';
-        const f = frameOf(LANES[side]);
-        const left = trackX0 + Math.floor(i / 2) * spacing;
-        const top = f.top + (f.height - laneCardW * 1.4) / 2;
-        const due = DEAL_START_MS + i * dealMs;
-        return (
-          <View key={`${revealed?.periodNumber}-${i}`} pointerEvents="none" style={[styles.abs, { left, top, zIndex: i }]}>
-            <LaneCard
-              card={card}
-              w={laneCardW}
-              from={{ x: jokerCentre.x - (left + laneCardW / 2), y: jokerCentre.y - (top + laneCardW * 0.7) }}
-              instant={dealElapsed - due > 600}
-              match={i === dealCards.length - 1 && dealDone}
-            />
-          </View>
-        );
-      })}
-
-      {/* Player panel in the left end of the table */}
-      <View style={[styles.abs, styles.sidePanel, leftPanel]}>
-        <MaterialCommunityIcons name="account-circle" size={30 * k} color={GOLD} />
-        <Text style={[styles.sideName, { fontSize: 12 * k }]} numberOfLines={1}>
-          {backendUser?.firstName ?? 'Player'}
-        </Text>
-        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>Balance</Text>
-        <Text style={[styles.sideValue, { fontSize: 14 * k }]} numberOfLines={1} adjustsFontSizeToFit>
-          ₹{displayBalance.toFixed(2)}
-        </Text>
-        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>Your bet</Text>
-        <Text style={[styles.sideValueWhite, { fontSize: 13 * k }]} numberOfLines={1} adjustsFontSizeToFit>
-          ₹{myTotal.toFixed(2)}
-        </Text>
-      </View>
-
-      {/* Road in the right end of the table */}
-      <View style={[styles.abs, styles.sidePanel, rightPanel]}>
-        <Text style={[styles.sideLabel, { fontSize: 10 * k }]}>LAST {Math.min(stats?.n ?? 0, BEAD_COLS * BEAD_ROWS)}</Text>
-        <View style={styles.beadGrid}>
-          {Array.from({ length: BEAD_COLS }, (_, c) => (
-            <View key={c} style={styles.beadCol}>
-              {Array.from({ length: BEAD_ROWS }, (_, r) => {
-                const h = beads[c * BEAD_ROWS + r];
-                const size = { width: beadS, height: beadS, borderRadius: beadS / 2 };
-                if (!h) return <View key={r} style={[styles.beadEmpty, size]} />;
-                const latest = c * BEAD_ROWS + r === beads.length - 1;
+          <React.Fragment key={side}>
+            <View
+              ref={(v) => {
+                boxRefs.current[side] = v;
+              }}
+              collapsable={false}
+              pointerEvents="none"
+              style={[styles.abs, { left: pcx - pileRX, top: pileCY - pileRY, width: pileRX * 2, height: pileRY * 2 }]}
+            >
+              {mine.map((c) => {
+                const a = jitter(c.key, 1) * Math.PI * 2;
+                const r = Math.sqrt(jitter(c.key, 2));
                 return (
-                  <View key={r} style={[styles.bead, size, { backgroundColor: BEAD_COLOR[h.winner] }, latest && styles.beadLatest]}>
-                    <Text style={[styles.beadText, { fontSize: beadS * 0.55 }]}>{h.winner === 'ANDAR' ? 'A' : 'B'}</Text>
+                  <View key={c.key} style={{ position: 'absolute', left: pileRX + Math.cos(a) * r * (pileRX - pileChip / 2) - pileChip / 2, top: pileRY + Math.sin(a) * r * (pileRY - pileChip / 2) - pileChip / 2 }}>
+                    <Chip value={c.amount} size={pileChip} label={shortAmount(c.amount)} />
                   </View>
                 );
               })}
             </View>
-          ))}
-        </View>
-        <View style={styles.statRow}>
-          <Text style={[styles.statLine, { color: '#8FB6FF', fontSize: 10 * k }]}>A {stats?.a ?? 0}%</Text>
-          <Text style={[styles.statLine, { color: '#FF9AA4', fontSize: 10 * k }]}>B {stats?.b ?? 0}%</Text>
-        </View>
+            <View pointerEvents="none" style={[styles.abs, styles.sideInfo, { left: pcx - 80, width: 160, top: inner.top + inner.height - 16 * k - 34 * k }]}>
+              <Text style={[styles.ratio, { fontSize: 20 * k, color: side === 'ANDAR' ? '#FFC2D6' : '#BFE6FF' }]}>{ratioLabel(multipliers[side])}</Text>
+              <Text style={[styles.sideTotal, { fontSize: 12 * k }]}>₹{shownTotal(side).toFixed(2)}</Text>
+            </View>
+          </React.Fragment>
+        );
+      })}
+
+      {/* Joker, clock / card count and status */}
+      <View style={[styles.abs, styles.jokerBox, { left: cx - jokerBox.w / 2, top: jokerTop, width: jokerBox.w, height: jokerBox.h, borderRadius: 10 }, boardResult && styles.jokerGlow]}>
+        <FlipCard card={revealed?.joker ?? null} w={cardW} />
+      </View>
+      <View pointerEvents="none" style={[styles.abs, styles.center, { left: cx - 90, width: 180, top: jokerTop + jokerBox.h + 6 }]}>
+        <Text style={[styles.status, { fontSize: 18 * k }, winnerSide && { color: SIDE_LOOK[winnerSide].neon }]}>{statusLabel}</Text>
+        {phase === 'BETTING' ? (
+          <View style={{ marginTop: 4 }}>
+            <Clock secs={secsLeft} fraction={clockFraction} size={clockSize} />
+          </View>
+        ) : (
+          <Text style={[styles.countText, { fontSize: 12 * k }]}>{dealtCount} cards</Text>
+        )}
       </View>
 
-      {/* Bet boxes */}
-      {BOXES.map((b) => (
-        <BetBox
-          key={b.area}
-          area={b.area}
-          title={b.title}
-          sub={b.sub}
-          mark={b.mark}
-          colors={b.colors}
-          multiplier={multipliers[b.area]}
-          total={shownTotal(b.area)}
-          state={areaState(b.area)}
-          big={b.big}
-          onPress={onAreaPress}
-          glow={glow}
-          boxRef={(v) => {
-            boxRefs.current[b.area] = v;
-          }}
-          frame={frameOf(b.r)}
-          k={k}
-        />
-      ))}
-
-      {/* Bottom rail: limits · chips · actions */}
-      <View pointerEvents="none" style={[styles.abs, { left: Math.max(X(40), leftEdge), top: Y(772) - lift }]}>
-        <Text style={[styles.railText, { fontSize: 10 * k }]}>
-          Bet ₹{minStake} – ₹{maxStake} per box
-        </Text>
-        <Text style={[styles.railHint, { fontSize: 9 * k }]}>Andar first · match the Joker</Text>
-      </View>
-      <View style={[styles.abs, styles.chipRail, { left: X(392), width: 896 * sx, top: Y(794) - chipSize / 2 - 2 - lift, gap: Math.max(4, 10 * sx) }]}>
-        {CHIP_VALUES.map((v) => {
-          const allowed = v >= minStake && v <= maxStake;
-          const active = v === selectedChip;
+      {/* Dealt cards */}
+      {(['ANDAR', 'BAHAR'] as const).map((side) =>
+        sideCards[side].map((card, j) => {
+          const i = side === 'ANDAR' ? j * 2 : j * 2 + 1;
+          const left = cardLeft(side, j);
+          const due = DEAL_START_MS + i * dealMs;
           return (
-            <Pressable key={v} disabled={!allowed} onPress={() => setSelectedChip(v)} style={[styles.chipBtn, active && styles.chipActive, !allowed && styles.dim]}>
-              <View
-                ref={(r) => {
-                  chipRefs.current[v] = r;
-                }}
-                collapsable={false}
-              >
-                <Chip value={v} size={chipSize} />
-              </View>
-            </Pressable>
+            <View key={`${revealed?.periodNumber}-${i}`} pointerEvents="none" style={[styles.abs, { left, top: fanTop, zIndex: side === 'ANDAR' ? 100 - j : 10 + j }]}>
+              <LaneCard
+                card={card}
+                w={cardW}
+                from={{ x: jokerCentre.x - (left + cardW / 2), y: jokerCentre.y - (fanTop + cardW * 0.7) }}
+                instant={dealElapsed - due > 600}
+                match={i === dealCards.length - 1 && dealDone}
+              />
+            </View>
           );
-        })}
-      </View>
-      <View style={[styles.abs, styles.actions, { right: Math.max(W - X(1834), rightInset), top: Y(803) - ctrlH / 2 - lift }]}>
-        {(
-          [
-            { label: 'UNDO', icon: 'undo-variant', color: '#F2E6FF', onPress: undo },
-            { label: 'REPEAT', icon: 'repeat', color: '#F2E6FF', onPress: repeat },
-            { label: 'CLEAR', icon: 'close-thick', color: '#FF6B6B', onPress: clearAll },
-          ] as const
-        ).map((a) => (
-          <Pressable key={a.label} onPress={a.onPress} style={({ pressed }) => [styles.ctrlBtn, { width: ctrlW, height: ctrlH }, pressed && styles.pressed]}>
-            <MaterialCommunityIcons name={a.icon} size={18 * k} color={a.color} />
-            <Text style={[styles.ctrlLabel, { fontSize: 9 * k }]}>{a.label}</Text>
-          </Pressable>
+        })
+      )}
+
+      {/* Bottom bar: Andar / Bahar bet buttons, balance, undo / repeat */}
+      <View style={[styles.bottomBar, { height: bottomH, paddingBottom: Math.max(insets.bottom, 6), paddingLeft: padX, paddingRight: padX }]}>
+        {(['ANDAR', 'BAHAR'] as const).map((side, idx) => (
+          <React.Fragment key={side}>
+            {idx === 1 && (
+              <View style={styles.balanceBox}>
+                <Text style={styles.balanceLabel}>Balance</Text>
+                <Text style={styles.balanceValue}>₹{displayBalance.toFixed(2)}</Text>
+                <Text style={styles.balanceLabel}>My bet ₹{myTotal.toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={styles.sideCtrl}>
+              <Pressable onPress={() => stepAmount(side, -1)} style={styles.coinBtn} hitSlop={6}>
+                <MaterialCommunityIcons name="minus" size={20} color="#5A3A00" />
+              </Pressable>
+              <Pressable
+                onPress={() => onAreaPress(side)}
+                style={({ pressed }) => [styles.betBtnWrap, pressed && styles.pressed, !bettingOpen && styles.dim]}
+              >
+                <View
+                  ref={(v) => {
+                    sideBtnRefs.current[side] = v;
+                  }}
+                  collapsable={false}
+                >
+                  <LinearGradient colors={SIDE_LOOK[side].button} style={styles.betBtn}>
+                    <Text style={styles.betBtnName}>{SIDE_LOOK[side].label}</Text>
+                    <Text style={styles.betBtnAmt}>₹{amounts[side].toFixed(2)}</Text>
+                  </LinearGradient>
+                </View>
+              </Pressable>
+              <Pressable onPress={() => stepAmount(side, 1)} style={styles.coinBtn} hitSlop={6}>
+                <MaterialCommunityIcons name="plus" size={20} color="#5A3A00" />
+              </Pressable>
+            </View>
+          </React.Fragment>
         ))}
+        <View style={styles.miniActions}>
+          <Pressable onPress={undo} style={styles.miniBtn} hitSlop={6}>
+            <MaterialCommunityIcons name="undo-variant" size={18} color="#F2E6FF" />
+          </Pressable>
+          <Pressable onPress={repeat} style={styles.miniBtn} hitSlop={6}>
+            <MaterialCommunityIcons name="repeat" size={18} color="#F2E6FF" />
+          </Pressable>
+        </View>
       </View>
 
       {/* Chips in flight */}
@@ -1173,8 +1016,8 @@ export default function AndarBaharScreen() {
           pointerEvents="none"
           style={{
             position: 'absolute',
-            left: -chipSize / 2,
-            top: -chipSize / 2,
+            left: -pileChip / 2,
+            top: -pileChip / 2,
             transform: [
               { translateX: f.anim.interpolate({ inputRange: [0, 1], outputRange: [f.from.x, f.to.x] }) },
               {
@@ -1187,72 +1030,27 @@ export default function AndarBaharScreen() {
             ],
           }}
         >
-          <Chip value={f.value} size={chipSize} />
+          <Chip value={f.value} size={pileChip} />
         </Animated.View>
       ))}
 
-      {/* Start / Stop Betting */}
       {banner && (
-        <View pointerEvents="none" style={styles.bannerLayer}>
-          <Animated.View
-            style={[
-              styles.bannerBar,
-              {
-                top: H * 0.3,
-                height: H * 0.26,
-                width: W * 0.75,
-                left: -W * 0.1,
-                opacity: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 0.95, 0] }),
-                transform: [
-                  { translateX: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [-W * 0.8, 0, -W * 0.2] }) },
-                  { skewX: '-22deg' },
-                ],
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={bannerStart ? ['rgba(40,90,230,0)', 'rgba(40,90,230,0.85)', 'rgba(120,170,255,0.9)'] : ['rgba(90,20,20,0)', 'rgba(120,30,30,0.85)', 'rgba(200,80,40,0.9)']}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.bannerBar,
-              {
-                top: H * 0.3,
-                height: H * 0.26,
-                width: W * 0.75,
-                right: -W * 0.1,
-                opacity: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 0.95, 0] }),
-                transform: [
-                  { translateX: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [W * 0.8, 0, W * 0.2] }) },
-                  { skewX: '-22deg' },
-                ],
-              },
-            ]}
-          >
-            <LinearGradient
-              colors={bannerStart ? ['rgba(255,110,110,0.9)', 'rgba(220,40,40,0.85)', 'rgba(220,40,40,0)'] : ['rgba(200,80,40,0.9)', 'rgba(120,30,30,0.85)', 'rgba(90,20,20,0)']}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={StyleSheet.absoluteFill}
-            />
-          </Animated.View>
-          <Animated.Text
-            style={[
-              styles.bannerText,
-              {
-                top: H * 0.3 + H * 0.13 - 30,
-                opacity: bannerAnim.interpolate({ inputRange: [0, 0.6, 1, 2], outputRange: [0, 1, 1, 0] }),
-                transform: [{ scale: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [2.2, 1, 1.15] }) }],
-              },
-            ]}
-          >
-            {banner.text}
-          </Animated.Text>
-        </View>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.abs,
+            styles.popPill,
+            {
+              top: inner.top + inner.height * 0.4,
+              left: cx - 110,
+              width: 220,
+              opacity: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] }),
+              transform: [{ scale: bannerAnim.interpolate({ inputRange: [0, 1, 2], outputRange: [0.6, 1, 1.1] }) }],
+            },
+          ]}
+        >
+          <Text style={styles.popText}>{banner.text}</Text>
+        </Animated.View>
       )}
 
       {win !== null && (
@@ -1282,6 +1080,36 @@ const styles = StyleSheet.create({
   rotatingText: { color: GOLD, fontSize: 16, fontWeight: '700' },
 
   abs: { position: 'absolute' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  recentRow: { flexDirection: 'row', gap: 3, flexShrink: 1, overflow: 'hidden' },
+  recentDot: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  recentText: { color: '#FFFFFF', fontSize: 9, fontWeight: '900' },
+  tableRim: { backgroundColor: '#1A1115', borderWidth: 2, borderColor: '#4A2A33', shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 12, elevation: 8 },
+  feltWrap: { flexDirection: 'row', overflow: 'hidden' },
+  feltHalf: { flex: 1, justifyContent: 'center' },
+  watermark: { position: 'absolute', top: '6%', color: 'rgba(255,255,255,0.1)', fontWeight: '900', fontStyle: 'italic' },
+  winEdge: { borderWidth: 3, shadowOpacity: 1, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } },
+  sideInfo: { alignItems: 'center' },
+  ratio: { fontWeight: '900', letterSpacing: 1 },
+  sideTotal: { color: '#FFFFFF', fontWeight: '800', opacity: 0.9 },
+  jokerBox: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+  jokerGlow: { borderColor: GOLD, borderWidth: 2, shadowColor: GOLD, shadowOpacity: 0.9, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } },
+  status: { color: GOLD, fontWeight: '900', fontStyle: 'italic', textShadowColor: '#000', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
+  countText: { color: '#FFFFFF', fontWeight: '800', marginTop: 2, opacity: 0.85 },
+  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(20,4,8,0.85)', borderTopWidth: 1, borderTopColor: '#4A2A33' },
+  sideCtrl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  coinBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F2B632', borderWidth: 2, borderColor: '#FFE08A' },
+  betBtnWrap: {},
+  betBtn: { width: 120, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.35)' },
+  betBtnName: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1 },
+  betBtnAmt: { color: 'rgba(255,255,255,0.95)', fontSize: 12, fontWeight: '800' },
+  balanceBox: { alignItems: 'center' },
+  balanceLabel: { color: 'rgba(255,220,230,0.7)', fontSize: 10, fontWeight: '700' },
+  balanceValue: { color: GOLD, fontSize: 15, fontWeight: '900' },
+  miniActions: { flexDirection: 'row', gap: 6 },
+  miniBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
+  popPill: { alignItems: 'center', paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(10,2,6,0.8)', borderWidth: 1.5, borderColor: GOLD },
+  popText: { color: GOLD, fontSize: 20, fontWeight: '900', fontStyle: 'italic' },
   stripName: { color: 'rgba(255,255,255,0.92)', fontWeight: '900', letterSpacing: 4, textShadowRadius: 14 },
   jokerLabel: { color: GOLD, fontWeight: '900', letterSpacing: 1.5 },
   jokerSlot: { padding: 3, backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1.5, borderColor: 'rgba(255,214,107,0.7)' },
