@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
 import { env } from "../config/env";
@@ -29,6 +28,10 @@ const MIN_AUTO_CASHOUT = 1.01;
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function cappedPayout(amount: number, multiplier: number): number {
+  return Math.min(round2(amount * multiplier), env.games.maxPayout);
 }
 
 /** IST (UTC+5:30) has no DST — a fixed offset is exact. Used only to make
@@ -118,23 +121,21 @@ async function resolvePendingBets(roundId: string) {
   for (const bet of pendingBets) {
     const auto = bet.autoCashoutAt !== null ? Number(bet.autoCashoutAt) : null;
     const won = auto !== null && auto <= crashMultiplier;
-    const payout = won ? round2(Number(bet.amount) * auto!) : 0;
+    const payout = won ? cappedPayout(Number(bet.amount), auto!) : 0;
 
-    const ops: Prisma.PrismaPromise<unknown>[] = [
-      prisma.aviatorBet.update({
-        where: { id: bet.id },
+    await prisma.$transaction(async (tx) => {
+      // Claimed only while still PENDING, so a manual cash-out racing this
+      // (or a second settle) can never pay the same bet twice.
+      const claimed = await tx.aviatorBet.updateMany({
+        where: { id: bet.id, status: "PENDING" },
         data: { status: won ? "WON" : "LOST", cashoutMultiplier: won ? auto : null, payout },
-      }),
-    ];
-    if (won) {
-      ops.push(
-        prisma.wallet.update({ where: { userId: bet.userId }, data: { balance: { increment: payout } } }),
-        prisma.transaction.create({
-          data: { userId: bet.userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" },
-        })
-      );
-    }
-    await prisma.$transaction(ops);
+      });
+      if (claimed.count === 0 || !won) return;
+      await tx.wallet.update({ where: { userId: bet.userId }, data: { balance: { increment: payout } } });
+      await tx.transaction.create({
+        data: { userId: bet.userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" },
+      });
+    });
   }
 }
 
@@ -229,41 +230,37 @@ export async function placeAviatorBet(userId: string, amount: number, autoCashou
   // Up to two concurrent bets per round (matches the mobile UI's two
   // independent bet panels — real Aviator lets a player run a manual bet
   // and a second auto-cashout bet side by side).
-  const existingCount = await prisma.aviatorBet.count({
-    where: { roundId: round.id, userId, status: "PENDING" },
-  });
-  if (existingCount >= 2) {
-    throw new ApiError(400, "You already have the maximum of two bets placed on this round.");
-  }
-
-  const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId } });
-  if (Number(wallet.balance) < amount) {
-    throw new ApiError(400, "Insufficient balance");
-  }
-
-  // Same locked-bonus wagering-progress mechanic as colorGameService.ts.
-  const lockedBonus = Number(wallet.lockedBonus);
-  const walletUpdateData: Record<string, unknown> = { balance: { decrement: amount } };
-  if (lockedBonus > 0) {
-    const newProgress = Number(wallet.wageringProgress) + amount;
-    if (newProgress >= Number(wallet.wageringRequired)) {
-      walletUpdateData.lockedBonus = 0;
-      walletUpdateData.wageringRequired = 0;
-      walletUpdateData.wageringProgress = 0;
-    } else {
-      walletUpdateData.wageringProgress = { increment: amount };
+  const bet = await prisma.$transaction(async (tx) => {
+    // Serialise this player's bets so parallel taps can't pass the
+    // two-bet limit or overdraw the wallet between the checks and writes.
+    await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+    const existingCount = await tx.aviatorBet.count({ where: { roundId: round.id, userId, status: "PENDING" } });
+    if (existingCount >= 2) {
+      throw new ApiError(400, "You already have the maximum of two bets placed on this round.");
     }
-  }
 
-  const [bet] = await prisma.$transaction([
-    prisma.aviatorBet.create({
-      data: { roundId: round.id, userId, amount, autoCashoutAt: autoCashoutAt ?? null },
-    }),
-    prisma.wallet.update({ where: { userId }, data: walletUpdateData }),
-    prisma.transaction.create({
-      data: { userId, type: "GAME_STAKE", amount, status: "COMPLETED" },
-    }),
-  ]);
+    const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId } });
+    const debited = await tx.wallet.updateMany({
+      where: { userId, balance: { gte: amount } },
+      data: { balance: { decrement: amount } },
+    });
+    if (debited.count === 0) throw new ApiError(400, "Insufficient balance");
+
+    // Same locked-bonus wagering-progress mechanic as colorGameService.ts.
+    if (Number(wallet.lockedBonus) > 0) {
+      const newProgress = Number(wallet.wageringProgress) + amount;
+      await tx.wallet.update({
+        where: { userId },
+        data:
+          newProgress >= Number(wallet.wageringRequired)
+            ? { lockedBonus: 0, wageringRequired: 0, wageringProgress: 0 }
+            : { wageringProgress: { increment: amount } },
+      });
+    }
+
+    await tx.transaction.create({ data: { userId, type: "GAME_STAKE", amount, status: "COMPLETED" } });
+    return tx.aviatorBet.create({ data: { roundId: round.id, userId, amount, autoCashoutAt: autoCashoutAt ?? null } });
+  });
 
   return bet;
 }
@@ -279,19 +276,25 @@ export async function cashOutAviatorBet(userId: string, betId: string) {
   if (phase === "BETTING") throw new ApiError(400, "The plane hasn't taken off yet.");
   if (phase === "CRASHED") throw new ApiError(400, "Too late — the plane already crashed.");
 
-  const multiplier = liveMultiplier(bet.round, now);
-  const payout = round2(Number(bet.amount) * multiplier);
+  // A bet with an auto cash-out has already cashed out once the flight
+  // passes that target, so a later manual tap pays the auto target, not
+  // more — otherwise auto 1.01x + manual later is a free option.
+  const live = liveMultiplier(bet.round, now);
+  const auto = bet.autoCashoutAt !== null ? Number(bet.autoCashoutAt) : null;
+  const multiplier = auto !== null && live >= auto ? auto : live;
+  const payout = cappedPayout(Number(bet.amount), multiplier);
 
-  await prisma.$transaction([
-    prisma.aviatorBet.update({
-      where: { id: bet.id },
+  await prisma.$transaction(async (tx) => {
+    // Claimed only while still PENDING: a double tap (or a settle racing
+    // it) can't pay the same bet twice.
+    const claimed = await tx.aviatorBet.updateMany({
+      where: { id: bet.id, status: "PENDING" },
       data: { status: "WON", cashoutMultiplier: multiplier, payout },
-    }),
-    prisma.wallet.update({ where: { userId }, data: { balance: { increment: payout } } }),
-    prisma.transaction.create({
-      data: { userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" },
-    }),
-  ]);
+    });
+    if (claimed.count === 0) throw new ApiError(409, "This bet has already been settled.");
+    await tx.wallet.update({ where: { userId }, data: { balance: { increment: payout } } });
+    await tx.transaction.create({ data: { userId, type: "GAME_PAYOUT", amount: payout, status: "COMPLETED" } });
+  });
 
   return { multiplier, payout };
 }
