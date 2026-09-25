@@ -360,7 +360,7 @@ export default function WinGoScreen() {
   const pageCount = Math.max(1, Math.ceil((historyTab === 'my' ? myBets.length : rows.length) / ROWS_PER_PAGE));
   const pageRows = rows.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE);
   const myRows = myBets.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE);
-  const sheetH = 290 + insets.bottom;
+  const [sheetH, setSheetH] = useState(380);
   const selColor = selection ? keyColor(selection) : G1;
   const chartW = W - pad * 2;
   const chartRowH = 42;
@@ -371,7 +371,7 @@ export default function WinGoScreen() {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={{ paddingBottom: (sheetOpen ? sheetH : 0) + insets.bottom + 24 }} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <LinearGradient colors={[G1, G2, G3]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 4 }]}>
+        <LinearGradient colors={[G1, G2, G3]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 4, height: insets.top + 60 + 130 }]}>
           <View pointerEvents="none" style={[styles.headerArc, { width: W * 1.4, height: W * 1.4, borderRadius: W * 0.7, right: -W * 0.9, top: -W * 0.55 }]} />
           <View style={styles.headerRow}>
             <Pressable onPress={() => navigation.goBack()} hitSlop={10} style={styles.headerBtn}>
@@ -675,7 +675,8 @@ export default function WinGoScreen() {
       {/* Bet sheet, tinted by the selection */}
       <Animated.View
         pointerEvents={sheetOpen ? 'auto' : 'none'}
-        style={[styles.sheet, { height: sheetH, paddingBottom: insets.bottom + 6, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [sheetH + 20, 0] }) }] }]}
+        onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}
+        style={[styles.sheet, { paddingBottom: insets.bottom + 6, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [sheetH + 40, 0] }) }] }]}
       >
         <View style={[styles.sheetHead, { backgroundColor: selColor }]}>
           <Text style={styles.sheetTitle}>Win Go {DURATION_LABEL[duration]}</Text>
@@ -798,7 +799,8 @@ const shadow = { shadowColor: '#0B3D22', shadowOpacity: 0.1, shadowRadius: 10, s
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: PAGE_BG },
-  header: { height: 200, borderBottomRightRadius: 60, overflow: 'hidden' },
+  // Height is set inline: status bar + icon row + the part the wallet card overlaps.
+  header: { borderBottomRightRadius: 60, overflow: 'hidden' },
   headerArc: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.07)' },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 6, height: 48 },
   headerBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
@@ -887,7 +889,7 @@ const styles = StyleSheet.create({
   sheetTitle: { fontFamily: SERIF, color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
   sheetSelPill: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 4 },
   sheetSelText: { fontSize: 14, fontWeight: '800' },
-  sheetBody: { paddingHorizontal: 14, paddingTop: 12, gap: 10, flex: 1 },
+  sheetBody: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, gap: 10 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetLabel: { fontFamily: SERIF, color: INK, fontSize: 15, fontWeight: '800' },
   sheetChoices: { flexDirection: 'row', gap: 6 },

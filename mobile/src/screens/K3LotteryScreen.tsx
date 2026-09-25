@@ -484,7 +484,7 @@ export default function K3LotteryScreen() {
   const pageCount = historyTab === 'my' ? myPages : pages;
   const pageRows = history.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE);
   const myRows = myBets.slice(page * ROWS_PER_PAGE, page * ROWS_PER_PAGE + ROWS_PER_PAGE);
-  const sheetH = 300 + insets.bottom;
+  const [sheetH, setSheetH] = useState(380);
 
   const pill = (label: string, on: boolean, onPress: () => void, tone: 'purple' | 'pink' | 'green' | 'red' | 'gold', width?: number) => (
     <Pressable key={label} onPress={onPress} style={[styles.pill, { width }, on ? [styles.pillOn, { backgroundColor: TONE[tone].on }] : { backgroundColor: TONE[tone].off }]}>
@@ -496,14 +496,14 @@ export default function K3LotteryScreen() {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={{ paddingBottom: (sheetOpen ? sheetH : 0) + insets.bottom + 24 }} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <LinearGradient colors={[G1, G2, G3]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <LinearGradient colors={[G1, G2, G3]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.header, { paddingTop: insets.top + 6, height: insets.top + 58 + 110 }]}>
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
             <View style={[styles.deco, { width: 180, height: 180, borderRadius: 90, right: -50, top: -40 }]} />
             <View style={[styles.deco, { width: 110, height: 110, borderRadius: 55, left: -30, top: 90 }]} />
-            <View style={[styles.decoDie, { right: 34, top: insets.top + 64, transform: [{ rotate: '18deg' }] }]}>
+            <View style={[styles.decoDie, { right: 64, top: insets.top + 14, transform: [{ rotate: '18deg' }] }]}>
               <DieFace value={5} size={34} />
             </View>
-            <View style={[styles.decoDie, { left: 30, top: insets.top + 58, transform: [{ rotate: '-14deg' }] }]}>
+            <View style={[styles.decoDie, { left: 60, top: insets.top + 16, transform: [{ rotate: '-14deg' }] }]}>
               <DieFace value={3} size={26} />
             </View>
           </View>
@@ -885,9 +885,10 @@ export default function K3LotteryScreen() {
       {/* Bet sheet */}
       <Animated.View
         pointerEvents={sheetOpen ? 'auto' : 'none'}
+        onLayout={(e) => setSheetH(e.nativeEvent.layout.height)}
         style={[
           styles.sheet,
-          { height: sheetH, paddingBottom: insets.bottom + 8, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [sheetH + 20, 0] }) }] },
+          { paddingBottom: insets.bottom + 8, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [sheetH + 40, 0] }) }] },
         ]}
       >
         <LinearGradient colors={[G1, G2]} style={styles.sheetHead}>
@@ -1036,7 +1037,8 @@ const shadow = { shadowColor: '#0B3D22', shadowOpacity: 0.12, shadowRadius: 10, 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: PAGE_BG },
-  header: { height: 190, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden' },
+  // Height is set inline: status bar + icon row + the part the wallet card overlaps.
+  header: { borderBottomLeftRadius: 28, borderBottomRightRadius: 28, overflow: 'hidden' },
   deco: { position: 'absolute', backgroundColor: 'rgba(255,255,255,0.07)' },
   decoDie: { position: 'absolute', opacity: 0.3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, height: 44 },
@@ -1132,7 +1134,7 @@ const styles = StyleSheet.create({
   sheetHead: { paddingVertical: 12, alignItems: 'center' },
   sheetTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   sheetSel: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', marginTop: 4, paddingHorizontal: 20 },
-  sheetBody: { paddingHorizontal: 14, paddingTop: 10, gap: 10, flex: 1 },
+  sheetBody: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12, gap: 10 },
   sheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetLabel: { color: INK, fontSize: 14, fontWeight: '800' },
   sheetChoices: { flexDirection: 'row', gap: 6 },
