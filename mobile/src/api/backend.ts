@@ -1036,3 +1036,83 @@ export function cashOutCricketXBet(betId: string) {
 export function fetchCricketXMyBets() {
   return apiFetch<AviatorMyBet[]>('/cricket-x/my-bets');
 }
+
+// ---- Jhandi Munda ------------------------------------------------------------
+
+export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';
+
+export interface JhandiMundaConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  roundSeconds: number;
+  betSeconds: number;
+  resultAtSeconds: number;
+  rtpPercent: number;
+  symbols: JhandiSymbol[];
+  /** Total return per unit staked, by how many dice show the symbol. */
+  paytable: Record<string, number>;
+}
+
+export interface JhandiMundaRoundView {
+  periodNumber: string;
+  startTime: string;
+  betEndTime: string;
+  resultTime: string;
+  endTime: string;
+  serverTime: string;
+  phase: 'BETTING' | 'ROLLING' | 'RESULT';
+  serverSeedHash: string;
+  dice: JhandiSymbol[] | null;
+  counts: Record<JhandiSymbol, number> | null;
+  serverSeed: string | null;
+}
+
+export interface JhandiMundaBet {
+  id: string;
+  area: JhandiSymbol;
+  amount: string;
+  matches: number | null;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+  createdAt: string;
+}
+
+export interface JhandiMundaHistoryEntry {
+  periodNumber: string;
+  dice: JhandiSymbol[];
+  counts: Record<JhandiSymbol, number>;
+  serverSeed: string;
+  serverSeedHash: string;
+}
+
+export function fetchJhandiMundaConfig() {
+  return apiFetch<JhandiMundaConfig>('/jhandi-munda/config');
+}
+
+export function fetchJhandiMundaCurrent() {
+  return apiFetch<JhandiMundaRoundView>('/jhandi-munda/current');
+}
+
+export function fetchJhandiMundaHistory(limit = 100) {
+  return apiFetch<JhandiMundaHistoryEntry[]>(`/jhandi-munda/history?limit=${limit}`);
+}
+
+export function placeJhandiMundaBets(bets: { area: JhandiSymbol; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: JhandiMundaBet[] }>('/jhandi-munda/bet', {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function cancelJhandiMundaBets(betIds?: string[]) {
+  return apiFetch<{ cancelled: string[]; refund: number }>('/jhandi-munda/cancel', {
+    method: 'POST',
+    body: JSON.stringify(betIds ? { betIds } : {}),
+  });
+}
+
+export function fetchJhandiMundaMyRound(periodNumber?: string) {
+  const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
+  return apiFetch<{ periodNumber: string | null; bets: JhandiMundaBet[] }>(`/jhandi-munda/my-round${q}`);
+}

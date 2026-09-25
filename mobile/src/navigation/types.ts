@@ -34,4 +34,5 @@ export type RootStackParamList = {
   AndarBahar: undefined;
   TeenPatti: undefined;
   CricketX: undefined;
+  JhandiMunda: undefined;
 };

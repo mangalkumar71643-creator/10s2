@@ -1,4 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { SymbolIcon } from './JhandiMundaScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -89,6 +90,8 @@ export default function HomeScreen() {
   const teenPattiTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const cricketXTileTop = 5 * GAME_GRID_CELL;
   const cricketXTileLeft = GAME_GRID_LEFT;
+  const jhandiMundaTileTop = 5 * GAME_GRID_CELL;
+  const jhandiMundaTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 6;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -444,6 +447,48 @@ export default function HomeScreen() {
         <MaterialCommunityIcons name="cricket" size={GAME_ICON_SIZE * 0.42} color="#FFFFFF" />
         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2, marginTop: 2 }}>
           CRICKET <Text style={{ color: '#FF4F6D' }}>X</Text>
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('JhandiMunda')}
+        style={{
+          position: 'absolute',
+          top: jhandiMundaTileTop,
+          left: jhandiMundaTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFD66B',
+          backgroundColor: '#5A0A22',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <View style={{ flexDirection: 'row' }}>
+          {(['HEART', 'CROWN', 'FLAG'] as const).map((sym, i) => (
+            <View
+              key={sym}
+              style={{
+                width: GAME_ICON_SIZE * 0.26,
+                height: GAME_ICON_SIZE * 0.26,
+                borderRadius: 6,
+                backgroundColor: '#FFF6E2',
+                marginLeft: i ? -4 : 0,
+                transform: [{ rotate: `${(i - 1) * 12}deg` }, { translateY: i === 1 ? -6 : 0 }],
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#C9972E',
+              }}
+            >
+              <SymbolIcon symbol={sym} size={GAME_ICON_SIZE * 0.18} />
+            </View>
+          ))}
+        </View>
+        <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 1, marginTop: 8 }}>
+          JHANDI <Text style={{ color: '#FFD66B' }}>MUNDA</Text>
         </Text>
       </Pressable>
       </ScrollView>
