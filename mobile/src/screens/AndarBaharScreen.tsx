@@ -1108,7 +1108,7 @@ const styles = StyleSheet.create({
   balanceValue: { color: GOLD, fontSize: 15, fontWeight: '900' },
   miniActions: { flexDirection: 'row', gap: 6 },
   miniBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
-  popPill: { alignItems: 'center', paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(10,2,6,0.8)', borderWidth: 1.5, borderColor: GOLD },
+  popPill: { zIndex: 1000, elevation: 30, alignItems: 'center', paddingVertical: 6, borderRadius: 20, backgroundColor: 'rgba(10,2,6,0.8)', borderWidth: 1.5, borderColor: GOLD },
   popText: { color: GOLD, fontSize: 20, fontWeight: '900', fontStyle: 'italic' },
   stripName: { color: 'rgba(255,255,255,0.92)', fontWeight: '900', letterSpacing: 4, textShadowRadius: 14 },
   jokerLabel: { color: GOLD, fontWeight: '900', letterSpacing: 1.5 },
@@ -1215,11 +1215,13 @@ const styles = StyleSheet.create({
   shardWrap: { position: 'absolute', top: '45%', left: '45%' },
   vsResult: { marginTop: 14, color: GOLD, fontSize: 32, fontWeight: '900', letterSpacing: 2, textShadowColor: '#7A3A00', textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
 
-  winWrap: { position: 'absolute', top: '28%', alignSelf: 'center', alignItems: 'center' },
+  // Above the dealt cards (they carry their own zIndex) and below them on
+  // screen, so the win never hides the cards.
+  winWrap: { position: 'absolute', top: '48%', alignSelf: 'center', alignItems: 'center', zIndex: 1000, elevation: 30 },
   winCard: { alignItems: 'center', paddingHorizontal: 34, paddingVertical: 12, borderRadius: 16, borderWidth: 2, borderColor: '#F5B942' },
   winTitle: { color: '#FFE08A', fontSize: 15, fontWeight: '900', letterSpacing: 3 },
   winAmount: { color: '#FFFFFF', fontSize: 26, fontWeight: '900', marginTop: 2 },
   winClose: { marginTop: 8, width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1C0B02', borderWidth: 2, borderColor: '#F5B942' },
-  toast: { position: 'absolute', alignSelf: 'center', top: '42%', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 1, borderColor: '#B7791F' },
+  toast: { position: 'absolute', alignSelf: 'center', top: '42%', zIndex: 1000, elevation: 30, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.85)', borderWidth: 1, borderColor: '#B7791F' },
   toastText: { color: '#FFE08A', fontSize: 14, fontWeight: '700' },
 });
