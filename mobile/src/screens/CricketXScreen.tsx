@@ -894,7 +894,7 @@ export default function CricketXScreen() {
             );
           })
         )}
-        <Text style={styles.footNote}>Provably fair · house edge {Math.round(config?.houseEdgePercent ?? 10)}% · bet ₹{minStake}–₹{maxStake}</Text>
+        <Text style={styles.footNote}>Provably fair · bet ₹{minStake}–₹{maxStake}</Text>
       </ScrollView>
 
       {toast && (
