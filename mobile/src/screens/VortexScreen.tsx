@@ -330,6 +330,8 @@ export default function VortexScreen() {
   }).current;
   const mountedRef = useRef(true);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const crashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const swirlLoop = useRef<Animated.CompositeAnimation | null>(null);
 
   const wheel = config.wheel;
   const segDeg = 360 / wheel.length;
@@ -345,13 +347,41 @@ export default function VortexScreen() {
   // Wheel angle so segment i sits under the pointer at 12 o'clock.
   const restAngleFor = useCallback((segment: number) => -(segment * segDeg + segDeg / 2), [segDeg]);
 
+  /** Ends the vortex scene at once (new spin / leaving the screen). */
+  const stopCrashScene = useCallback(() => {
+    if (crashTimer.current) clearTimeout(crashTimer.current);
+    crashTimer.current = null;
+    swirlLoop.current?.stop();
+    swirlLoop.current = null;
+    crashAnim.stopAnimation();
+  }, [crashAnim]);
+
+  /** The vortex swallows the rings, spins for 3 s, then fades away and the
+   * board resets for the next round. */
+  const playCrashScene = useCallback(() => {
+    stopCrashScene();
+    setCrashed(true);
+    crashAnim.setValue(0);
+    swirlSpin.setValue(0);
+    swirlLoop.current = Animated.loop(Animated.timing(swirlSpin, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true }));
+    swirlLoop.current.start();
+    Animated.timing(crashAnim, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    crashTimer.current = setTimeout(() => {
+      crashTimer.current = null;
+      Animated.timing(crashAnim, { toValue: 0, duration: 600, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(({ finished }) => {
+        if (!finished) return;
+        swirlLoop.current?.stop();
+        swirlLoop.current = null;
+        if (mountedRef.current) setCrashed(false);
+      });
+    }, 3000);
+  }, [crashAnim, swirlSpin, stopCrashScene]);
+
   useEffect(() => {
     mountedRef.current = true;
     const id = rot.addListener(({ value }) => {
       rotValue.current = value;
     });
-    const swirl = Animated.loop(Animated.timing(swirlSpin, { toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true }));
-    swirl.start();
     fetchVortexConfig()
       .then((c) => mountedRef.current && setConfig(c))
       .catch(() => {});
@@ -366,7 +396,7 @@ export default function VortexScreen() {
     return () => {
       mountedRef.current = false;
       rot.removeListener(id);
-      swirl.stop();
+      stopCrashScene();
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
     // Mount only.
@@ -421,9 +451,7 @@ export default function VortexScreen() {
     (res: VortexSpinResult) => {
       setRound(res.round);
       if (res.outcome === 'CRASH') {
-        setCrashed(true);
-        crashAnim.setValue(0);
-        Animated.timing(crashAnim, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+        playCrashScene();
         loadHistory();
         return;
       }
@@ -439,7 +467,7 @@ export default function VortexScreen() {
         loadHistory();
       }
     },
-    [crashAnim, pulses, popMultiplier, refreshWallet, loadHistory]
+    [playCrashScene, pulses, popMultiplier, refreshWallet, loadHistory]
   );
 
   const spin = async () => {
@@ -453,6 +481,7 @@ export default function VortexScreen() {
     setBusy(true);
     setWin(null);
     if (!continuing) {
+      stopCrashScene();
       setCrashed(false);
       crashAnim.setValue(0);
     }
