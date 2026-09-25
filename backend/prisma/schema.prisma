@@ -234,6 +234,9 @@ model Transaction {
   createdAt           DateTime          @default(now())
 }
 
+// Retired: the sportsbook (Sport / Event / Market / Selection / Bet) had no
+// screen in the app and its endpoints are gone. Kept read-only so past
+// records stay; open bets were refunded by retiredGamesCloseout.ts.
 model Sport {
   id     String  @id @default(uuid())
   name   String  @unique
@@ -279,6 +282,8 @@ model Selection {
 // This is NOT the same as accredited RNG certification, which a real
 // casino licence still requires; that is a compliance step outside this
 // codebase.
+// Retired: the old instant Dice / Coin Flip games (no screen in the app).
+// Kept read-only so past plays stay on record.
 model GameRound {
   id             String   @id @default(uuid())
   userId         String
@@ -359,7 +364,7 @@ model Bet {
 // is revealed at settlement.
 // Retired: the original Win Go. Kept (read-only) so past rounds and bets
 // stay on record; nothing places or settles bets here any more except the
-// one-time close-out in legacyColorGameCloseout.ts. The live game is WinGo*.
+// one-time close-out in retiredGamesCloseout.ts. The live game is WinGo*.
 model ColorGameRound {
   id              String         @id @default(uuid())
   durationSeconds Int

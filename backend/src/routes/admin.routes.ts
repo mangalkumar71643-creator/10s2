@@ -3,7 +3,6 @@ import { z } from "zod";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
-import { settleMarket } from "../services/betService";
 import { paymentProvider } from "../services/paymentService";
 import * as winGoService from "../services/winGoService";
 import * as aviatorService from "../services/aviatorService";
@@ -15,79 +14,7 @@ router.use(requireAuth, requireAdmin);
 
 const userSummarySelect = { firstName: true, lastName: true, uid: true, email: true, phone: true } as const;
 
-// --- Sports / events / markets / odds management ---
-
-const sportSchema = z.object({ name: z.string().min(1), slug: z.string().min(1) });
-router.post(
-  "/sports",
-  asyncHandler(async (req, res) => {
-    const input = sportSchema.parse(req.body);
-    const sport = await prisma.sport.create({ data: input });
-    res.status(201).json(sport);
-  })
-);
-
-const eventSchema = z.object({
-  sportId: z.string().uuid(),
-  name: z.string().min(1),
-  startTime: z.string(),
-});
-router.post(
-  "/events",
-  asyncHandler(async (req, res) => {
-    const input = eventSchema.parse(req.body);
-    const event = await prisma.event.create({
-      data: { ...input, startTime: new Date(input.startTime) },
-    });
-    res.status(201).json(event);
-  })
-);
-
-const marketSchema = z.object({
-  eventId: z.string().uuid(),
-  name: z.string().min(1),
-  selections: z.array(z.object({ name: z.string().min(1), odds: z.number().positive() })).min(2),
-});
-router.post(
-  "/markets",
-  asyncHandler(async (req, res) => {
-    const input = marketSchema.parse(req.body);
-    const market = await prisma.market.create({
-      data: {
-        eventId: input.eventId,
-        name: input.name,
-        selections: { create: input.selections },
-      },
-      include: { selections: true },
-    });
-    res.status(201).json(market);
-  })
-);
-
-const oddsUpdateSchema = z.object({ odds: z.number().positive() });
-router.patch(
-  "/selections/:selectionId/odds",
-  asyncHandler(async (req, res) => {
-    const { odds } = oddsUpdateSchema.parse(req.body);
-    const selection = await prisma.selection.update({
-      where: { id: req.params.selectionId },
-      data: { odds },
-    });
-    res.json(selection);
-  })
-);
-
-const settleSchema = z.object({ winningSelectionId: z.string().uuid() });
-router.post(
-  "/markets/:marketId/settle",
-  asyncHandler(async (req, res) => {
-    const { winningSelectionId } = settleSchema.parse(req.body);
-    const market = await settleMarket(req.params.marketId, winningSelectionId);
-    res.json(market);
-  })
-);
-
-// --- Users / KYC / bets / reports ---
+// --- Users / KYC / reports ---
 
 router.get(
   "/users",
@@ -164,18 +91,6 @@ router.patch(
       select: { id: true, isBanned: true },
     });
     res.json(user);
-  })
-);
-
-router.get(
-  "/bets",
-  asyncHandler(async (_req, res) => {
-    const bets = await prisma.bet.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 200,
-      include: { user: { select: { email: true } }, selection: true },
-    });
-    res.json(bets);
   })
 );
 
@@ -386,7 +301,7 @@ router.patch(
   })
 );
 
-// --- Live game monitoring (Win Go / Aviator / Dice / Coin Flip) ---
+// --- Live game monitoring (Win Go / Aviator / ...) ---
 // Everything here is read-only — lets an admin watch a round unfold, check
 // past rounds against their revealed seed, and audit who's actually been
 // betting, without granting any special foresight the game's fairness
@@ -460,22 +375,6 @@ router.get(
       },
     });
     res.json(bets);
-  })
-);
-
-const instantGameTypeQuery = z.enum(["dice", "coinflip"]);
-router.get(
-  "/instant-games/rounds",
-  asyncHandler(async (req, res) => {
-    const gameType = instantGameTypeQuery.parse(req.query.gameType);
-    const limit = Math.min(Number(req.query.limit) || 50, 200);
-    const rounds = await prisma.gameRound.findMany({
-      where: { gameType },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-      include: { user: { select: userSummarySelect } },
-    });
-    res.json(rounds);
   })
 );
 

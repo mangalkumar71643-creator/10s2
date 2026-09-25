@@ -37,7 +37,7 @@ export const env = {
     // First-deposit-only bonus: min(amount * percent, cap). Credited
     // straight into balance (so it's immediately playable) but locked
     // from withdrawal until wageringMultiplier x the bonus is staked —
-    // see paymentService.ts / gameEngineService.ts.
+    // see paymentService.ts and each game service (e.g. vortexService.ts).
     firstDepositBonusPercent: Number(process.env.FIRST_DEPOSIT_BONUS_PERCENT ?? 0.15),
     firstDepositBonusCap: Number(process.env.FIRST_DEPOSIT_BONUS_CAP ?? 500),
     wageringMultiplier: Number(process.env.WAGERING_MULTIPLIER ?? 3),

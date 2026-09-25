@@ -5,8 +5,6 @@ import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth.routes";
 import kycRoutes from "./routes/kyc.routes";
 import walletRoutes from "./routes/wallet.routes";
-import sportsRoutes from "./routes/sports.routes";
-import betsRoutes from "./routes/bets.routes";
 import gamesRoutes from "./routes/games.routes";
 import responsibleGamblingRoutes from "./routes/responsibleGambling.routes";
 import adminRoutes from "./routes/admin.routes";
@@ -25,7 +23,7 @@ import jhandiMundaRoutes from "./routes/jhandiMunda.routes";
 import rouletteRoutes from "./routes/roulette.routes";
 import k3Routes from "./routes/k3.routes";
 import winGoRoutes from "./routes/winGo.routes";
-import { closeOutLegacyColorGame } from "./services/legacyColorGameCloseout";
+import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
 
@@ -37,8 +35,6 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/auth", authRoutes);
 app.use("/kyc", kycRoutes);
 app.use("/wallet", walletRoutes);
-app.use("/sports", sportsRoutes);
-app.use("/bets", betsRoutes);
 app.use("/games", gamesRoutes);
 app.use("/responsible-gambling", responsibleGamblingRoutes);
 app.use("/admin", adminRoutes);
@@ -60,6 +56,6 @@ app.use("/wingo", winGoRoutes);
 
 app.use(errorHandler);
 
-// The original Win Go is retired: settle / refund anything still open on it.
-// Idempotent, so running on every cold start is harmless.
-closeOutLegacyColorGame().catch((err) => console.error("Legacy Win Go close-out failed", err));
+// Retired games (the original Win Go, the sportsbook): settle / refund
+// anything still open on them. Idempotent, so every cold start is harmless.
+closeOutRetiredGames().catch((err) => console.error("Retired games close-out failed", err));

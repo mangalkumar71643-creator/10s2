@@ -406,47 +406,6 @@
         </div>
       </div>
 
-      <div class="panel" id="panel-game-dice">
-        <h1 class="page-title">Dice</h1>
-        <div class="page-sub">Recent plays across every player.</div>
-        <div class="card">
-          <div class="table-scroll" id="diceRounds"></div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-game-coinflip">
-        <h1 class="page-title">Coin Flip</h1>
-        <div class="page-sub">Recent plays across every player.</div>
-        <div class="card">
-          <div class="table-scroll" id="coinflipRounds"></div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-game-sportsbook">
-        <h1 class="page-title">Sportsbook</h1>
-        <div class="page-sub">Manage sportsbook events, markets and odds.</div>
-        <div class="card">
-          <h2 style="margin-bottom:12px;">Create Sport</h2>
-          <div class="form-row">
-            <input id="sportName" placeholder="Name (e.g. Cricket)" />
-            <input id="sportSlug" placeholder="Slug (e.g. cricket)" />
-            <button class="btn" id="createSportBtn" style="flex:0 0 auto;">Create</button>
-          </div>
-          <hr class="divider" />
-          <h2 style="margin-bottom:12px;">Events</h2>
-          <div class="form-row">
-            <select id="sportSelect"></select>
-            <button class="btn secondary" id="refreshSportsBtn" style="flex:0 0 auto;">Refresh sports</button>
-          </div>
-          <div class="form-row">
-            <input id="eventName" placeholder="Event name (e.g. Team A vs Team B)" />
-            <input id="eventStart" type="datetime-local" />
-            <button class="btn" id="createEventBtn" style="flex:0 0 auto;">Create</button>
-          </div>
-          <div id="eventsList"></div>
-        </div>
-      </div>
-
       <div class="panel" id="panel-support">
         <h1 class="page-title">Support</h1>
         <div class="page-sub">Live chat with players who've escalated a ticket.</div>
@@ -626,9 +585,6 @@
     { id: 'games', label: 'Games', icon: 'games', children: [
         { id: 'game-colorpredict', label: 'Win Go' },
         { id: 'game-aviator', label: 'Aviator' },
-        { id: 'game-dice', label: 'Dice' },
-        { id: 'game-coinflip', label: 'Coin Flip' },
-        { id: 'game-sportsbook', label: 'Sportsbook' },
       ] },
     { id: 'support', label: 'Support', icon: 'support' },
     { id: 'reports', label: 'Reports', icon: 'reports' },
@@ -677,9 +633,6 @@
     transactions: loadWithdrawals,
     'game-colorpredict': function () { loadColorPredictPanel(); activeGamePollInterval = setInterval(loadColorPredictPanel, 4000); },
     'game-aviator': function () { loadAviatorPanel(); activeGamePollInterval = setInterval(loadAviatorPanel, 2000); },
-    'game-dice': function () { loadInstantGameRounds('dice', 'diceRounds'); },
-    'game-coinflip': function () { loadInstantGameRounds('coinflip', 'coinflipRounds'); },
-    'game-sportsbook': function () { loadSports(); },
     support: loadTickets,
     reports: loadReports,
     settings: loadSettings,
@@ -1012,7 +965,7 @@
     return escapeHtml(name) + (u.uid ? ' <span class="item-meta">(UID ' + u.uid + ')</span>' : '');
   }
 
-  // --- Win Go (Color Predict) ---
+  // --- Win Go ---
   // Counts how many bets each player has in the given list — more than
   // one per round is normal (a player can bet color + size + number all
   // at once), so this is shown as a neutral count, not an accusation; the
@@ -1023,15 +976,21 @@
     return counts;
   }
 
+  // "NUM:7" -> "Number 7", "GREEN" -> "Green".
+  function winGoBetLabel(area) {
+    if (area.indexOf('NUM:') === 0) return 'Number ' + area.slice(4);
+    return area.charAt(0) + area.slice(1).toLowerCase();
+  }
+
   function loadColorPredictPanel() {
     var duration = Number(document.getElementById('cpDuration').value);
     Promise.all([
-      api('/admin/color-game/live?duration=' + duration),
-      api('/admin/color-game/bets?duration=' + duration + '&limit=100'),
+      api('/admin/wingo/live?duration=' + duration),
+      api('/admin/wingo/bets?duration=' + duration + '&limit=100'),
     ]).then(function (results) {
       var v = results[0], allBets = results[1];
       document.getElementById('cpLive').innerHTML =
-        '<div class="live-box">Period <b>' + v.periodNumber + '</b> &nbsp;·&nbsp; Time left: <b>' + v.timeRemainingSeconds + 's</b> &nbsp;·&nbsp; ' +
+        '<div class="live-box">Period <b>' + v.periodNumber + '</b> &nbsp;·&nbsp; Time left: <b>' + Math.max(0, Math.round((new Date(v.endTime) - new Date(v.serverTime)) / 1000)) + 's</b> &nbsp;·&nbsp; ' +
         '<span class="pill ' + (v.locked ? 'banned' : 'active') + '">' + (v.locked ? 'Betting locked' : 'Betting open') + '</span>' +
         '<br/>Committed hash (fixed before the round started): <span class="seed-hash">' + v.serverSeedHash + '</span></div>';
 
@@ -1040,7 +999,7 @@
       document.getElementById('cpActiveCount').textContent = Object.keys(activeCounts).length;
       var activeRows = activeBets.map(function (b) {
         var badge = activeCounts[b.userId] > 1 ? ' <span class="item-meta">(' + activeCounts[b.userId] + ' bets this round)</span>' : '';
-        return '<tr><td>' + playerCellHtml(b.user) + badge + '</td><td>' + b.betType + ': ' + escapeHtml(b.betValue) + '</td>' +
+        return '<tr><td>' + playerCellHtml(b.user) + badge + '</td><td>' + escapeHtml(winGoBetLabel(b.area)) + '</td>' +
           '<td>' + fmtMoney(b.amount) + '</td><td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
       }).join('');
       document.getElementById('cpActiveBets').innerHTML = activeBets.length
@@ -1048,20 +1007,20 @@
         : '<div class="empty">No one has bet in this round yet.</div>';
 
       var rows = allBets.slice(0, 40).map(function (b) {
-        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + b.betType + ': ' + escapeHtml(b.betValue) + '</td>' +
-          '<td>' + fmtMoney(b.amount) + '</td><td>' + b.round.periodNumber + '</td>' +
+        return '<tr><td>' + playerCellHtml(b.user) + '</td><td>' + escapeHtml(winGoBetLabel(b.area)) + '</td>' +
+          '<td>' + fmtMoney(b.amount) + '</td><td>' + b.round.periodNumber + '</td><td>' + fmtMoney(b.payout) + '</td>' +
           '<td><span class="pill ' + (b.status === 'WON' ? 'approved' : b.status === 'LOST' ? 'rejected' : 'pending') + '">' + b.status + '</span></td>' +
           '<td>' + new Date(b.createdAt).toLocaleTimeString() + '</td></tr>';
       }).join('');
       document.getElementById('cpBets').innerHTML = allBets.length
-        ? '<table><thead><tr><th>Player</th><th>Bet</th><th>Amount</th><th>Period</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        ? '<table><thead><tr><th>Player</th><th>Bet</th><th>Amount</th><th>Period</th><th>Payout</th><th>Status</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
         : '<div class="empty">No bets yet.</div>';
     }).catch(function (err) { if (err.authError) doLogout(); });
 
-    api('/admin/color-game/rounds?duration=' + duration + '&limit=15').then(function (rounds) {
+    api('/admin/wingo/rounds?duration=' + duration + '&limit=15').then(function (rounds) {
       var rows = rounds.map(function (r) {
         return '<tr><td>' + r.periodNumber + '</td>' +
-          '<td>' + (r.resultNumber != null ? r.resultNumber + ' · ' + r.resultSize : '—') + '</td>' +
+          '<td>' + r.number + ' · ' + r.size + ' · ' + r.colors.join('/') + '</td>' +
           '<td>' + seedCellHtml(r.serverSeed, r.serverSeedHash) + '</td></tr>';
       }).join('');
       var el = document.getElementById('cpHistory');
@@ -1122,191 +1081,6 @@
       el.innerHTML = rounds.length ? '<table><thead><tr><th>Period</th><th>Crashed at</th><th>Server seed (verify)</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<div class="empty">No settled rounds yet.</div>';
       wireVerifyButtons(el);
     }).catch(function (err) { if (err.authError) doLogout(); });
-  }
-
-  // --- Dice / Coin Flip (instant, per-play games) ---
-  function loadInstantGameRounds(gameType, containerId) {
-    api('/admin/instant-games/rounds?gameType=' + gameType + '&limit=40').then(function (rounds) {
-      var rows = rounds.map(function (r) {
-        return '<tr><td>' + playerCellHtml(r.user) + '</td><td>' + fmtMoney(r.stake) + '</td>' +
-          '<td>' + (r.target != null ? 'Under ' + r.target : '—') + '</td>' +
-          '<td>' + Number(r.multiplier).toFixed(2) + 'x</td><td>' + fmtMoney(r.payout) + '</td>' +
-          '<td><span class="pill ' + (r.won ? 'approved' : 'rejected') + '">' + (r.won ? 'Won' : 'Lost') + '</span></td>' +
-          '<td>' + new Date(r.createdAt).toLocaleString() + '</td></tr>';
-      }).join('');
-      document.getElementById(containerId).innerHTML = rounds.length
-        ? '<table><thead><tr><th>Player</th><th>Stake</th><th>Target</th><th>Multiplier</th><th>Payout</th><th>Result</th><th>Time</th></tr></thead><tbody>' + rows + '</tbody></table>'
-        : '<div class="empty">No plays yet.</div>';
-    }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
-  }
-
-  // ---------- Games (sports / events / markets) ----------
-  var sportsCache = [];
-
-  function loadSports() {
-    fetch(API + '/sports').then(function (r) { return r.json(); }).then(function (sports) {
-      sportsCache = sports;
-      var select = document.getElementById('sportSelect');
-      var prev = select.value;
-      select.innerHTML = sports.map(function (s) { return '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>'; }).join('');
-      if (prev && sports.some(function (s) { return s.id === prev; })) select.value = prev;
-      if (select.value) loadEvents(select.value);
-      else document.getElementById('eventsList').innerHTML = '<div class="empty">Create a sport first.</div>';
-    });
-  }
-
-  document.getElementById('createSportBtn').addEventListener('click', function () {
-    var name = document.getElementById('sportName').value.trim();
-    var slug = document.getElementById('sportSlug').value.trim();
-    if (!name || !slug) { alert('Enter a name and slug.'); return; }
-    api('/admin/sports', { method: 'POST', body: JSON.stringify({ name: name, slug: slug }) })
-      .then(function () {
-        document.getElementById('sportName').value = '';
-        document.getElementById('sportSlug').value = '';
-        loadSports();
-      })
-      .catch(function (err) { alert(err.message); });
-  });
-
-  document.getElementById('refreshSportsBtn').addEventListener('click', loadSports);
-  document.getElementById('sportSelect').addEventListener('change', function () { loadEvents(this.value); });
-
-  document.getElementById('createEventBtn').addEventListener('click', function () {
-    var sportId = document.getElementById('sportSelect').value;
-    var name = document.getElementById('eventName').value.trim();
-    var start = document.getElementById('eventStart').value;
-    if (!sportId) { alert('Create/select a sport first.'); return; }
-    if (!name || !start) { alert('Enter an event name and start time.'); return; }
-    api('/admin/events', { method: 'POST', body: JSON.stringify({ sportId: sportId, name: name, startTime: new Date(start).toISOString() }) })
-      .then(function () {
-        document.getElementById('eventName').value = '';
-        document.getElementById('eventStart').value = '';
-        loadEvents(sportId);
-      })
-      .catch(function (err) { alert(err.message); });
-  });
-
-  function selectionRowHtml(sel, marketOpen) {
-    var oddsInput = marketOpen
-      ? '<input type="number" step="0.01" value="' + sel.odds + '" data-odds-for="' + sel.id + '" style="width:70px;display:inline-block;" />'
-      : sel.odds;
-    var winnerTag = sel.isWinner === true ? ' 🏆' : '';
-    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:13px;">' +
-      '<span style="flex:1;">' + escapeHtml(sel.name) + winnerTag + '</span>' + oddsInput +
-      (marketOpen ? '<button class="icon-btn edit" data-save-odds="' + sel.id + '">Save</button>' : '') +
-    '</div>';
-  }
-
-  function marketHtml(market) {
-    var open = market.status === 'OPEN';
-    var selectionOptions = market.selections.map(function (s) { return '<option value="' + s.id + '">' + escapeHtml(s.name) + '</option>'; }).join('');
-    return (
-      '<div class="item">' +
-        '<div class="item-top"><div class="item-title">' + escapeHtml(market.name) + '</div><span class="pill ' + (open ? 'pending' : 'approved') + '">' + market.status + '</span></div>' +
-        '<div style="margin-top:10px;">' + market.selections.map(function (s) { return selectionRowHtml(s, open); }).join('') + '</div>' +
-        (open ? (
-          '<div class="form-row" style="margin-top:10px;">' +
-            '<select data-winner-select="' + market.id + '">' + selectionOptions + '</select>' +
-            '<button class="icon-btn ban" data-settle="' + market.id + '" style="flex:0 0 auto;">Settle (pay winners)</button>' +
-          '</div>'
-        ) : '') +
-      '</div>'
-    );
-  }
-
-  var selectionsBufferByEvent = {};
-  function renderSelectionsBuffer(eventId) {
-    var buffer = selectionsBufferByEvent[eventId] || [];
-    var container = document.getElementById('newMarketSelections-' + eventId);
-    if (!container) return;
-    container.innerHTML = buffer.map(function (_, i) {
-      return '<div class="selection-row">' +
-        '<input placeholder="Selection name" data-sel-name="' + eventId + ':' + i + '" value="' + escapeHtml(buffer[i].name) + '" />' +
-        '<input placeholder="Odds" type="number" step="0.01" data-sel-odds="' + eventId + ':' + i + '" value="' + buffer[i].odds + '" style="max-width:90px;" />' +
-        '<button class="icon-btn ban" data-remove-sel="' + eventId + ':' + i + '">✕</button>' +
-      '</div>';
-    }).join('');
-    container.querySelectorAll('[data-sel-name]').forEach(function (el) {
-      el.addEventListener('input', function () {
-        var parts = el.getAttribute('data-sel-name').split(':');
-        selectionsBufferByEvent[parts[0]][+parts[1]].name = el.value;
-      });
-    });
-    container.querySelectorAll('[data-sel-odds]').forEach(function (el) {
-      el.addEventListener('input', function () {
-        var parts = el.getAttribute('data-sel-odds').split(':');
-        selectionsBufferByEvent[parts[0]][+parts[1]].odds = el.value;
-      });
-    });
-    container.querySelectorAll('[data-remove-sel]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var parts = el.getAttribute('data-remove-sel').split(':');
-        selectionsBufferByEvent[parts[0]].splice(+parts[1], 1);
-        renderSelectionsBuffer(parts[0]);
-      });
-    });
-  }
-
-  function eventHtml(event) {
-    return '<div class="item">' +
-      '<div class="item-title">' + escapeHtml(event.name) + '</div>' +
-      '<div class="item-meta">' + new Date(event.startTime).toLocaleString() + ' · ' + event.status + '</div>' +
-      '<div style="margin-top:10px;">' + event.markets.map(marketHtml).join('') + '</div>' +
-      '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">' +
-        '<div class="item-meta" style="margin-bottom:6px;">Add market</div>' +
-        '<input id="newMarketName-' + event.id + '" placeholder="Market name (e.g. Match Winner)" style="margin-bottom:8px;" />' +
-        '<div id="newMarketSelections-' + event.id + '"></div>' +
-        '<div class="form-row" style="margin-top:6px;">' +
-          '<button class="icon-btn edit" data-add-sel-row="' + event.id + '" style="flex:0 0 auto;">+ Add selection</button>' +
-          '<button class="icon-btn view" data-create-market="' + event.id + '" style="flex:0 0 auto;">Create market</button>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }
-
-  function loadEvents(sportId) {
-    fetch(API + '/sports/' + sportId + '/events').then(function (r) { return r.json(); }).then(function (events) {
-      document.getElementById('eventsList').innerHTML = events.length
-        ? events.map(eventHtml).join('')
-        : '<div class="empty">No events yet for this sport.</div>';
-
-      document.querySelectorAll('[data-save-odds]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var selId = btn.getAttribute('data-save-odds');
-          var input = document.querySelector('[data-odds-for="' + selId + '"]');
-          api('/admin/selections/' + selId + '/odds', { method: 'PATCH', body: JSON.stringify({ odds: Number(input.value) }) })
-            .then(function () { loadEvents(sportId); }).catch(function (err) { alert(err.message); });
-        });
-      });
-      document.querySelectorAll('[data-settle]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var marketId = btn.getAttribute('data-settle');
-          var winnerSelect = document.querySelector('[data-winner-select="' + marketId + '"]');
-          if (!confirm('Settle this market? Winners will be paid out immediately and this cannot be undone.')) return;
-          api('/admin/markets/' + marketId + '/settle', { method: 'POST', body: JSON.stringify({ winningSelectionId: winnerSelect.value }) })
-            .then(function () { loadEvents(sportId); }).catch(function (err) { alert(err.message); });
-        });
-      });
-      document.querySelectorAll('[data-add-sel-row]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var eventId = btn.getAttribute('data-add-sel-row');
-          if (!selectionsBufferByEvent[eventId]) selectionsBufferByEvent[eventId] = [];
-          selectionsBufferByEvent[eventId].push({ name: '', odds: '2.0' });
-          renderSelectionsBuffer(eventId);
-        });
-      });
-      document.querySelectorAll('[data-create-market]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var eventId = btn.getAttribute('data-create-market');
-          var nameInput = document.getElementById('newMarketName-' + eventId);
-          var buffer = selectionsBufferByEvent[eventId] || [];
-          var selections = buffer.filter(function (s) { return s.name.trim(); }).map(function (s) { return { name: s.name.trim(), odds: Number(s.odds) }; });
-          if (!nameInput.value.trim() || selections.length < 2) { alert('Enter a market name and at least 2 selections.'); return; }
-          api('/admin/markets', { method: 'POST', body: JSON.stringify({ eventId: eventId, name: nameInput.value.trim(), selections: selections }) })
-            .then(function () { delete selectionsBufferByEvent[eventId]; loadEvents(sportId); }).catch(function (err) { alert(err.message); });
-        });
-      });
-    });
   }
 
   // ---------- Support ----------

@@ -2,6 +2,18 @@ import { prisma } from "../db/prismaClient";
 import { fairRandomFloat } from "../utils/rng";
 
 /**
+ * Close-out for games that have been retired (their endpoints are gone, so
+ * nothing else would ever settle a bet still open on them). Idempotent:
+ * every bet is claimed with a guarded PENDING update, so running this on
+ * every cold start can never pay anything twice.
+ */
+export async function closeOutRetiredGames() {
+  const colorRounds = await closeOutLegacyColorGame();
+  const sportsBets = await refundOpenSportsbookBets();
+  return { colorRounds, sportsBets };
+}
+
+/**
  * The original Win Go ("color game") has been retired in favour of the
  * rebuilt /wingo game. Its endpoints are gone, so nothing would ever settle
  * a bet still open on it. This closes those bets out fairly, once:
@@ -31,7 +43,7 @@ function oldPayoutMultiplier(betType: string, betValue: string, n: number): numb
   return 0;
 }
 
-export async function closeOutLegacyColorGame() {
+async function closeOutLegacyColorGame() {
   const now = new Date();
   const rounds = await prisma.colorGameRound.findMany({ where: { settled: false } });
   for (const round of rounds) {
@@ -65,4 +77,22 @@ export async function closeOutLegacyColorGame() {
     });
   }
   return rounds.length;
+}
+
+/**
+ * The sportsbook never had a screen in the app and has been retired. A bet
+ * still open on it can no longer be decided, so its stake is refunded.
+ */
+async function refundOpenSportsbookBets() {
+  const open = await prisma.bet.findMany({ where: { status: "PENDING" } });
+  for (const bet of open) {
+    const stake = Number(bet.stake);
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.bet.updateMany({ where: { id: bet.id, status: "PENDING" }, data: { status: "VOID", settledAt: new Date() } });
+      if (claimed.count === 0) return;
+      await tx.wallet.update({ where: { userId: bet.userId }, data: { balance: { increment: stake } } });
+      await tx.transaction.create({ data: { userId: bet.userId, type: "BET_REFUND", amount: stake, status: "COMPLETED", betId: bet.id } });
+    });
+  }
+  return open.length;
 }

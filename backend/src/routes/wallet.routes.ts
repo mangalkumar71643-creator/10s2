@@ -101,9 +101,9 @@ router.post(
 
     // First-deposit-only bonus: min(amount * percent, cap), credited into
     // balance (immediately playable) and locked from withdrawal until
-    // wageringMultiplier x the bonus has been staked in games — see
-    // gameEngineService.ts for where wageringProgress advances and the
-    // lock is released.
+    // wageringMultiplier x the bonus has been staked in games — each game
+    // service (e.g. vortexService.ts, andarBaharService.ts) advances
+    // wageringProgress and releases the lock.
     const bonus = user.firstDepositBonusClaimed
       ? 0
       : Math.round(Math.min(amount * env.wallet.firstDepositBonusPercent, env.wallet.firstDepositBonusCap) * 100) / 100;

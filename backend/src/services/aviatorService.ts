@@ -246,7 +246,7 @@ export async function placeAviatorBet(userId: string, amount: number, autoCashou
     });
     if (debited.count === 0) throw new ApiError(400, "Insufficient balance");
 
-    // Same locked-bonus wagering-progress mechanic as gameEngineService.ts.
+    // Same locked-bonus wagering-progress mechanic as vortexService.ts.
     if (Number(wallet.lockedBonus) > 0) {
       const newProgress = Number(wallet.wageringProgress) + amount;
       await tx.wallet.update({
