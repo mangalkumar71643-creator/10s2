@@ -37,4 +37,5 @@ export type RootStackParamList = {
   JhandiMunda: undefined;
   Roulette: undefined;
   K3Lottery: undefined;
+  WinGo: undefined;
 };

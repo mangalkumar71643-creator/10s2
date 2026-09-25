@@ -17,6 +17,7 @@ import CricketXScreen from '../screens/CricketXScreen';
 import JhandiMundaScreen from '../screens/JhandiMundaScreen';
 import RouletteScreen from '../screens/RouletteScreen';
 import K3LotteryScreen from '../screens/K3LotteryScreen';
+import WinGoScreen from '../screens/WinGoScreen';
 import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
@@ -83,6 +84,7 @@ function MainNavigator() {
       <Stack.Screen name="JhandiMunda" component={JhandiMundaScreen} />
       <Stack.Screen name="Roulette" component={RouletteScreen} />
       <Stack.Screen name="K3Lottery" component={K3LotteryScreen} />
+      <Stack.Screen name="WinGo" component={WinGoScreen} />
     </Stack.Navigator>
   );
 }

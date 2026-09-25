@@ -1269,3 +1269,76 @@ export function placeK3Bets(duration: K3Duration, bets: { area: string; amount: 
 export function fetchK3MyBets(limit = 50) {
   return apiFetch<K3MyBet[]>(`/k3/my-bets?limit=${limit}`);
 }
+
+// ---- Win Go (rebuilt, /wingo) --------------------------------------------------
+
+export type WinGoDuration = 30 | 60 | 180 | 300 | 600;
+
+export interface WinGoConfig {
+  durations: WinGoDuration[];
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  lockSeconds: number;
+  rtpPercent: number;
+  payouts: { number: number; size: number; violet: number; color: number; colorMixed: number };
+}
+
+export interface WinGoRoundView {
+  periodNumber: string;
+  durationSeconds: WinGoDuration;
+  startTime: string;
+  endTime: string;
+  serverTime: string;
+  serverSeedHash: string;
+  locked: boolean;
+}
+
+export interface WinGoResult {
+  number: number;
+  size: 'BIG' | 'SMALL';
+  colors: ('GREEN' | 'RED' | 'VIOLET')[];
+}
+
+export interface WinGoHistoryEntry extends WinGoResult {
+  periodNumber: string;
+  serverSeed: string;
+  serverSeedHash: string;
+}
+
+export interface WinGoMyBet {
+  id: string;
+  /** NUM:0-9, GREEN, RED, VIOLET, BIG or SMALL. */
+  area: string;
+  amount: string;
+  paidMultiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+  createdAt: string;
+  periodNumber: string;
+  durationSeconds: WinGoDuration;
+  result: WinGoResult | null;
+}
+
+export function fetchWinGoConfig() {
+  return apiFetch<WinGoConfig>('/wingo/config');
+}
+
+export function fetchWinGoCurrent(duration: WinGoDuration) {
+  return apiFetch<WinGoRoundView>(`/wingo/${duration}/current`);
+}
+
+export function fetchWinGoHistory(duration: WinGoDuration, limit = 100) {
+  return apiFetch<WinGoHistoryEntry[]>(`/wingo/${duration}/history?limit=${limit}`);
+}
+
+export function placeWinGoBets(duration: WinGoDuration, bets: { area: string; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: WinGoMyBet[] }>(`/wingo/${duration}/bet`, {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function fetchWinGoMyBets(limit = 50) {
+  return apiFetch<WinGoMyBet[]>(`/wingo/my-bets?limit=${limit}`);
+}

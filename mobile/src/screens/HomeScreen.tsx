@@ -203,7 +203,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
       <Pressable
-        onPress={() => (navigation as any).navigate('ColorPredict')}
+        onPress={() => (navigation as any).navigate('WinGo')}
         style={{
           position: 'absolute',
           top: winGoTileTop,
