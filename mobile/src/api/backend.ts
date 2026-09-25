@@ -923,3 +923,82 @@ export function fetchAndarBaharMyRound(periodNumber?: string) {
   const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
   return apiFetch<{ periodNumber: string | null; bets: AndarBaharBet[] }>(`/andar-bahar/my-round${q}`);
 }
+
+export type TeenPattiArea = 'PLAYER_A' | 'PLAYER_B' | 'TIE';
+
+export interface TeenPattiConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  roundSeconds: number;
+  betSeconds: number;
+  resultAtSeconds: number;
+  rtpPercent: number;
+  multipliers: Record<TeenPattiArea, number>;
+}
+
+export interface TeenPattiRoundView {
+  periodNumber: string;
+  startTime: string;
+  betEndTime: string;
+  resultTime: string;
+  endTime: string;
+  serverTime: string;
+  phase: 'BETTING' | 'DEALING' | 'RESULT';
+  serverSeedHash: string;
+  playerA: PlayingCard[] | null;
+  playerB: PlayingCard[] | null;
+  handA: string | null;
+  handB: string | null;
+  winner: 'PLAYER_A' | 'PLAYER_B' | 'TIE' | null;
+  serverSeed: string | null;
+}
+
+export interface TeenPattiBet {
+  id: string;
+  area: TeenPattiArea;
+  amount: string;
+  multiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+}
+
+export interface TeenPattiHistoryEntry {
+  periodNumber: string;
+  playerA: PlayingCard[];
+  playerB: PlayingCard[];
+  handA: string;
+  handB: string;
+  winner: 'PLAYER_A' | 'PLAYER_B' | 'TIE';
+}
+
+export function fetchTeenPattiConfig() {
+  return apiFetch<TeenPattiConfig>('/teen-patti/config');
+}
+
+export function fetchTeenPattiCurrent() {
+  return apiFetch<TeenPattiRoundView>('/teen-patti/current');
+}
+
+export function fetchTeenPattiHistory(limit = 100) {
+  return apiFetch<TeenPattiHistoryEntry[]>(`/teen-patti/history?limit=${limit}`);
+}
+
+export function placeTeenPattiBets(bets: { area: TeenPattiArea; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: TeenPattiBet[] }>('/teen-patti/bet', {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function cancelTeenPattiBets(betIds?: string[]) {
+  return apiFetch<{ cancelled: string[]; refund: number }>('/teen-patti/cancel', {
+    method: 'POST',
+    body: JSON.stringify(betIds ? { betIds } : {}),
+  });
+}
+
+export function fetchTeenPattiMyRound(periodNumber?: string) {
+  const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
+  return apiFetch<{ periodNumber: string | null; bets: TeenPattiBet[] }>(`/teen-patti/my-round${q}`);
+}

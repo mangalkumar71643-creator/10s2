@@ -85,6 +85,8 @@ export default function HomeScreen() {
   const vortexTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const andarBaharTileTop = 4 * GAME_GRID_CELL;
   const andarBaharTileLeft = GAME_GRID_LEFT;
+  const teenPattiTileTop = 4 * GAME_GRID_CELL;
+  const teenPattiTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 5;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -379,6 +381,45 @@ export default function HomeScreen() {
           </View>
         </View>
         <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1, marginTop: 8 }}>ANDAR BAHAR</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('TeenPatti')}
+        style={{
+          position: 'absolute',
+          top: teenPattiTileTop,
+          left: teenPattiTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          borderWidth: 2,
+          borderColor: '#D9A441',
+          backgroundColor: '#0E4A2E',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 60 }}>
+          {['A♠', 'K♥', 'Q♦'].map((c, i) => (
+            <View
+              key={c}
+              style={{
+                width: 34,
+                height: 48,
+                borderRadius: 5,
+                backgroundColor: '#FFFFFF',
+                marginLeft: i ? -10 : 0,
+                transform: [{ rotate: `${(i - 1) * 14}deg` }, { translateY: i === 1 ? -6 : 0 }],
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#CCCCCC',
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '900', color: i === 0 ? '#111111' : '#D0142C' }}>{c}</Text>
+            </View>
+          ))}
+        </View>
+        <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1, marginTop: 6 }}>TEEN PATTI</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

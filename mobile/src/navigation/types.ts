@@ -32,4 +32,5 @@ export type RootStackParamList = {
   DragonTiger: undefined;
   Vortex: undefined;
   AndarBahar: undefined;
+  TeenPatti: undefined;
 };
