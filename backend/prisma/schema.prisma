@@ -181,6 +181,7 @@ model User {
   dragonTigerBets   DragonTigerBet[]
   vortexRounds      VortexRound[]
   AndarBaharBet     AndarBaharBet[]
+  TeenPattiBet      TeenPattiBet[]
 }
 
 model KycVerification {
@@ -660,6 +661,46 @@ model AndarBaharBet {
   status     BetStatus       @default(PENDING)
   payout     Decimal         @default(0) @db.Decimal(12, 2)
   createdAt  DateTime        @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
+}
+
+// One shared Teen Patti 20-20 round on a fixed wall-clock slot. `cards`
+// holds the six cards in deal order (A, B, A, B, A, B), fixed at creation
+// from the round's server seed and only revealed once betting has closed.
+model TeenPattiRound {
+  id             String         @id @default(uuid())
+  periodNumber   String         @unique
+  startTime      DateTime
+  betEndTime     DateTime
+  resultTime     DateTime
+  endTime        DateTime
+  cards          Int[]
+  serverSeed     String
+  serverSeedHash String
+  settled        Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  bets           TeenPattiBet[]
+
+  @@index([startTime])
+  @@index([settled, resultTime])
+}
+
+// One chip stack on a Teen Patti area, at the multiplier locked in when
+// placed. VOID marks a bet taken back during the betting window.
+model TeenPattiBet {
+  id         String         @id @default(uuid())
+  roundId    String
+  round      TeenPattiRound @relation(fields: [roundId], references: [id])
+  userId     String
+  user       User           @relation(fields: [userId], references: [id])
+  area       String
+  amount     Decimal        @db.Decimal(12, 2)
+  multiplier Decimal        @db.Decimal(8, 2)
+  status     BetStatus      @default(PENDING)
+  payout     Decimal        @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime       @default(now())
 
   @@index([userId])
   @@index([roundId, userId])
