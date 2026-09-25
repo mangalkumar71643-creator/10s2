@@ -4,7 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient as SvgLinearGradient, Path, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient as SvgLinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
@@ -29,7 +29,6 @@ const STAKE_STEPS = [10, 20, 50, 100, 200, 500];
 const QUICK = [10, 50, 100, 500];
 const AUTO_STEPS = [1.2, 1.5, 2, 3, 5, 10, 20, 50];
 /** The ball climbs along its arc for this long, then hovers near the top. */
-const ASCEND_S = 8;
 const TOAST_MS = 1800;
 
 function round2(n: number): number {
@@ -47,73 +46,208 @@ function multColor(m: number): string {
 }
 
 // ---------- scene ----------
+// A side-on broadcast shot: the batter plays the shot, then the camera
+// follows the ball — the stands and outfield scroll past behind it while
+// the multiplier climbs. When the round ends the ball drops to the turf.
 
-/** Night stadium: sky, floodlights, crowd, striped outfield, pitch. */
-const Stadium = memo(function Stadium({ w, h }: { w: number; h: number }) {
-  const crowd = useMemo(() => {
-    let seed = 11;
-    const rnd = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-    const colors = ['#FF4F6D', '#FFD66B', '#4FC3FF', '#FFFFFF', '#7EE2A3', '#B06CFF'];
-    return Array.from({ length: 150 }, () => ({ x: rnd() * w, y: h * (0.3 + rnd() * 0.16), r: 0.8 + rnd() * 1.4, c: colors[Math.floor(rnd() * colors.length)], o: 0.35 + rnd() * 0.5 }));
-  }, [w, h]);
-  const fieldTop = h * 0.5;
-  const stripes = 7;
+function seeded(seed: number) {
+  let x = seed;
+  return () => {
+    x = (x * 9301 + 49297) % 233280;
+    return x / 233280;
+  };
+}
+
+/** Sky with the floodlit glow near the roof. Static. */
+const Sky = memo(function Sky({ w, h }: { w: number; h: number }) {
   return (
     <Svg width={w} height={h} style={StyleSheet.absoluteFill}>
       <Defs>
-        <SvgLinearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#050A1E" />
-          <Stop offset="1" stopColor="#1A2350" />
-        </SvgLinearGradient>
-        <RadialGradient id="flood" cx="50%" cy="50%" r="50%">
-          <Stop offset="0" stopColor="#FFFBEA" stopOpacity={0.95} />
-          <Stop offset="0.3" stopColor="#FFF1B8" stopOpacity={0.35} />
-          <Stop offset="1" stopColor="#FFF1B8" stopOpacity={0} />
-        </RadialGradient>
-        <SvgLinearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#FFF6D0" stopOpacity={0.22} />
-          <Stop offset="1" stopColor="#FFF6D0" stopOpacity={0} />
-        </SvgLinearGradient>
-        <SvgLinearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#1F8A3C" />
-          <Stop offset="1" stopColor="#0B4A1C" />
-        </SvgLinearGradient>
-        <SvgLinearGradient id="stand" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor="#161B3A" />
-          <Stop offset="1" stopColor="#0C0F24" />
+        <SvgLinearGradient id="cxSky" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#0A1F5C" />
+          <Stop offset="0.35" stopColor="#1A47A8" />
+          <Stop offset="0.55" stopColor="#0B1F55" />
         </SvgLinearGradient>
       </Defs>
-      <Rect x={0} y={0} width={w} height={h} fill="url(#sky)" />
-      {/* Floodlight beams and heads */}
-      <Polygon points={`${w * 0.08},${h * 0.1} ${w * 0.45},${h * 0.55} ${w * 0.1},${h * 0.62}`} fill="url(#beam)" />
-      <Polygon points={`${w * 0.92},${h * 0.1} ${w * 0.55},${h * 0.55} ${w * 0.9},${h * 0.62}`} fill="url(#beam)" />
-      <Circle cx={w * 0.08} cy={h * 0.1} r={h * 0.16} fill="url(#flood)" />
-      <Circle cx={w * 0.92} cy={h * 0.1} r={h * 0.16} fill="url(#flood)" />
-      {/* Stands and crowd */}
-      <Path d={`M0 ${h * 0.28} Q ${w / 2} ${h * 0.22} ${w} ${h * 0.28} L ${w} ${fieldTop} L 0 ${fieldTop} Z`} fill="url(#stand)" />
-      {crowd.map((p, i) => (
-        <Circle key={i} cx={p.x} cy={p.y} r={p.r} fill={p.c} opacity={p.o} />
-      ))}
-      <Rect x={0} y={h * 0.47} width={w} height={h * 0.035} fill="#0E1A3A" />
-      <Rect x={0} y={h * 0.47} width={w} height={2} fill="#4FC3FF" opacity={0.6} />
-      {/* Outfield with mowing stripes and the boundary rope */}
-      <Rect x={0} y={fieldTop} width={w} height={h - fieldTop} fill="url(#grass)" />
-      {Array.from({ length: stripes }, (_, i) =>
-        i % 2 ? <Rect key={i} x={(w / stripes) * i} y={fieldTop} width={w / stripes} height={h - fieldTop} fill="#FFFFFF" opacity={0.05} /> : null
-      )}
-      <Ellipse cx={w / 2} cy={h * 1.05} rx={w * 0.62} ry={h * 0.5} fill="none" stroke="#FFFFFF" strokeOpacity={0.5} strokeWidth={2} />
-      {/* Pitch with creases and stumps where the batter stands */}
-      <Polygon points={`${w * 0.02},${h} ${w * 0.2},${h} ${w * 0.3},${h * 0.72} ${w * 0.2},${h * 0.72}`} fill="#C9A86A" opacity={0.85} />
-      <Line x1={w * 0.08} y1={h * 0.9} x2={w * 0.21} y2={h * 0.9} stroke="#FFFFFF" strokeWidth={2} opacity={0.8} />
-      {[0, 1, 2].map((i) => (
-        <Line key={i} x1={w * (0.11 + i * 0.012)} y1={h * 0.9} x2={w * (0.11 + i * 0.012)} y2={h * 0.8} stroke="#F4E3B5" strokeWidth={2.5} />
-      ))}
+      <Rect x={0} y={0} width={w} height={h} fill="url(#cxSky)" />
     </Svg>
   );
 });
+
+/** One screen-wide tile of the stands: roof with floodlights, crowd tiers
+ * and two rows of coloured advertising boards. Repeats as the camera pans. */
+const StandsTile = memo(function StandsTile({ w, h }: { w: number; h: number }) {
+  const crowd = useMemo(() => {
+    const rnd = seeded(7);
+    const colors = ['#E8EEF8', '#FF6B6B', '#FFD66B', '#4FC3FF', '#7EE2A3', '#C9A0FF', '#FFFFFF'];
+    return Array.from({ length: 260 }, () => {
+      const tier = rnd() < 0.55 ? 0 : 1;
+      return { x: rnd() * w, y: h * (tier ? 0.44 + rnd() * 0.07 : 0.3 + rnd() * 0.08), c: colors[Math.floor(rnd() * colors.length)], o: 0.35 + rnd() * 0.5 };
+    });
+  }, [w, h]);
+  const lights = 8;
+  const boardColors = ['#E53935', '#FDD835', '#43A047', '#FDD835', '#E53935', '#26C6DA'];
+  const board = (y: number, bh: number, shift: number) =>
+    Array.from({ length: 24 }, (_, i) => (
+      <Rect key={`${y}-${i}`} x={(w / 24) * i} y={y} width={w / 24 + 0.5} height={bh} fill={boardColors[(i + shift) % boardColors.length]} />
+    ));
+  return (
+    <Svg width={w} height={h}>
+      <Defs>
+        <RadialGradient id="cxLamp" cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={1} />
+          <Stop offset="0.35" stopColor="#CFE8FF" stopOpacity={0.55} />
+          <Stop offset="1" stopColor="#8FC8FF" stopOpacity={0} />
+        </RadialGradient>
+        <SvgLinearGradient id="cxStand" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#1B2A55" />
+          <Stop offset="1" stopColor="#0C1433" />
+        </SvgLinearGradient>
+      </Defs>
+      {/* Roof edge and floodlights */}
+      <Rect x={0} y={h * 0.2} width={w} height={h * 0.07} fill="#16254F" />
+      <Rect x={0} y={h * 0.2} width={w} height={2} fill="#6FA8FF" opacity={0.7} />
+      {Array.from({ length: lights }, (_, i) => {
+        const cx = (w / lights) * (i + 0.5);
+        return (
+          <G key={i}>
+            <Circle cx={cx} cy={h * 0.235} r={h * 0.07} fill="url(#cxLamp)" />
+            {[0, 1, 2, 3].map((k) => (
+              <Rect key={k} x={cx - 9 + k * 5} y={h * 0.225} width={3.5} height={h * 0.02} fill="#FFFFFF" />
+            ))}
+          </G>
+        );
+      })}
+      {/* Stands and crowd */}
+      <Rect x={0} y={h * 0.27} width={w} height={h * 0.27} fill="url(#cxStand)" />
+      {crowd.map((p, i) => (
+        <Rect key={i} x={p.x} y={p.y} width={2.2} height={2.6} fill={p.c} opacity={p.o} />
+      ))}
+      {board(h * 0.395, h * 0.018, 0)}
+      {board(h * 0.525, h * 0.022, 2)}
+      <Rect x={0} y={h * 0.547} width={w} height={2} fill="#000000" opacity={0.35} />
+    </Svg>
+  );
+});
+
+/** One tile of outfield grass with mowing bands. Repeats as the camera pans. */
+const GroundTile = memo(function GroundTile({ w, h }: { w: number; h: number }) {
+  const top = h * 0.55;
+  const bands = 6;
+  return (
+    <Svg width={w} height={h}>
+      <Defs>
+        <SvgLinearGradient id="cxGrass" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#2F9A3E" />
+          <Stop offset="1" stopColor="#1C6E2A" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect x={0} y={top} width={w} height={h - top} fill="url(#cxGrass)" />
+      {Array.from({ length: bands }, (_, i) => {
+        const y0 = top + ((h - top) / bands) * i;
+        return i % 2 ? <Rect key={i} x={0} y={y0} width={w} height={(h - top) / bands} fill="#FFFFFF" opacity={0.05} /> : null;
+      })}
+    </Svg>
+  );
+});
+
+/** The pitch strip under the batter, with the popping crease. */
+const Pitch = memo(function Pitch({ w, h }: { w: number; h: number }) {
+  return (
+    <Svg width={w} height={h}>
+      <Defs>
+        <SvgLinearGradient id="cxPitch" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#D9C79A" />
+          <Stop offset="0.8" stopColor="#CDB889" />
+          <Stop offset="1" stopColor="#CDB889" stopOpacity={0} />
+        </SvgLinearGradient>
+      </Defs>
+      <Polygon points={`0,${h * 0.6} ${w},${h * 0.6} ${w * 0.85},${h} 0,${h}`} fill="url(#cxPitch)" />
+      <Line x1={w * 0.02} y1={h * 0.92} x2={w * 0.72} y2={h * 0.92} stroke="#FFFFFF" strokeWidth={2} opacity={0.85} />
+      <Line x1={w * 0.2} y1={h * 0.62} x2={w * 0.06} y2={h * 0.98} stroke="#FFFFFF" strokeWidth={2} opacity={0.7} />
+    </Svg>
+  );
+});
+
+/** Stumps with bails. */
+const Stumps = memo(function Stumps({ h }: { h: number }) {
+  const w = h * 0.22;
+  return (
+    <Svg width={w} height={h}>
+      {[0, 1, 2].map((i) => (
+        <G key={i}>
+          <Rect x={w * (0.1 + i * 0.3)} y={h * 0.06} width={w * 0.14} height={h * 0.94} rx={1.5} fill="#F4ECD8" />
+          {[0.3, 0.55, 0.8].map((y) => (
+            <Rect key={y} x={w * (0.1 + i * 0.3)} y={h * y} width={w * 0.14} height={h * 0.05} fill="#C62828" />
+          ))}
+        </G>
+      ))}
+      <Rect x={w * 0.06} y={h * 0.02} width={w * 0.88} height={h * 0.04} rx={1} fill="#F4ECD8" />
+    </Svg>
+  );
+});
+
+/** A side-on batter in his stance, facing right, bat grounded behind. */
+const Batter = memo(function Batter({ h }: { h: number }) {
+  const w = h * 0.7;
+  const s = h / 150;
+  const P = (x: number, y: number) => `${(x * s).toFixed(1)},${(y * s).toFixed(1)}`;
+  return (
+    <Svg width={w} height={h}>
+      <Defs>
+        <SvgLinearGradient id="cxKit" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="1" stopColor="#D6DCE8" />
+        </SvgLinearGradient>
+        <SvgLinearGradient id="cxBat" x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor="#F3DDA6" />
+          <Stop offset="1" stopColor="#C9A55E" />
+        </SvgLinearGradient>
+      </Defs>
+      <Ellipse cx={55 * s} cy={146 * s} rx={34 * s} ry={4 * s} fill="#000000" opacity={0.3} />
+      {/* Bat (behind the body) */}
+      <Polygon points={`${P(39, 76)} ${P(46, 79)} ${P(26, 126)} ${P(17, 122)}`} fill="url(#cxBat)" stroke="#9C7B3C" strokeWidth={0.8} />
+      <Line x1={40 * s} y1={64 * s} x2={43 * s} y2={78 * s} stroke="#2B2B2B" strokeWidth={3.5 * s} strokeLinecap="round" />
+      {/* Legs: trousers then pads */}
+      <Path d={`M ${P(48, 80)} L ${P(42, 106)} L ${P(39, 138)}`} stroke="url(#cxKit)" strokeWidth={13 * s} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <Path d={`M ${P(61, 80)} L ${P(67, 106)} L ${P(71, 138)}`} stroke="url(#cxKit)" strokeWidth={13 * s} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {[112, 119, 126, 133].map((y) => (
+        <G key={y}>
+          <Line x1={34 * s} y1={y * s} x2={45 * s} y2={(y + 0.5) * s} stroke="#B8C0CF" strokeWidth={0.9} />
+          <Line x1={65 * s} y1={y * s} x2={77 * s} y2={(y - 0.5) * s} stroke="#B8C0CF" strokeWidth={0.9} />
+        </G>
+      ))}
+      <Ellipse cx={37 * s} cy={142 * s} rx={9 * s} ry={4 * s} fill="#1E2A44" />
+      <Ellipse cx={75 * s} cy={142 * s} rx={9 * s} ry={4 * s} fill="#1E2A44" />
+      {/* Torso */}
+      <Path d={`M ${P(45, 42)} Q ${P(55, 36)} ${P(68, 42)} L ${P(66, 82)} L ${P(46, 82)} Z`} fill="url(#cxKit)" />
+      <Path d={`M ${P(52, 40)} L ${P(57, 50)} L ${P(62, 40)}`} stroke="#1E4FA8" strokeWidth={2 * s} fill="none" />
+      <Rect x={46 * s} y={78 * s} width={20 * s} height={4 * s} fill="#1E4FA8" />
+      {/* Arms to the grip */}
+      <Path d={`M ${P(64, 46)} Q ${P(58, 62)} ${P(44, 66)}`} stroke="url(#cxKit)" strokeWidth={8 * s} strokeLinecap="round" fill="none" />
+      <Path d={`M ${P(50, 47)} Q ${P(46, 58)} ${P(42, 64)}`} stroke="#E0B48A" strokeWidth={6 * s} strokeLinecap="round" fill="none" />
+      <Circle cx={42 * s} cy={66 * s} r={5 * s} fill="#FFFFFF" stroke="#B8C0CF" strokeWidth={0.8} />
+      {/* Helmet and face */}
+      <Circle cx={58 * s} cy={25 * s} r={12 * s} fill="#1B2E6B" />
+      <Path d={`M ${P(47, 24)} Q ${P(58, 10)} ${P(70, 22)}`} stroke="#2F4FA8" strokeWidth={2 * s} fill="none" />
+      <Rect x={62 * s} y={27 * s} width={8 * s} height={9 * s} rx={2 * s} fill="#E0B48A" />
+      {[28, 31, 34].map((y) => (
+        <Line key={y} x1={66 * s} y1={y * s} x2={74 * s} y2={y * s} stroke="#9AA4B8" strokeWidth={1.2} />
+      ))}
+      <Line x1={72 * s} y1={26 * s} x2={73 * s} y2={37 * s} stroke="#9AA4B8" strokeWidth={1.2} />
+    </Svg>
+  );
+});
+
+/** Log-scale distance ruler: 1, 2, 5 … 500, ∞, with a marker at `m`. */
+const RULER_TICKS = [1, 2, 5, 10, 20, 50, 100, 200, 500];
+function rulerFraction(m: number): number {
+  const n = RULER_TICKS.length; // the last segment runs 500 -> ∞
+  for (let i = 0; i < n - 1; i++) {
+    if (m < RULER_TICKS[i + 1]) return (i + Math.log(Math.max(m, 1) / RULER_TICKS[i]) / Math.log(RULER_TICKS[i + 1] / RULER_TICKS[i])) / n;
+  }
+  return (n - 1 + Math.min(1, Math.log(m / 500) / Math.log(10))) / n;
+}
 
 /** A red leather ball with a white seam, turned by `spin` degrees. */
 function Ball({ size, spin }: { size: number; spin: number }) {
@@ -121,17 +255,18 @@ function Ball({ size, spin }: { size: number; spin: number }) {
   return (
     <Svg width={size} height={size}>
       <Defs>
-        <RadialGradient id="leather" cx="35%" cy="35%" r="70%">
-          <Stop offset="0" stopColor="#FF6B6B" />
-          <Stop offset="0.6" stopColor="#C8102E" />
-          <Stop offset="1" stopColor="#6E0514" />
+        <RadialGradient id="leather" cx="35%" cy="32%" r="72%">
+          <Stop offset="0" stopColor="#FF8A80" />
+          <Stop offset="0.45" stopColor="#E53935" />
+          <Stop offset="1" stopColor="#8E0B16" />
         </RadialGradient>
       </Defs>
       <Circle cx={r} cy={r} r={r - 1} fill="url(#leather)" />
       <G rotation={spin} origin={`${r}, ${r}`}>
-        <Path d={`M ${r * 0.35} ${r * 0.2} Q ${r * 0.85} ${r} ${r * 0.35} ${r * 1.8}`} stroke="#FFF4E0" strokeWidth={1.4} fill="none" />
-        <Path d={`M ${r * 0.5} ${r * 0.15} Q ${r} ${r} ${r * 0.5} ${r * 1.85}`} stroke="#FFF4E0" strokeWidth={0.8} strokeDasharray="1.5,1.5" fill="none" />
+        <Path d={`M ${r * 0.62} ${r * 0.08} Q ${r * 1.18} ${r} ${r * 0.62} ${r * 1.92}`} stroke="#FFF4E0" strokeWidth={Math.max(1.2, r * 0.05)} fill="none" />
+        <Path d={`M ${r * 0.78} ${r * 0.06} Q ${r * 1.34} ${r} ${r * 0.78} ${r * 1.94}`} stroke="#FFF4E0" strokeWidth={Math.max(0.8, r * 0.03)} strokeDasharray={`${r * 0.06},${r * 0.06}`} fill="none" />
       </G>
+      <Circle cx={r * 0.7} cy={r * 0.62} r={r * 0.22} fill="#FFFFFF" opacity={0.25} />
     </Svg>
   );
 }
@@ -174,7 +309,7 @@ export default function CricketXScreen() {
   panelsRef.current = panels;
   const periodRef = useRef<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const caughtAnim = useRef(new Animated.Value(0)).current;
+  const fallAnim = useRef(new Animated.Value(0)).current;
 
   const growth = config?.growthRate ?? DEFAULT_GROWTH;
   const minStake = config?.minStake ?? 1;
@@ -273,7 +408,7 @@ export default function CricketXScreen() {
     const first = periodRef.current === null;
     periodRef.current = view.periodNumber;
     if (first) return;
-    caughtAnim.setValue(0);
+    fallAnim.setValue(0);
     loadLists();
     refreshWallet();
     panelsRef.current.forEach((p, i) => {
@@ -291,14 +426,15 @@ export default function CricketXScreen() {
   const crashedPeriod = view?.phase === 'CRASHED' ? view.periodNumber : null;
   useEffect(() => {
     if (!crashedPeriod) return;
-    caughtAnim.setValue(0);
-    Animated.spring(caughtAnim, { toValue: 1, friction: 5, tension: 120, useNativeDriver: true }).start();
+    // The ball drops to the turf and bounces.
+    fallAnim.setValue(0);
+    Animated.timing(fallAnim, { toValue: 1, duration: 1100, easing: Easing.bounce, useNativeDriver: true }).start();
     setTimeout(() => {
       if (!mountedRef.current) return;
       refreshWallet();
       loadLists();
     }, 600);
-  }, [crashedPeriod, caughtAnim, refreshWallet, loadLists]);
+  }, [crashedPeriod, fallAnim, refreshWallet, loadLists]);
 
   const placeBet = useCallback(
     async (i: 0 | 1, fromQueue = false) => {
@@ -372,24 +508,30 @@ export default function CricketXScreen() {
   // ---- scene geometry ----
   const SW = W - 20;
   const SH = Math.min(SW * 0.72, 320);
-  const origin = { x: SW * 0.2, y: SH * 0.8 };
-  const end = { x: SW * 0.86, y: SH * 0.2 };
-  const pointAt = (t: number) => ({
-    x: origin.x + (end.x - origin.x) * t,
-    y: origin.y - (origin.y - end.y) * Math.pow(t, 1.8),
-  });
-  const t = localPhase === 'BETTING' ? 0 : Math.min(1, (localPhase === 'CRASHED' && view?.crashMultiplier ? Math.log(view.crashMultiplier) / growth : elapsed) / ASCEND_S);
-  const hover = t >= 1 && localPhase === 'FLYING' ? Math.sin(srvNow / 600) * SH * 0.04 : 0;
-  const ballPos = pointAt(t);
-  ballPos.y += hover;
-  const trail = Array.from({ length: 28 }, (_, k) => pointAt((t * k) / 27));
-  const trailD = trail.map((p, k) => `${k ? 'L' : 'M'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-  const areaD = `${trailD} L ${ballPos.x.toFixed(1)} ${origin.y} Z`;
-  const ballSize = SH * 0.09;
+  const crashed = localPhase === 'CRASHED';
+  const flightS = localPhase === 'BETTING' ? 0 : crashed && view?.crashMultiplier ? Math.log(view.crashMultiplier) / growth : elapsed;
+  // Camera travel in px: pans away from the batter and speeds up in flight.
+  const pan = SW * (0.55 * flightS + 0.05 * flightS * flightS);
+  const standsOff = (pan * 0.35) % SW;
+  const groundOff = pan % SW;
+  const batterH = SH * 0.62;
+  const batterX = SW * 0.2 - pan;
+  const batterY = SH * 0.96 - batterH;
+  const LAUNCH_S = 0.7;
+  const launch = Math.min(1, flightS / LAUNCH_S);
+  const ease = 1 - Math.pow(1 - launch, 3);
+  const ballBig = SH * 0.3;
+  const ballSize = SH * 0.06 + (ballBig - SH * 0.06) * ease;
+  const contact = { x: batterX + batterH * 0.12, y: batterY + batterH * 0.62 };
+  const centre = { x: SW * 0.55, y: SH * 0.4 + (localPhase === 'FLYING' && launch >= 1 ? Math.sin(srvNow / 450) * SH * 0.015 : 0) };
+  const ballX = contact.x + (centre.x - contact.x) * ease;
+  const ballY = contact.y + (centre.y - contact.y) * ease;
+  const groundY = SH * 0.8;
   const betLeft = localPhase === 'BETTING' ? Math.max(0, (flyStart - srvNow) / 1000) : 0;
   const betTotal = config?.bettingDurationSeconds ?? 6;
-  const crashed = localPhase === 'CRASHED';
-  const color = crashed ? '#FF4F4F' : multColor(liveMult);
+  const rulerY = SH * 0.9;
+  const rulerX0 = SW * 0.07;
+  const rulerX1 = SW * 0.93;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -428,65 +570,94 @@ export default function CricketXScreen() {
           })}
         </ScrollView>
 
-        {/* Stadium scene */}
+        {/* Broadcast-style scene */}
         <View style={[styles.scene, { width: SW, height: SH }]}>
-          <Stadium w={SW} h={SH} />
-          <Svg width={SW} height={SH} style={StyleSheet.absoluteFill}>
-            <Defs>
-              <SvgLinearGradient id="trailFill" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor={color} stopOpacity={0.45} />
-                <Stop offset="1" stopColor={color} stopOpacity={0.02} />
-              </SvgLinearGradient>
-            </Defs>
-            {t > 0 && (
-              <>
-                <Path d={areaD} fill="url(#trailFill)" />
-                <Path d={trailD} stroke={color} strokeWidth={3.5} fill="none" strokeLinecap="round" />
-                <Path d={trailD} stroke="#FFFFFF" strokeOpacity={0.6} strokeWidth={1.2} fill="none" strokeDasharray="4,6" />
-              </>
-            )}
-          </Svg>
-          {/* Batter at the crease */}
-          <View pointerEvents="none" style={[styles.batter, { left: origin.x - 34, top: origin.y - 50 }]}>
-            <MaterialCommunityIcons name="cricket" size={46} color="#FFFFFF" style={styles.batterGlow} />
+          <Sky w={SW} h={SH} />
+          <View style={[styles.tileRow, { width: SW * 2 + 1, height: SH, transform: [{ translateX: -standsOff }] }]}>
+            <StandsTile w={SW + 1} h={SH} />
+            <View style={[styles.tileNext, { left: SW }]}>
+              <StandsTile w={SW + 1} h={SH} />
+            </View>
           </View>
-          {/* Ball */}
-          <View pointerEvents="none" style={{ position: 'absolute', left: ballPos.x - ballSize / 2, top: ballPos.y - ballSize / 2 }}>
-            <Ball size={ballSize} spin={elapsed * 540} />
+          <View style={[styles.tileRow, { width: SW * 2 + 1, height: SH, transform: [{ translateX: -groundOff }] }]}>
+            <GroundTile w={SW + 1} h={SH} />
+            <View style={[styles.tileNext, { left: SW }]}>
+              <GroundTile w={SW + 1} h={SH} />
+            </View>
           </View>
-          {crashed && (
+          {batterX > -SW && (
+            <>
+              <View pointerEvents="none" style={{ position: 'absolute', left: batterX - SW * 0.35, top: 0 }}>
+                <Pitch w={SW * 1.2} h={SH} />
+              </View>
+              <View pointerEvents="none" style={{ position: 'absolute', left: batterX - batterH * 0.28, top: batterY + batterH * 0.52 }}>
+                <Stumps h={batterH * 0.42} />
+              </View>
+              <View pointerEvents="none" style={{ position: 'absolute', left: batterX, top: batterY }}>
+                <Batter h={batterH} />
+              </View>
+            </>
+          )}
+
+          {/* Ball with a motion streak; drops to the turf when the round ends */}
+          {localPhase !== 'BETTING' && (
             <Animated.View
               pointerEvents="none"
-              style={[
-                styles.glove,
-                { left: ballPos.x - 26, top: ballPos.y - 24, transform: [{ scale: caughtAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 1] }) }] },
-              ]}
+              style={{
+                position: 'absolute',
+                left: ballX - ballSize / 2,
+                top: ballY - ballSize / 2,
+                transform: [
+                  { translateY: fallAnim.interpolate({ inputRange: [0, 1], outputRange: [0, groundY - ballY - ballSize * 0.1] }) },
+                  { translateX: fallAnim.interpolate({ inputRange: [0, 1], outputRange: [0, SW * 0.12] }) },
+                  { scale: fallAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) },
+                ],
+              }}
             >
-              <MaterialCommunityIcons name="hand-back-right" size={44} color="#FFD6A5" />
+              {!crashed && launch > 0.2 && (
+                <LinearGradient
+                  colors={['rgba(255,255,255,0)', 'rgba(255,230,230,0.45)']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={{ position: 'absolute', left: -ballSize * 1.1, top: ballSize * 0.22, width: ballSize * 1.4, height: ballSize * 0.56, borderRadius: ballSize * 0.3 }}
+                />
+              )}
+              <Ball size={ballSize} spin={crashed ? 0 : elapsed * 720} />
             </Animated.View>
           )}
 
-          {/* Centre read-out */}
-          <View pointerEvents="none" style={styles.centre}>
-            {localPhase === 'BETTING' ? (
-              <>
-                <Text style={styles.nextText}>NEXT BALL IN</Text>
-                <Text style={styles.countText}>{betLeft.toFixed(1)}s</Text>
-                <View style={styles.countTrack}>
-                  <View style={[styles.countFill, { width: `${Math.min(100, (betLeft / betTotal) * 100)}%` }]} />
-                </View>
-              </>
-            ) : (
-              <>
-                {crashed && (
-                  <Animated.Text style={[styles.caught, { transform: [{ scale: caughtAnim.interpolate({ inputRange: [0, 1], outputRange: [1.8, 1] }) }] }]}>
-                    CAUGHT!
-                  </Animated.Text>
-                )}
-                <Text style={[styles.multText, { color, textShadowColor: color }]}>{liveMult.toFixed(2)}x</Text>
-              </>
-            )}
-          </View>
+          {/* Multiplier and the distance ruler */}
+          {localPhase !== 'BETTING' && (
+            <View pointerEvents="none" style={[styles.bigMultWrap, { left: SW * 0.08, top: SH * 0.62 }]}>
+              {crashed && <Text style={styles.landed}>BALL DOWN!</Text>}
+              <Text style={[styles.bigMult, { fontSize: SH * 0.2, color: crashed ? '#FF4F4F' : '#FFFFFF' }]}>{liveMult.toFixed(2)}x</Text>
+            </View>
+          )}
+          <Svg width={SW} height={SH} style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Line x1={rulerX0} y1={rulerY} x2={rulerX1} y2={rulerY} stroke="#FFFFFF" strokeOpacity={0.85} strokeWidth={1.5} />
+            {[...RULER_TICKS, Infinity].map((tk, i) => {
+              const x = rulerX0 + ((rulerX1 - rulerX0) * i) / RULER_TICKS.length;
+              return (
+                <G key={i}>
+                  <Line x1={x} y1={rulerY - 4} x2={x} y2={rulerY + 4} stroke="#FFFFFF" strokeOpacity={0.85} strokeWidth={1.5} />
+                  <SvgText x={x} y={rulerY + 16} fontSize={10} fontWeight="700" fill="#FFFFFF" fillOpacity={0.9} textAnchor="middle">
+                    {tk === Infinity ? '∞' : String(tk)}
+                  </SvgText>
+                </G>
+              );
+            })}
+            <Circle cx={rulerX0 + (rulerX1 - rulerX0) * rulerFraction(liveMult)} cy={rulerY - 9} r={4.5} fill="#E53935" stroke="#FFFFFF" strokeWidth={1} />
+          </Svg>
+
+          {localPhase === 'BETTING' && (
+            <View pointerEvents="none" style={styles.nextWrap}>
+              <Text style={styles.nextText}>NEXT BALL IN</Text>
+              <Text style={styles.countText}>{betLeft.toFixed(1)}s</Text>
+              <View style={styles.countTrack}>
+                <View style={[styles.countFill, { width: `${Math.min(100, (betLeft / betTotal) * 100)}%` }]} />
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Two bet panels */}
@@ -506,7 +677,7 @@ export default function CricketXScreen() {
             sub = `@ ${p.cashedAt.toFixed(2)}x`;
             colors = ['#3A4A7A', '#26335C'];
           } else if (lostBet) {
-            label = 'CAUGHT';
+            label = 'BALL DOWN';
             sub = `-₹${Number(p.bet!.amount).toFixed(2)}`;
             colors = ['#5A2A3A', '#3A1422'];
           } else if (p.bet) {
@@ -614,9 +785,13 @@ const styles = StyleSheet.create({
   histText: { fontSize: 12, fontWeight: '900' },
 
   scene: { alignSelf: 'center', borderRadius: 18, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(79,195,255,0.35)' },
-  batter: { position: 'absolute' },
-  batterGlow: { textShadowColor: '#4FC3FF', textShadowRadius: 12 },
-  glove: { position: 'absolute' },
+  tileRow: { position: 'absolute', left: 0, top: 0 },
+  // Overlaps the first tile by 1px so no anti-aliased seam shows.
+  tileNext: { position: 'absolute', top: 0 },
+  bigMultWrap: { position: 'absolute' },
+  bigMult: { fontWeight: '900', fontStyle: 'italic', letterSpacing: -1, textShadowColor: 'rgba(0,0,0,0.55)', textShadowRadius: 8, textShadowOffset: { width: 2, height: 3 } },
+  landed: { color: '#FFD6D6', fontSize: 15, fontWeight: '900', letterSpacing: 2, textShadowColor: '#000', textShadowRadius: 5, marginBottom: -4 },
+  nextWrap: { position: 'absolute', top: '8%', alignSelf: 'center', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 16, backgroundColor: 'rgba(5,10,30,0.6)' },
   centre: { position: 'absolute', top: '18%', left: 0, right: 0, alignItems: 'center' },
   nextText: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '900', letterSpacing: 2 },
   countText: { color: GOLD, fontSize: 34, fontWeight: '900', marginTop: 2 },
