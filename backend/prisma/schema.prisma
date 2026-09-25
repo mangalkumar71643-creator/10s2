@@ -180,6 +180,7 @@ model User {
   plinkoBets        PlinkoBet[]
   dragonTigerBets   DragonTigerBet[]
   vortexRounds      VortexRound[]
+  AndarBaharBet     AndarBaharBet[]
 }
 
 model KycVerification {
@@ -620,4 +621,46 @@ model VortexRound {
   settledAt      DateTime?
 
   @@index([userId])
+}
+
+// One shared Andar Bahar round on a fixed wall-clock slot. `joker` and the
+// dealt `cards` (Andar, Bahar, Andar, … up to and including the first card
+// of the Joker's rank) are fixed at creation from the round's server seed
+// and only revealed once betting has closed.
+model AndarBaharRound {
+  id             String          @id @default(uuid())
+  periodNumber   String          @unique
+  startTime      DateTime
+  betEndTime     DateTime
+  resultTime     DateTime
+  endTime        DateTime
+  joker          Int
+  cards          Int[]
+  serverSeed     String
+  serverSeedHash String
+  settled        Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  bets           AndarBaharBet[]
+
+  @@index([startTime])
+  @@index([settled, resultTime])
+}
+
+// One chip stack on an Andar Bahar area, at the multiplier locked in when
+// placed. VOID marks a bet taken back during the betting window.
+model AndarBaharBet {
+  id         String          @id @default(uuid())
+  roundId    String
+  round      AndarBaharRound @relation(fields: [roundId], references: [id])
+  userId     String
+  user       User            @relation(fields: [userId], references: [id])
+  area       String
+  amount     Decimal         @db.Decimal(12, 2)
+  multiplier Decimal         @db.Decimal(8, 2)
+  status     BetStatus       @default(PENDING)
+  payout     Decimal         @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime        @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
 }

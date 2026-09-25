@@ -19,6 +19,7 @@ import sevenUpDownRoutes from "./routes/sevenUpDown.routes";
 import plinkoRoutes from "./routes/plinko.routes";
 import dragonTigerRoutes from "./routes/dragonTiger.routes";
 import vortexRoutes from "./routes/vortex.routes";
+import andarBaharRoutes from "./routes/andarBahar.routes";
 
 export const app = express();
 
@@ -44,5 +45,6 @@ app.use("/seven-up-down", sevenUpDownRoutes);
 app.use("/plinko", plinkoRoutes);
 app.use("/dragon-tiger", dragonTigerRoutes);
 app.use("/vortex", vortexRoutes);
+app.use("/andar-bahar", andarBaharRoutes);
 
 app.use(errorHandler);
