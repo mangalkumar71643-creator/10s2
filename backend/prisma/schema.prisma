@@ -184,6 +184,7 @@ model User {
   TeenPattiBet      TeenPattiBet[]
   CricketXBet       CricketXBet[]
   JhandiMundaBet    JhandiMundaBet[]
+  RouletteBet       RouletteBet[]
 }
 
 model KycVerification {
@@ -780,6 +781,47 @@ model JhandiMundaBet {
   status    BetStatus        @default(PENDING)
   payout    Decimal          @default(0) @db.Decimal(12, 2)
   createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
+}
+
+// One shared European roulette round on a fixed wall-clock slot. `result`
+// (0-36) is fixed at creation from the round's server seed and only
+// revealed once betting has closed.
+model RouletteRound {
+  id             String        @id @default(uuid())
+  periodNumber   String        @unique
+  startTime      DateTime
+  betEndTime     DateTime
+  resultTime     DateTime
+  endTime        DateTime
+  result         Int
+  serverSeed     String
+  serverSeedHash String
+  settled        Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  bets           RouletteBet[]
+
+  @@index([startTime])
+  @@index([settled, resultTime])
+}
+
+// One chip stack on a roulette bet spot (see SPOTS in rouletteService.ts),
+// at the multiplier locked in when placed. VOID marks a bet taken back
+// during the betting window.
+model RouletteBet {
+  id         String        @id @default(uuid())
+  roundId    String
+  round      RouletteRound @relation(fields: [roundId], references: [id])
+  userId     String
+  user       User          @relation(fields: [userId], references: [id])
+  area       String
+  amount     Decimal       @db.Decimal(12, 2)
+  multiplier Decimal       @db.Decimal(8, 2)
+  status     BetStatus     @default(PENDING)
+  payout     Decimal       @default(0) @db.Decimal(12, 2)
+  createdAt  DateTime      @default(now())
 
   @@index([userId])
   @@index([roundId, userId])
