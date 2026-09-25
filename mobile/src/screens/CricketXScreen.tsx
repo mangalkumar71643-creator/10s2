@@ -3,7 +3,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient as SvgLinearGradient, Path, Polygon, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
@@ -187,57 +187,152 @@ const Stumps = memo(function Stumps({ h }: { h: number }) {
   );
 });
 
-/** A side-on batter in his stance, facing right, bat grounded behind. */
-const Batter = memo(function Batter({ h }: { h: number }) {
+type BatterPose = 'stance' | 'hit';
+
+/** Where the ball leaves the bat in the 'hit' pose, as fractions of the batter's height. */
+const BAT_CONTACT = { x: 0.57, y: 0.66 };
+
+type Pt = [number, number];
+type PoseDef = {
+  backLeg: [Pt, Pt, Pt];
+  frontLeg: [Pt, Pt, Pt];
+  backShoe: Pt;
+  frontShoe: Pt;
+  /** Back shoulder, chest curve control, front shoulder, front hip, back hip. */
+  torso: [Pt, Pt, Pt, Pt, Pt];
+  head: Pt;
+  backArm: [Pt, Pt, Pt];
+  frontArm: [Pt, Pt, Pt];
+  /** Handle top, handle bottom (where the blade starts), blade toe. */
+  bat: [Pt, Pt, Pt];
+  gloves: [Pt, Pt];
+};
+
+// Right-hander, side-on, facing the bowler on the right (viewBox 105 x 150).
+const POSES: Record<BatterPose, PoseDef> = {
+  // Ready stance: knees soft, feet apart, head still, bat lifted back.
+  stance: {
+    backLeg: [[47, 84], [43, 111], [37, 137]],
+    frontLeg: [[60, 84], [68, 110], [73, 137]],
+    backShoe: [36, 142],
+    frontShoe: [77, 142],
+    torso: [[49, 47], [58, 40], [69, 47], [65, 86], [46, 86]],
+    head: [63, 29],
+    backArm: [[51, 49], [41, 61], [44, 74]],
+    frontArm: [[66, 50], [61, 64], [49, 73]],
+    bat: [[53, 73], [38, 75], [5, 70]],
+    gloves: [[48, 73], [43, 75]],
+  },
+  // Front-foot drive at the moment of contact: stride in, head over the ball.
+  hit: {
+    backLeg: [[49, 86], [39, 112], [27, 137]],
+    frontLeg: [[60, 86], [74, 108], [81, 137]],
+    backShoe: [26, 142],
+    frontShoe: [86, 142],
+    torso: [[55, 49], [65, 42], [76, 53], [67, 89], [48, 88]],
+    head: [72, 33],
+    backArm: [[59, 53], [65, 65], [73, 71]],
+    frontArm: [[72, 55], [78, 63], [75, 70]],
+    bat: [[73, 64], [77, 77], [90, 113]],
+    gloves: [[75, 69], [74, 73]],
+  },
+};
+
+/** A side-on batter, holding the bat in both gloves. */
+const Batter = memo(function Batter({ h, pose }: { h: number; pose: BatterPose }) {
   const w = h * 0.7;
   const s = h / 150;
-  const P = (x: number, y: number) => `${(x * s).toFixed(1)},${(y * s).toFixed(1)}`;
+  const p = POSES[pose];
+  const P = ([x, y]: Pt) => `${(x * s).toFixed(1)},${(y * s).toFixed(1)}`;
+  const limb = (pts: Pt[]) => `M ${P(pts[0])} Q ${P(pts[1])} ${P(pts[2])}`;
+  // The blade as a quad around the handle-bottom -> toe line.
+  const [, b0, b1] = p.bat;
+  const dx = b1[0] - b0[0];
+  const dy = b1[1] - b0[1];
+  const len = Math.hypot(dx, dy);
+  const nx = (-dy / len) * 3.6;
+  const ny = (dx / len) * 3.6;
+  const blade = [
+    [b0[0] + nx * 0.8, b0[1] + ny * 0.8],
+    [b1[0] + nx, b1[1] + ny],
+    [b1[0] - nx, b1[1] - ny],
+    [b0[0] - nx * 0.8, b0[1] - ny * 0.8],
+  ] as Pt[];
+  const skin = '#C98E62';
   return (
     <Svg width={w} height={h}>
       <Defs>
         <SvgLinearGradient id="cxKit" x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#FFFFFF" />
-          <Stop offset="1" stopColor="#D6DCE8" />
+          <Stop offset="1" stopColor="#D3DAE6" />
         </SvgLinearGradient>
         <SvgLinearGradient id="cxBat" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#F3DDA6" />
+          <Stop offset="0" stopColor="#F6E2B0" />
           <Stop offset="1" stopColor="#C9A55E" />
         </SvgLinearGradient>
       </Defs>
-      <Ellipse cx={55 * s} cy={146 * s} rx={34 * s} ry={4 * s} fill="#000000" opacity={0.3} />
-      {/* Bat (behind the body) */}
-      <Polygon points={`${P(39, 76)} ${P(46, 79)} ${P(26, 126)} ${P(17, 122)}`} fill="url(#cxBat)" stroke="#9C7B3C" strokeWidth={0.8} />
-      <Line x1={40 * s} y1={64 * s} x2={43 * s} y2={78 * s} stroke="#2B2B2B" strokeWidth={3.5 * s} strokeLinecap="round" />
-      {/* Legs: trousers then pads */}
-      <Path d={`M ${P(48, 80)} L ${P(42, 106)} L ${P(39, 138)}`} stroke="url(#cxKit)" strokeWidth={13 * s} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <Path d={`M ${P(61, 80)} L ${P(67, 106)} L ${P(71, 138)}`} stroke="url(#cxKit)" strokeWidth={13 * s} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      {[112, 119, 126, 133].map((y) => (
-        <G key={y}>
-          <Line x1={34 * s} y1={y * s} x2={45 * s} y2={(y + 0.5) * s} stroke="#B8C0CF" strokeWidth={0.9} />
-          <Line x1={65 * s} y1={y * s} x2={77 * s} y2={(y - 0.5) * s} stroke="#B8C0CF" strokeWidth={0.9} />
+      <Ellipse cx={56 * s} cy={146 * s} rx={40 * s} ry={4 * s} fill="#000000" opacity={0.28} />
+      {/* Legs: trousers into pads, then shoes */}
+      {[p.backLeg, p.frontLeg].map((leg, i) => (
+        <G key={i}>
+          <Path d={limb(leg)} stroke={i ? 'url(#cxKit)' : '#E4E8F0'} strokeWidth={13 * s} strokeLinecap="round" fill="none" />
+          <Path d={`M ${P(leg[1])} L ${P(leg[2])}`} stroke="#F7F8FB" strokeWidth={14 * s} strokeLinecap="round" fill="none" />
+          {[0.3, 0.55, 0.8].map((t) => {
+            const x = leg[1][0] + (leg[2][0] - leg[1][0]) * t;
+            const y = leg[1][1] + (leg[2][1] - leg[1][1]) * t;
+            return <Line key={t} x1={(x - 6) * s} y1={y * s} x2={(x + 6) * s} y2={y * s} stroke="#B8C0CF" strokeWidth={0.9} />;
+          })}
         </G>
       ))}
-      <Ellipse cx={37 * s} cy={142 * s} rx={9 * s} ry={4 * s} fill="#1E2A44" />
-      <Ellipse cx={75 * s} cy={142 * s} rx={9 * s} ry={4 * s} fill="#1E2A44" />
-      {/* Torso */}
-      <Path d={`M ${P(45, 42)} Q ${P(55, 36)} ${P(68, 42)} L ${P(66, 82)} L ${P(46, 82)} Z`} fill="url(#cxKit)" />
-      <Path d={`M ${P(52, 40)} L ${P(57, 50)} L ${P(62, 40)}`} stroke="#1E4FA8" strokeWidth={2 * s} fill="none" />
-      <Rect x={46 * s} y={78 * s} width={20 * s} height={4 * s} fill="#1E4FA8" />
-      {/* Arms to the grip */}
-      <Path d={`M ${P(64, 46)} Q ${P(58, 62)} ${P(44, 66)}`} stroke="url(#cxKit)" strokeWidth={8 * s} strokeLinecap="round" fill="none" />
-      <Path d={`M ${P(50, 47)} Q ${P(46, 58)} ${P(42, 64)}`} stroke="#E0B48A" strokeWidth={6 * s} strokeLinecap="round" fill="none" />
-      <Circle cx={42 * s} cy={66 * s} r={5 * s} fill="#FFFFFF" stroke="#B8C0CF" strokeWidth={0.8} />
-      {/* Helmet and face */}
-      <Circle cx={58 * s} cy={25 * s} r={12 * s} fill="#1B2E6B" />
-      <Path d={`M ${P(47, 24)} Q ${P(58, 10)} ${P(70, 22)}`} stroke="#2F4FA8" strokeWidth={2 * s} fill="none" />
-      <Rect x={62 * s} y={27 * s} width={8 * s} height={9 * s} rx={2 * s} fill="#E0B48A" />
-      {[28, 31, 34].map((y) => (
-        <Line key={y} x1={66 * s} y1={y * s} x2={74 * s} y2={y * s} stroke="#9AA4B8" strokeWidth={1.2} />
+      {[p.backShoe, p.frontShoe].map(([x, y], i) => (
+        <G key={i}>
+          <Ellipse cx={x * s} cy={y * s} rx={9 * s} ry={4.2 * s} fill="#F2F4F8" />
+          <Rect x={(x - 9) * s} y={(y + 2) * s} width={18 * s} height={2 * s} rx={1 * s} fill="#2A3346" />
+        </G>
       ))}
-      <Line x1={72 * s} y1={26 * s} x2={73 * s} y2={37 * s} stroke="#9AA4B8" strokeWidth={1.2} />
+      {/* Torso */}
+      <Path d={`M ${P(p.torso[0])} Q ${P(p.torso[1])} ${P(p.torso[2])} L ${P(p.torso[3])} L ${P(p.torso[4])} Z`} fill="url(#cxKit)" />
+      {/* Back arm (behind the handle) */}
+      <Path d={limb(p.backArm)} stroke="#E4E8F0" strokeWidth={7.5 * s} strokeLinecap="round" fill="none" />
+      <Path d={`M ${P(p.backArm[1])} L ${P(p.backArm[2])}`} stroke={skin} strokeWidth={5.5 * s} strokeLinecap="round" fill="none" />
+      {/* Bat: blade, then the rubber grip through both gloves */}
+      <Polygon points={blade.map(P).join(' ')} fill="url(#cxBat)" stroke="#9C7B3C" strokeWidth={0.8} strokeLinejoin="round" />
+      <Line x1={p.bat[0][0] * s} y1={p.bat[0][1] * s} x2={b0[0] * s} y2={b0[1] * s} stroke="#1F2533" strokeWidth={3.2 * s} strokeLinecap="round" />
+      {/* Front arm, then the gloves wrapped round the handle */}
+      <Path d={limb(p.frontArm)} stroke="url(#cxKit)" strokeWidth={8 * s} strokeLinecap="round" fill="none" />
+      <Path d={`M ${P(p.frontArm[1])} L ${P(p.frontArm[2])}`} stroke={skin} strokeWidth={6 * s} strokeLinecap="round" fill="none" />
+      {p.gloves.map(([x, y], i) => (
+        <G key={i}>
+          <Circle cx={x * s} cy={y * s} r={4.6 * s} fill="#FFFFFF" stroke="#AEB7C8" strokeWidth={0.8} />
+          <Rect x={(x - 3.5) * s} y={(y - 1) * s} width={7 * s} height={1.6 * s} fill="#1E4FA8" opacity={0.85} />
+        </G>
+      ))}
+      {/* Helmet, face and grille, looking at the bowler */}
+      <Circle cx={p.head[0] * s} cy={p.head[1] * s} r={11.5 * s} fill="#1B2E6B" />
+      <Path d={`M ${P([p.head[0] - 11, p.head[1] + 2])} L ${P([p.head[0] + 14, p.head[1] + 1])}`} stroke="#14224F" strokeWidth={3 * s} strokeLinecap="round" />
+      <Rect x={(p.head[0] + 3) * s} y={(p.head[1] + 2) * s} width={8 * s} height={9 * s} rx={2 * s} fill={skin} />
+      {[3, 6, 9].map((dy) => (
+        <Line key={dy} x1={(p.head[0] + 7) * s} y1={(p.head[1] + dy) * s} x2={(p.head[0] + 14) * s} y2={(p.head[1] + dy) * s} stroke="#9AA4B8" strokeWidth={1.2} />
+      ))}
+      <Line x1={(p.head[0] + 13) * s} y1={(p.head[1] + 2) * s} x2={(p.head[0] + 13) * s} y2={(p.head[1] + 11) * s} stroke="#9AA4B8" strokeWidth={1.2} />
     </Svg>
   );
 });
+
+/** Height above the turf of a dropped ball that bounces with restitution `e`. */
+function dropHeight(t: number, H: number, g: number, e = 0.42): number {
+  const tFall = Math.sqrt((2 * H) / g);
+  if (t < tFall) return H - 0.5 * g * t * t;
+  let v = e * Math.sqrt(2 * g * H);
+  t -= tFall;
+  while (v > 1) {
+    const T = (2 * v) / g;
+    if (t < T) return v * t - 0.5 * g * t * t;
+    t -= T;
+    v *= e;
+  }
+  return 0;
+}
 
 /** Log-scale distance ruler: 1, 2, 5 … 500, ∞, with a marker at `m`. */
 const RULER_TICKS = [1, 2, 5, 10, 20, 50, 100, 200, 500];
@@ -309,7 +404,8 @@ export default function CricketXScreen() {
   panelsRef.current = panels;
   const periodRef = useRef<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fallAnim = useRef(new Animated.Value(0)).current;
+  /** When this client saw the ball go down; drives the drop-and-roll. */
+  const crashSeenRef = useRef(0);
 
   const growth = config?.growthRate ?? DEFAULT_GROWTH;
   const minStake = config?.minStake ?? 1;
@@ -408,7 +504,6 @@ export default function CricketXScreen() {
     const first = periodRef.current === null;
     periodRef.current = view.periodNumber;
     if (first) return;
-    fallAnim.setValue(0);
     loadLists();
     refreshWallet();
     panelsRef.current.forEach((p, i) => {
@@ -426,15 +521,14 @@ export default function CricketXScreen() {
   const crashedPeriod = view?.phase === 'CRASHED' ? view.periodNumber : null;
   useEffect(() => {
     if (!crashedPeriod) return;
-    // The ball drops to the turf and bounces.
-    fallAnim.setValue(0);
-    Animated.timing(fallAnim, { toValue: 1, duration: 1100, easing: Easing.bounce, useNativeDriver: true }).start();
+    // The ball drops to the turf, bounces and rolls on (see the scene geometry).
+    crashSeenRef.current = Date.now();
     setTimeout(() => {
       if (!mountedRef.current) return;
       refreshWallet();
       loadLists();
     }, 600);
-  }, [crashedPeriod, fallAnim, refreshWallet, loadLists]);
+  }, [crashedPeriod, refreshWallet, loadLists]);
 
   const placeBet = useCallback(
     async (i: 0 | 1, fromQueue = false) => {
@@ -510,8 +604,12 @@ export default function CricketXScreen() {
   const SH = Math.min(SW * 0.72, 320);
   const crashed = localPhase === 'CRASHED';
   const flightS = localPhase === 'BETTING' ? 0 : crashed && view?.crashMultiplier ? Math.log(view.crashMultiplier) / growth : elapsed;
+  // Once down, the ball keeps rolling and the camera eases to a stop with it.
+  const downS = crashed && crashSeenRef.current ? (Date.now() - crashSeenRef.current) / 1000 : 0;
+  const ROLL_K = 1.4;
+  const rollOut = (1 - Math.exp(-ROLL_K * downS)) / ROLL_K;
   // Camera travel in px: pans away from the batter and speeds up in flight.
-  const pan = SW * (0.55 * flightS + 0.05 * flightS * flightS);
+  const pan = SW * (0.55 * flightS + 0.05 * flightS * flightS + (0.55 + 0.1 * flightS) * 0.6 * rollOut);
   const standsOff = (pan * 0.35) % SW;
   const groundOff = pan % SW;
   const batterH = SH * 0.62;
@@ -522,11 +620,22 @@ export default function CricketXScreen() {
   const ease = 1 - Math.pow(1 - launch, 3);
   const ballBig = SH * 0.3;
   const ballSize = SH * 0.06 + (ballBig - SH * 0.06) * ease;
-  const contact = { x: batterX + batterH * 0.12, y: batterY + batterH * 0.62 };
+  const contact = { x: batterX + batterH * BAT_CONTACT.x, y: batterY + batterH * BAT_CONTACT.y };
   const centre = { x: SW * 0.55, y: SH * 0.4 + (localPhase === 'FLYING' && launch >= 1 ? Math.sin(srvNow / 450) * SH * 0.015 : 0) };
-  const ballX = contact.x + (centre.x - contact.x) * ease;
-  const ballY = contact.y + (centre.y - contact.y) * ease;
-  const groundY = SH * 0.8;
+  const flyX = contact.x + (centre.x - contact.x) * ease;
+  const flyY = contact.y + (centre.y - contact.y) * ease;
+  // Drop: falls from where it was, bounces lower each time, then rolls on.
+  const turfY = SH * 0.87;
+  const restSize = ballSize * 0.7;
+  const restY = turfY - restSize / 2;
+  const dropH = Math.max(0, restY - flyY);
+  const GRAV = SH * 5;
+  const tFall = Math.sqrt((2 * dropH) / GRAV) || 0.01;
+  const lift = crashed ? dropHeight(downS, dropH, GRAV) : 0;
+  const shownSize = crashed ? ballSize - (ballSize - restSize) * Math.min(1, downS / tFall) : ballSize;
+  const ballX = crashed ? flyX + SW * 0.4 * rollOut : flyX;
+  const ballY = crashed ? restY - lift : flyY;
+  const rollDeg = crashed ? (((ballX - flyX) + (pan - SW * (0.55 * flightS + 0.05 * flightS * flightS))) / (restSize / 2)) * (180 / Math.PI) : 0;
   const betLeft = localPhase === 'BETTING' ? Math.max(0, (flyStart - srvNow) / 1000) : 0;
   const betTotal = config?.bettingDurationSeconds ?? 6;
   const rulerY = SH * 0.9;
@@ -594,36 +703,63 @@ export default function CricketXScreen() {
                 <Stumps h={batterH * 0.42} />
               </View>
               <View pointerEvents="none" style={{ position: 'absolute', left: batterX, top: batterY }}>
-                <Batter h={batterH} />
+                <Batter h={batterH} pose={localPhase === 'BETTING' ? 'stance' : 'hit'} />
               </View>
             </>
           )}
 
-          {/* Ball with a motion streak; drops to the turf when the round ends */}
+          {/* Bat-on-ball flash */}
+          {localPhase === 'FLYING' && flightS < 0.3 && (
+            <View pointerEvents="none" style={{ position: 'absolute', left: contact.x - SH * 0.1, top: contact.y - SH * 0.1, opacity: 1 - flightS / 0.3 }}>
+              <Svg width={SH * 0.2} height={SH * 0.2}>
+                {Array.from({ length: 8 }, (_, i) => {
+                  const a = (i / 8) * Math.PI * 2;
+                  const r0 = SH * 0.025;
+                  const r1 = SH * (i % 2 ? 0.06 : 0.09);
+                  return (
+                    <Line key={i} x1={SH * 0.1 + Math.cos(a) * r0} y1={SH * 0.1 + Math.sin(a) * r0} x2={SH * 0.1 + Math.cos(a) * r1} y2={SH * 0.1 + Math.sin(a) * r1} stroke="#D8F1FF" strokeWidth={2} strokeLinecap="round" />
+                  );
+                })}
+                <Circle cx={SH * 0.1} cy={SH * 0.1} r={SH * 0.025} fill="#FFFFFF" opacity={0.9} />
+              </Svg>
+            </View>
+          )}
+
+          {/* Soft shadow on the turf, tighter and darker as the ball comes down */}
+          {crashed && (
+            <View pointerEvents="none" style={{ position: 'absolute', left: ballX - restSize * 0.55, top: turfY - restSize * 0.1 }}>
+              <Svg width={restSize * 1.1} height={restSize * 0.2}>
+                <Defs>
+                  <RadialGradient id="cxBallShadow" cx="50%" cy="50%" r="50%">
+                    <Stop offset="0" stopColor="#000000" stopOpacity={0.45} />
+                    <Stop offset="1" stopColor="#000000" stopOpacity={0} />
+                  </RadialGradient>
+                </Defs>
+                <Ellipse
+                  cx={restSize * 0.55}
+                  cy={restSize * 0.1}
+                  rx={restSize * 0.55 * (1 - 0.4 * Math.min(1, lift / Math.max(1, dropH)))}
+                  ry={restSize * 0.1}
+                  fill="url(#cxBallShadow)"
+                  opacity={1 - 0.6 * Math.min(1, lift / Math.max(1, dropH))}
+                />
+              </Svg>
+            </View>
+          )}
+
+          {/* Ball with a motion streak; drops, bounces and rolls when the round ends */}
           {localPhase !== 'BETTING' && (
-            <Animated.View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                left: ballX - ballSize / 2,
-                top: ballY - ballSize / 2,
-                transform: [
-                  { translateY: fallAnim.interpolate({ inputRange: [0, 1], outputRange: [0, groundY - ballY - ballSize * 0.1] }) },
-                  { translateX: fallAnim.interpolate({ inputRange: [0, 1], outputRange: [0, SW * 0.12] }) },
-                  { scale: fallAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }) },
-                ],
-              }}
-            >
+            <View pointerEvents="none" style={{ position: 'absolute', left: ballX - shownSize / 2, top: ballY - shownSize / 2 }}>
               {!crashed && launch > 0.2 && (
                 <LinearGradient
                   colors={['rgba(255,255,255,0)', 'rgba(255,230,230,0.45)']}
                   start={{ x: 0, y: 0.5 }}
                   end={{ x: 1, y: 0.5 }}
-                  style={{ position: 'absolute', left: -ballSize * 1.1, top: ballSize * 0.22, width: ballSize * 1.4, height: ballSize * 0.56, borderRadius: ballSize * 0.3 }}
+                  style={{ position: 'absolute', left: -shownSize * 1.1, top: shownSize * 0.22, width: shownSize * 1.4, height: shownSize * 0.56, borderRadius: shownSize * 0.3 }}
                 />
               )}
-              <Ball size={ballSize} spin={crashed ? 0 : elapsed * 720} />
-            </Animated.View>
+              <Ball size={shownSize} spin={flightS * 720 + rollDeg} />
+            </View>
           )}
 
           {/* Multiplier and the distance ruler */}
