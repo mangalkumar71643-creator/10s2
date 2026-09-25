@@ -24,6 +24,7 @@ import teenPattiRoutes from "./routes/teenPatti.routes";
 import cricketXRoutes from "./routes/cricketX.routes";
 import jhandiMundaRoutes from "./routes/jhandiMunda.routes";
 import rouletteRoutes from "./routes/roulette.routes";
+import k3Routes from "./routes/k3.routes";
 
 export const app = express();
 
@@ -54,5 +55,6 @@ app.use("/teen-patti", teenPattiRoutes);
 app.use("/cricket-x", cricketXRoutes);
 app.use("/jhandi-munda", jhandiMundaRoutes);
 app.use("/roulette", rouletteRoutes);
+app.use("/k3", k3Routes);
 
 app.use(errorHandler);
