@@ -11,7 +11,6 @@ import gamesRoutes from "./routes/games.routes";
 import responsibleGamblingRoutes from "./routes/responsibleGambling.routes";
 import adminRoutes from "./routes/admin.routes";
 import supportRoutes from "./routes/support.routes";
-import colorGameRoutes from "./routes/colorGame.routes";
 import aviatorRoutes from "./routes/aviator.routes";
 import chickenRoadRoutes from "./routes/chickenRoad.routes";
 import minesRoutes from "./routes/mines.routes";
@@ -26,6 +25,7 @@ import jhandiMundaRoutes from "./routes/jhandiMunda.routes";
 import rouletteRoutes from "./routes/roulette.routes";
 import k3Routes from "./routes/k3.routes";
 import winGoRoutes from "./routes/winGo.routes";
+import { closeOutLegacyColorGame } from "./services/legacyColorGameCloseout";
 
 export const app = express();
 
@@ -43,7 +43,6 @@ app.use("/games", gamesRoutes);
 app.use("/responsible-gambling", responsibleGamblingRoutes);
 app.use("/admin", adminRoutes);
 app.use("/support", supportRoutes);
-app.use("/color-game", colorGameRoutes);
 app.use("/aviator", aviatorRoutes);
 app.use("/chicken-road", chickenRoadRoutes);
 app.use("/mines", minesRoutes);
@@ -60,3 +59,7 @@ app.use("/k3", k3Routes);
 app.use("/wingo", winGoRoutes);
 
 app.use(errorHandler);
+
+// The original Win Go is retired: settle / refund anything still open on it.
+// Idempotent, so running on every cold start is harmless.
+closeOutLegacyColorGame().catch((err) => console.error("Legacy Win Go close-out failed", err));

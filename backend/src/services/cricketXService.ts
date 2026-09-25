@@ -12,7 +12,7 @@ import { fairRandomFloat, generateServerSeed, hashServerSeed } from "../utils/rn
 import { assertCanTransact } from "./responsibleGamblingService";
 
 /** No new bets once the ball has been hit — same anti-abuse idea as
- * ColorGame's LOCK_SECONDS, but here it's just "the betting window". */
+ * Win Go's LOCK_SECONDS, but here it's just "the betting window". */
 const BETTING_DURATION_SECONDS = 6;
 
 /** How long the crashed multiplier stays on screen before the next
@@ -154,10 +154,10 @@ async function settleRound(roundId: string) {
 }
 
 /** Returns the live round, settling and chaining past any that have
- * already ended. Same lazy pattern as ColorGame's ensureCurrentRound —
+ * already ended. Same lazy catch-up pattern as Win Go's rounds —
  * there's no always-on process ticking rounds forward on this serverless
  * backend, so every read/write catches the chain up to "now" first.
- * Unlike ColorGame, rounds aren't aligned to wall-clock slots — each one
+ * Unlike Win Go, rounds aren't aligned to wall-clock slots — each one
  * starts the instant the previous one's result-pause ends. */
 // No single round's flight can realistically take anywhere near this long
 // (even a rare huge crash multiplier resolves in well under a minute), so
@@ -256,7 +256,7 @@ export async function placeCricketXBet(userId: string, amount: number, autoCasho
     });
     if (debited.count === 0) throw new ApiError(400, "Insufficient balance");
 
-    // Same locked-bonus wagering-progress mechanic as colorGameService.ts.
+    // Same locked-bonus wagering-progress mechanic as gameEngineService.ts.
     if (Number(wallet.lockedBonus) > 0) {
       const newProgress = Number(wallet.wageringProgress) + amount;
       await tx.wallet.update({

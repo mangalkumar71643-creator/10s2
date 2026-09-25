@@ -5,7 +5,7 @@ import { requireAdmin, requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { settleMarket } from "../services/betService";
 import { paymentProvider } from "../services/paymentService";
-import * as colorGameService from "../services/colorGameService";
+import * as winGoService from "../services/winGoService";
 import * as aviatorService from "../services/aviatorService";
 import { getChickenRoadConfig } from "../services/chickenRoadService";
 import { getMinesConfig } from "../services/minesService";
@@ -386,40 +386,40 @@ router.patch(
   })
 );
 
-// --- Live game monitoring (Color Predict / Aviator / Dice / Coin Flip) ---
+// --- Live game monitoring (Win Go / Aviator / Dice / Coin Flip) ---
 // Everything here is read-only — lets an admin watch a round unfold, check
 // past rounds against their revealed seed, and audit who's actually been
 // betting, without granting any special foresight the game's fairness
 // model wouldn't otherwise allow (the live views below return exactly what
 // a player already sees).
 
-const colorGameDurationQuery = z.coerce.number().refine((n) => colorGameService.COLOR_GAME_DURATIONS.includes(n as any), {
+const winGoDurationQuery = z.coerce.number().refine((n) => winGoService.WINGO_DURATIONS.includes(n as winGoService.WinGoDuration), {
   message: "Invalid duration",
 });
 
 router.get(
-  "/color-game/live",
+  "/wingo/live",
   asyncHandler(async (req, res) => {
-    const duration = colorGameDurationQuery.parse(req.query.duration ?? 30);
-    res.json(await colorGameService.getCurrentRoundView(duration));
+    const duration = winGoDurationQuery.parse(req.query.duration ?? 30);
+    res.json(await winGoService.getCurrentRoundView(duration));
   })
 );
 
 router.get(
-  "/color-game/rounds",
+  "/wingo/rounds",
   asyncHandler(async (req, res) => {
-    const duration = colorGameDurationQuery.parse(req.query.duration ?? 30);
+    const duration = winGoDurationQuery.parse(req.query.duration ?? 30);
     const limit = Math.min(Number(req.query.limit) || 20, 100);
-    res.json(await colorGameService.getHistory(duration, limit));
+    res.json(await winGoService.getWinGoHistory(duration, limit));
   })
 );
 
 router.get(
-  "/color-game/bets",
+  "/wingo/bets",
   asyncHandler(async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
-    const duration = req.query.duration ? colorGameDurationQuery.parse(req.query.duration) : undefined;
-    const bets = await prisma.colorGameBet.findMany({
+    const duration = req.query.duration ? winGoDurationQuery.parse(req.query.duration) : undefined;
+    const bets = await prisma.winGoBet.findMany({
       where: duration ? { round: { durationSeconds: duration } } : undefined,
       orderBy: { createdAt: "desc" },
       take: limit,

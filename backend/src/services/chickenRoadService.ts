@@ -10,7 +10,7 @@ export type ChickenRoadDifficultyKey = "EASY" | "MEDIUM" | "HARD" | "HARDCORE";
 
 /**
  * One private round per play (no shared betting window like Aviator/
- * ColorGame) — the player crosses lanes one at a time, each survived lane
+ * Win Go) — the player crosses lanes one at a time, each survived lane
  * raising the multiplier, until they cash out or the chicken gets hit.
  * Harder difficulties have fewer total lanes, a higher per-lane bust
  * chance, and a steeper multiplier curve as a result.

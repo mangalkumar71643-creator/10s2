@@ -357,6 +357,9 @@ model Bet {
 // can be placed), and resultNumber = HMAC-SHA256(serverSeed, periodNumber)
 // mod 10 — deterministic and independently recomputable once serverSeed
 // is revealed at settlement.
+// Retired: the original Win Go. Kept (read-only) so past rounds and bets
+// stay on record; nothing places or settles bets here any more except the
+// one-time close-out in legacyColorGameCloseout.ts. The live game is WinGo*.
 model ColorGameRound {
   id              String         @id @default(uuid())
   durationSeconds Int

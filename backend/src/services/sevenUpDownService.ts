@@ -7,7 +7,7 @@ import { assertCanTransact } from "./responsibleGamblingService";
 
 /**
  * "7 Up Down": two dice per shared round, bets on the total. Rounds sit on
- * fixed wall-clock slots (like ColorGame) so every player sees the same
+ * fixed wall-clock slots (like Win Go) so every player sees the same
  * timer: betting, then the cup shakes, then the dice are revealed.
  */
 export const ROUND_SECONDS = 20;

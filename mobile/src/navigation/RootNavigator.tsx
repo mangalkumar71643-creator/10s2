@@ -18,7 +18,6 @@ import JhandiMundaScreen from '../screens/JhandiMundaScreen';
 import RouletteScreen from '../screens/RouletteScreen';
 import K3LotteryScreen from '../screens/K3LotteryScreen';
 import WinGoScreen from '../screens/WinGoScreen';
-import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -70,7 +69,6 @@ function MainNavigator() {
       <Stack.Screen name="History" component={HistoryScreen} />
       <Stack.Screen name="Deposit" component={DepositScreen} />
       <Stack.Screen name="Withdraw" component={WithdrawScreen} />
-      <Stack.Screen name="ColorPredict" component={ColorPredictScreen} />
       <Stack.Screen name="Aviator" component={AviatorScreen} />
       <Stack.Screen name="ChickenRoad" component={ChickenRoadScreen} />
       <Stack.Screen name="Mines" component={MinesScreen} />

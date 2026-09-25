@@ -23,7 +23,6 @@ export type RootStackParamList = {
   History: undefined;
   Deposit: undefined;
   Withdraw: undefined;
-  ColorPredict: undefined;
   Aviator: undefined;
   ChickenRoad: undefined;
   Mines: undefined;
