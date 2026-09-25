@@ -186,6 +186,7 @@ model User {
   JhandiMundaBet    JhandiMundaBet[]
   RouletteBet       RouletteBet[]
   K3Bet             K3Bet[]
+  WinGoBet          WinGoBet[]
 }
 
 model KycVerification {
@@ -863,6 +864,47 @@ model K3Bet {
   status     BetStatus @default(PENDING)
   payout     Decimal   @default(0) @db.Decimal(12, 2)
   createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
+}
+
+// Win Go (rebuilt): one number 0-9 per round on per-duration wall-clock
+// tracks. `result` is fixed at creation from the round's server seed and
+// only revealed once the round has ended.
+model WinGoRound {
+  id              String     @id @default(uuid())
+  durationSeconds Int
+  periodNumber    String
+  startTime       DateTime
+  endTime         DateTime
+  result          Int
+  serverSeed      String
+  serverSeedHash  String
+  settled         Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  bets            WinGoBet[]
+
+  @@unique([durationSeconds, periodNumber])
+  @@index([durationSeconds, startTime])
+  @@index([settled, endTime])
+}
+
+// One Win Go bet (area: NUM:0-9, GREEN, RED, VIOLET, BIG, SMALL). The rate
+// it pays depends on the number drawn (green/red pay less on 5/0), so it is
+// recorded at settlement in paidMultiplier.
+model WinGoBet {
+  id             String     @id @default(uuid())
+  roundId        String
+  round          WinGoRound @relation(fields: [roundId], references: [id])
+  userId         String
+  user           User       @relation(fields: [userId], references: [id])
+  area           String
+  amount         Decimal    @db.Decimal(12, 2)
+  paidMultiplier Decimal    @default(0) @db.Decimal(8, 2)
+  status         BetStatus  @default(PENDING)
+  payout         Decimal    @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime   @default(now())
 
   @@index([userId])
   @@index([roundId, userId])
