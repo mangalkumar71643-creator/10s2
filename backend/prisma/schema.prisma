@@ -183,6 +183,7 @@ model User {
   AndarBaharBet     AndarBaharBet[]
   TeenPattiBet      TeenPattiBet[]
   CricketXBet       CricketXBet[]
+  JhandiMundaBet    JhandiMundaBet[]
 }
 
 model KycVerification {
@@ -741,4 +742,45 @@ model CricketXBet {
 
   @@index([userId])
   @@index([roundId])
+}
+
+// One shared Jhandi Munda round on a fixed wall-clock slot. `dice` holds the
+// face (0..5) each of the six dice lands on, fixed at creation from the
+// round's server seed and only revealed once betting has closed.
+model JhandiMundaRound {
+  id             String           @id @default(uuid())
+  periodNumber   String           @unique
+  startTime      DateTime
+  betEndTime     DateTime
+  resultTime     DateTime
+  endTime        DateTime
+  dice           Int[]
+  serverSeed     String
+  serverSeedHash String
+  settled        Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  bets           JhandiMundaBet[]
+
+  @@index([startTime])
+  @@index([settled, resultTime])
+}
+
+// One chip stack on a Jhandi Munda symbol. The payout depends on how many
+// dice show the symbol (see jhandiMundaService.ts); `matches` is filled in
+// on settlement. VOID marks a bet taken back during the betting window.
+model JhandiMundaBet {
+  id        String           @id @default(uuid())
+  roundId   String
+  round     JhandiMundaRound @relation(fields: [roundId], references: [id])
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  area      String
+  amount    Decimal          @db.Decimal(12, 2)
+  matches   Int?
+  status    BetStatus        @default(PENDING)
+  payout    Decimal          @default(0) @db.Decimal(12, 2)
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
 }
