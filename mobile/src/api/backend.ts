@@ -847,3 +847,79 @@ export function spinVortexRound(roundId: string) {
 export function cashOutVortexRound(roundId: string) {
   return apiFetch<VortexRound>('/vortex/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
 }
+
+export type AndarBaharArea = 'ANDAR' | 'BAHAR' | 'C1_5' | 'C6_10' | 'C11_15' | 'C16_25' | 'C26_35' | 'C36_49';
+
+export interface AndarBaharConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  roundSeconds: number;
+  betSeconds: number;
+  resultAtSeconds: number;
+  rtpPercent: number;
+  multipliers: Record<AndarBaharArea, number>;
+}
+
+export interface AndarBaharRoundView {
+  periodNumber: string;
+  startTime: string;
+  betEndTime: string;
+  resultTime: string;
+  endTime: string;
+  serverTime: string;
+  phase: 'BETTING' | 'DEALING' | 'RESULT';
+  serverSeedHash: string;
+  joker: PlayingCard | null;
+  cards: PlayingCard[] | null;
+  winner: 'ANDAR' | 'BAHAR' | null;
+  totalCards: number | null;
+  serverSeed: string | null;
+}
+
+export interface AndarBaharBet {
+  id: string;
+  area: AndarBaharArea;
+  amount: string;
+  multiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+}
+
+export interface AndarBaharHistoryEntry {
+  periodNumber: string;
+  joker: PlayingCard;
+  winner: 'ANDAR' | 'BAHAR';
+  totalCards: number;
+}
+
+export function fetchAndarBaharConfig() {
+  return apiFetch<AndarBaharConfig>('/andar-bahar/config');
+}
+
+export function fetchAndarBaharCurrent() {
+  return apiFetch<AndarBaharRoundView>('/andar-bahar/current');
+}
+
+export function fetchAndarBaharHistory(limit = 100) {
+  return apiFetch<AndarBaharHistoryEntry[]>(`/andar-bahar/history?limit=${limit}`);
+}
+
+export function placeAndarBaharBets(bets: { area: AndarBaharArea; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: AndarBaharBet[] }>('/andar-bahar/bet', {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function cancelAndarBaharBets(betIds?: string[]) {
+  return apiFetch<{ cancelled: string[]; refund: number }>('/andar-bahar/cancel', {
+    method: 'POST',
+    body: JSON.stringify(betIds ? { betIds } : {}),
+  });
+}
+
+export function fetchAndarBaharMyRound(periodNumber?: string) {
+  const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
+  return apiFetch<{ periodNumber: string | null; bets: AndarBaharBet[] }>(`/andar-bahar/my-round${q}`);
+}

@@ -83,7 +83,9 @@ export default function HomeScreen() {
   const dragonTigerTileLeft = GAME_GRID_LEFT;
   const vortexTileTop = 3 * GAME_GRID_CELL;
   const vortexTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 4;
+  const andarBaharTileTop = 4 * GAME_GRID_CELL;
+  const andarBaharTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 5;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -350,6 +352,33 @@ export default function HomeScreen() {
           <MaterialCommunityIcons name="fire" size={16} color="#FF8A2A" />
         </View>
         <Text style={{ color: '#FFD66B', fontSize: 18, fontWeight: '900', letterSpacing: 3, marginTop: 2 }}>VORTEX</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('AndarBahar')}
+        style={{
+          position: 'absolute',
+          top: andarBaharTileTop,
+          left: andarBaharTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#D9A441',
+          backgroundColor: '#3A0A2E',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#2F6BE0', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900' }}>A</Text>
+          </View>
+          <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: '#E0303F', alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 26, fontWeight: '900' }}>B</Text>
+          </View>
+        </View>
+        <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1, marginTop: 8 }}>ANDAR BAHAR</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

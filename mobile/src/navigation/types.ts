@@ -31,4 +31,5 @@ export type RootStackParamList = {
   Plinko: undefined;
   DragonTiger: undefined;
   Vortex: undefined;
+  AndarBahar: undefined;
 };

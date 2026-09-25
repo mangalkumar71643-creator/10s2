@@ -11,6 +11,7 @@ import SevenUpDownScreen from '../screens/SevenUpDownScreen';
 import PlinkoScreen from '../screens/PlinkoScreen';
 import DragonTigerScreen from '../screens/DragonTigerScreen';
 import VortexScreen from '../screens/VortexScreen';
+import AndarBaharScreen from '../screens/AndarBaharScreen';
 import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
@@ -71,6 +72,7 @@ function MainNavigator() {
       <Stack.Screen name="Plinko" component={PlinkoScreen} />
       <Stack.Screen name="DragonTiger" component={DragonTigerScreen} />
       <Stack.Screen name="Vortex" component={VortexScreen} />
+      <Stack.Screen name="AndarBahar" component={AndarBaharScreen} />
     </Stack.Navigator>
   );
 }
