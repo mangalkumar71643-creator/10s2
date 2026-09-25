@@ -212,6 +212,9 @@ export async function getCurrentRoundView() {
     endTime: phase === "CRASHED" ? round.endTime : null,
     serverSeedHash: round.serverSeedHash,
     phase,
+    // Lets the app line its clock up with the server's for the countdown
+    // and the live multiplier.
+    serverTime: now,
     multiplier: liveMultiplier(round, now),
     // Only reveal the crash point once the round has actually reached it.
     crashMultiplier: phase === "CRASHED" ? Number(round.crashMultiplier) : null,

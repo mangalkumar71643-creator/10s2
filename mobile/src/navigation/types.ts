@@ -33,4 +33,5 @@ export type RootStackParamList = {
   Vortex: undefined;
   AndarBahar: undefined;
   TeenPatti: undefined;
+  CricketX: undefined;
 };

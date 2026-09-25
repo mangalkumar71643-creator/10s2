@@ -13,6 +13,7 @@ import DragonTigerScreen from '../screens/DragonTigerScreen';
 import VortexScreen from '../screens/VortexScreen';
 import AndarBaharScreen from '../screens/AndarBaharScreen';
 import TeenPattiScreen from '../screens/TeenPattiScreen';
+import CricketXScreen from '../screens/CricketXScreen';
 import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
@@ -75,6 +76,7 @@ function MainNavigator() {
       <Stack.Screen name="Vortex" component={VortexScreen} />
       <Stack.Screen name="AndarBahar" component={AndarBaharScreen} />
       <Stack.Screen name="TeenPatti" component={TeenPattiScreen} />
+      <Stack.Screen name="CricketX" component={CricketXScreen} />
     </Stack.Navigator>
   );
 }

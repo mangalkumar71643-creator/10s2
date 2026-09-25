@@ -87,7 +87,9 @@ export default function HomeScreen() {
   const andarBaharTileLeft = GAME_GRID_LEFT;
   const teenPattiTileTop = 4 * GAME_GRID_CELL;
   const teenPattiTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 5;
+  const cricketXTileTop = 5 * GAME_GRID_CELL;
+  const cricketXTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 6;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -420,6 +422,29 @@ export default function HomeScreen() {
           ))}
         </View>
         <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1, marginTop: 6 }}>TEEN PATTI</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('CricketX')}
+        style={{
+          position: 'absolute',
+          top: cricketXTileTop,
+          left: cricketXTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#4FC3FF',
+          backgroundColor: '#0B1A3A',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '38%', backgroundColor: '#17702F' }} />
+        <MaterialCommunityIcons name="cricket" size={GAME_ICON_SIZE * 0.42} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2, marginTop: 2 }}>
+          CRICKET <Text style={{ color: '#FF4F6D' }}>X</Text>
+        </Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

@@ -363,6 +363,8 @@ export interface AviatorRoundView {
   phase: AviatorPhase;
   multiplier: number;
   crashMultiplier: number | null;
+  /** Server clock at the time of the response (Cricket X only). */
+  serverTime?: string;
 }
 
 export function fetchAviatorCurrentRound() {
@@ -1001,4 +1003,36 @@ export function cancelTeenPattiBets(betIds?: string[]) {
 export function fetchTeenPattiMyRound(periodNumber?: string) {
   const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
   return apiFetch<{ periodNumber: string | null; bets: TeenPattiBet[] }>(`/teen-patti/my-round${q}`);
+}
+
+// ---- Cricket X (same crash engine and shapes as Aviator) -------------------
+
+export function fetchCricketXConfig() {
+  return apiFetch<AviatorConfig>('/cricket-x/config');
+}
+
+export function fetchCricketXCurrentRound() {
+  return apiFetch<AviatorRoundView>('/cricket-x/current');
+}
+
+export function fetchCricketXHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/cricket-x/history?limit=${limit}`);
+}
+
+export function placeCricketXBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<AviatorBetResult>('/cricket-x/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+export function cashOutCricketXBet(betId: string) {
+  return apiFetch<{ multiplier: number; payout: number }>('/cricket-x/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+export function fetchCricketXMyBets() {
+  return apiFetch<AviatorMyBet[]>('/cricket-x/my-bets');
 }
