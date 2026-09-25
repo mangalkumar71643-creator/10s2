@@ -21,6 +21,7 @@ import dragonTigerRoutes from "./routes/dragonTiger.routes";
 import vortexRoutes from "./routes/vortex.routes";
 import andarBaharRoutes from "./routes/andarBahar.routes";
 import teenPattiRoutes from "./routes/teenPatti.routes";
+import cricketXRoutes from "./routes/cricketX.routes";
 
 export const app = express();
 
@@ -48,5 +49,6 @@ app.use("/dragon-tiger", dragonTigerRoutes);
 app.use("/vortex", vortexRoutes);
 app.use("/andar-bahar", andarBaharRoutes);
 app.use("/teen-patti", teenPattiRoutes);
+app.use("/cricket-x", cricketXRoutes);
 
 app.use(errorHandler);
