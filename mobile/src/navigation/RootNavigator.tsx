@@ -15,6 +15,7 @@ import AndarBaharScreen from '../screens/AndarBaharScreen';
 import TeenPattiScreen from '../screens/TeenPattiScreen';
 import CricketXScreen from '../screens/CricketXScreen';
 import JhandiMundaScreen from '../screens/JhandiMundaScreen';
+import RouletteScreen from '../screens/RouletteScreen';
 import ColorPredictScreen from '../screens/ColorPredictScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
@@ -79,6 +80,7 @@ function MainNavigator() {
       <Stack.Screen name="TeenPatti" component={TeenPattiScreen} />
       <Stack.Screen name="CricketX" component={CricketXScreen} />
       <Stack.Screen name="JhandiMunda" component={JhandiMundaScreen} />
+      <Stack.Screen name="Roulette" component={RouletteScreen} />
     </Stack.Navigator>
   );
 }

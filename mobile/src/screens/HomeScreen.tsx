@@ -1,5 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { SymbolIcon } from './JhandiMundaScreen';
+import { RouletteTileArt } from './RouletteScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -92,7 +93,9 @@ export default function HomeScreen() {
   const cricketXTileLeft = GAME_GRID_LEFT;
   const jhandiMundaTileTop = 5 * GAME_GRID_CELL;
   const jhandiMundaTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 6;
+  const rouletteTileTop = 6 * GAME_GRID_CELL;
+  const rouletteTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 7;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -490,6 +493,26 @@ export default function HomeScreen() {
         <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 1, marginTop: 8 }}>
           JHANDI <Text style={{ color: '#FFD66B' }}>MUNDA</Text>
         </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Roulette')}
+        style={{
+          position: 'absolute',
+          top: rouletteTileTop,
+          left: rouletteTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#E9C46A',
+          backgroundColor: '#0A3D22',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <RouletteTileArt size={GAME_ICON_SIZE * 0.62} />
+        <Text style={{ color: '#E9C46A', fontSize: 15, fontWeight: '900', letterSpacing: 2, marginTop: 4 }}>ROULETTE</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

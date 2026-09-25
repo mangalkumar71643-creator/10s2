@@ -1116,3 +1116,82 @@ export function fetchJhandiMundaMyRound(periodNumber?: string) {
   const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
   return apiFetch<{ periodNumber: string | null; bets: JhandiMundaBet[] }>(`/jhandi-munda/my-round${q}`);
 }
+
+// ---- Roulette (European, single zero) ----------------------------------------
+
+export interface RouletteConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  roundSeconds: number;
+  betSeconds: number;
+  resultAtSeconds: number;
+  rtpPercent: number;
+  redNumbers: number[];
+  /** Total return per unit staked, by how many numbers the bet covers. */
+  multipliers: Record<string, number>;
+}
+
+export interface RouletteRoundView {
+  periodNumber: string;
+  startTime: string;
+  betEndTime: string;
+  resultTime: string;
+  endTime: string;
+  serverTime: string;
+  phase: 'BETTING' | 'SPINNING' | 'RESULT';
+  serverSeedHash: string;
+  result: number | null;
+  color: 'RED' | 'BLACK' | 'GREEN' | null;
+  serverSeed: string | null;
+}
+
+export interface RouletteBet {
+  id: string;
+  /** Bet spot key, e.g. "S:17", "SP:0-1", "CO:5", "DZ2", "RED". */
+  area: string;
+  amount: string;
+  multiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+  createdAt: string;
+}
+
+export interface RouletteHistoryEntry {
+  periodNumber: string;
+  result: number;
+  color: 'RED' | 'BLACK' | 'GREEN';
+  serverSeed: string;
+  serverSeedHash: string;
+}
+
+export function fetchRouletteConfig() {
+  return apiFetch<RouletteConfig>('/roulette/config');
+}
+
+export function fetchRouletteCurrent() {
+  return apiFetch<RouletteRoundView>('/roulette/current');
+}
+
+export function fetchRouletteHistory(limit = 100) {
+  return apiFetch<RouletteHistoryEntry[]>(`/roulette/history?limit=${limit}`);
+}
+
+export function placeRouletteBets(bets: { area: string; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: RouletteBet[] }>('/roulette/bet', {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function cancelRouletteBets(betIds?: string[]) {
+  return apiFetch<{ cancelled: string[]; refund: number }>('/roulette/cancel', {
+    method: 'POST',
+    body: JSON.stringify(betIds ? { betIds } : {}),
+  });
+}
+
+export function fetchRouletteMyRound(periodNumber?: string) {
+  const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
+  return apiFetch<{ periodNumber: string | null; bets: RouletteBet[] }>(`/roulette/my-round${q}`);
+}
