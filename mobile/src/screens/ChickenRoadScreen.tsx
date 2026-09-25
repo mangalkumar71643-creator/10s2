@@ -95,16 +95,16 @@ const HOP_DURATION_MS = 380;
 // different vehicles (cropped from one reference sheet) so back-to-back
 // traffic on the same lane doesn't look like the same car repeating.
 const CAR_SOURCES = [
-  require('../../assets/chicken-road-car-1.png'),
-  require('../../assets/chicken-road-car-2.png'),
-  require('../../assets/chicken-road-car-3.png'),
-  require('../../assets/chicken-road-car-4.png'),
-  require('../../assets/chicken-road-car-5.png'),
-  require('../../assets/chicken-road-car-6.png'),
-  require('../../assets/chicken-road-car-7.png'),
-  require('../../assets/chicken-road-car-8.png'),
-  require('../../assets/chicken-road-car-9.png'),
-  require('../../assets/chicken-road-car-10.png'),
+  require('../../assets/chicken-road-car-1.webp'),
+  require('../../assets/chicken-road-car-2.webp'),
+  require('../../assets/chicken-road-car-3.webp'),
+  require('../../assets/chicken-road-car-4.webp'),
+  require('../../assets/chicken-road-car-5.webp'),
+  require('../../assets/chicken-road-car-6.webp'),
+  require('../../assets/chicken-road-car-7.webp'),
+  require('../../assets/chicken-road-car-8.webp'),
+  require('../../assets/chicken-road-car-9.webp'),
+  require('../../assets/chicken-road-car-10.webp'),
 ];
 function randomCarSource() {
   return CAR_SOURCES[Math.floor(Math.random() * CAR_SOURCES.length)];
@@ -579,7 +579,7 @@ export default function ChickenRoadScreen() {
         contentContainerStyle={{ width: totalRoadWidth, height: PANEL_HEIGHT }}
       >
         <Image
-          source={require('../../assets/chicken-road-panel-bg.png')}
+          source={require('../../assets/chicken-road-panel-bg.webp')}
           style={{ width: PANEL_WIDTH, height: PANEL_HEIGHT }}
           resizeMode="contain"
         />
@@ -630,7 +630,7 @@ export default function ChickenRoadScreen() {
                 }}
               >
                 <Image
-                  source={require('../../assets/chicken-road-manhole.png')}
+                  source={require('../../assets/chicken-road-manhole.webp')}
                   style={{ width: PLATE_WIDTH, height: PLATE_HEIGHT }}
                   resizeMode="contain"
                 />
@@ -674,7 +674,7 @@ export default function ChickenRoadScreen() {
                 }}
               >
                 <Image
-                  source={require('../../assets/chicken-road-barrier.png')}
+                  source={require('../../assets/chicken-road-barrier.webp')}
                   style={{ width: BARRIER_WIDTH, height: BARRIER_HEIGHT }}
                   resizeMode="contain"
                 />
@@ -700,8 +700,8 @@ export default function ChickenRoadScreen() {
           <Image
             source={
               isChickenHit
-                ? require('../../assets/chicken-road-chicken-hit.png')
-                : require('../../assets/chicken-road-chicken.png')
+                ? require('../../assets/chicken-road-chicken-hit.webp')
+                : require('../../assets/chicken-road-chicken.webp')
             }
             style={{ width: CHICKEN_WIDTH, height: CHICKEN_HEIGHT }}
             resizeMode="contain"

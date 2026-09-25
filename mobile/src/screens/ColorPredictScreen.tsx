@@ -625,7 +625,7 @@ export default function ColorPredictScreen() {
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* ---------------- TOP IMAGE ---------------- */}
         <View style={{ width, height: topImageHeight }}>
-          <Image source={require('../../assets/win-go-screen.jpg')} style={{ width, height: topImageHeight }} resizeMode="cover" />
+          <Image source={require('../../assets/win-go-screen.webp')} style={{ width, height: topImageHeight }} resizeMode="cover" />
 
           {/* Balance overlay + refresh button */}
           <View
@@ -866,7 +866,7 @@ export default function ColorPredictScreen() {
         {/* ---------------- BOTTOM IMAGE ---------------- */}
         <View style={{ width, height: bottomImageHeight }}>
           <Image
-            source={require('../../assets/win-go-screen-bottom.jpg')}
+            source={require('../../assets/win-go-screen-bottom.webp')}
             style={{ width, height: bottomImageHeight }}
             resizeMode="cover"
           />

@@ -92,7 +92,7 @@ export default function HomeScreen() {
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
   return (
-    <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.jpg')}>
+    <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.webp')}>
       <View
         style={{
           position: 'absolute',
@@ -104,7 +104,7 @@ export default function HomeScreen() {
         }}
       >
         <Image
-          source={require('../../assets/novaplay-badge.png')}
+          source={require('../../assets/novaplay-badge.webp')}
           style={{
             position: 'absolute',
             width: NOVAPLAY_BADGE_SIZE,
@@ -123,7 +123,7 @@ export default function HomeScreen() {
           }}
         >
           <Image
-            source={require('../../assets/wallet-button.png')}
+            source={require('../../assets/wallet-button.webp')}
             style={{ width: walletButtonWidth, height: WALLET_BUTTON_HEIGHT }}
             resizeMode="contain"
           />
@@ -155,7 +155,7 @@ export default function HomeScreen() {
           }}
         >
           <Image
-            source={require('../../assets/gift-icon.png')}
+            source={require('../../assets/gift-icon.webp')}
             style={{ width: GIFT_ICON_SIZE, height: GIFT_ICON_SIZE }}
             resizeMode="contain"
           />
@@ -176,7 +176,7 @@ export default function HomeScreen() {
         </Pressable>
       </View>
       <Image
-        source={require('../../assets/control-panel.png')}
+        source={require('../../assets/control-panel.webp')}
         style={{
           position: 'absolute',
           top: panelTop,
@@ -203,7 +203,7 @@ export default function HomeScreen() {
         }}
       >
         <Image
-          source={require('../../assets/wingo-home-icon.png')}
+          source={require('../../assets/wingo-home-icon.webp')}
           style={{ width: '100%', height: '100%' }}
           resizeMode="contain"
         />
@@ -220,7 +220,7 @@ export default function HomeScreen() {
         }}
       >
         <Image
-          source={require('../../assets/aviator-home-icon.png')}
+          source={require('../../assets/aviator-home-icon.webp')}
           style={{ width: '100%', height: '100%' }}
           resizeMode="contain"
         />

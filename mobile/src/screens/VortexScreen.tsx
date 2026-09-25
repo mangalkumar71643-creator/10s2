@@ -47,9 +47,9 @@ const LOOK: Record<VortexOutcome, Look> = {
   CRASH: { name: 'Vortex', icon: 'weather-hurricane', colors: ['#3A1260', '#0C0218'], glow: '#B45CFF' },
 };
 const ELEMENT_ART: Record<VortexElement, number> = {
-  WATER: require('../../assets/vortex/water.png'),
-  EARTH: require('../../assets/vortex/earth.png'),
-  FIRE: require('../../assets/vortex/fire.png'),
+  WATER: require('../../assets/vortex/water.webp'),
+  EARTH: require('../../assets/vortex/earth.webp'),
+  FIRE: require('../../assets/vortex/fire.webp'),
 };
 
 /** Element badge art, or the vortex glyph for the losing segment. */

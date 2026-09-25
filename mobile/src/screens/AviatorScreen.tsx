@@ -556,7 +556,7 @@ function FlightTrail({ round }: { round: AviatorRoundView | null }) {
         />
       </Svg>
       <Image
-        source={require('../../assets/aviator-plane.png')}
+        source={require('../../assets/aviator-plane.webp')}
         resizeMode="contain"
         style={[
           styles.plane,
@@ -1318,7 +1318,7 @@ export default function AviatorScreen() {
       <View style={[styles.betPanelWrap, { width: BET_PANEL_WIDTH }]}>
         <View style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_1_HEIGHT }}>
           <Image
-            source={require('../../assets/aviator-bet-panel-1.png')}
+            source={require('../../assets/aviator-bet-panel-1.webp')}
             style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_1_HEIGHT }}
             resizeMode="contain"
           />
@@ -1364,7 +1364,7 @@ export default function AviatorScreen() {
 
         <View style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_2_HEIGHT }}>
           <Image
-            source={require('../../assets/aviator-bet-panel-2.png')}
+            source={require('../../assets/aviator-bet-panel-2.webp')}
             style={{ width: BET_PANEL_WIDTH, height: BET_PANEL_2_HEIGHT }}
             resizeMode="contain"
           />

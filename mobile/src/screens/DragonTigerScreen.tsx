@@ -91,7 +91,7 @@ const SUIT_SYMBOL: Record<string, string> = { S: '♠', H: '♥', C: '♣', D: '
 // The table is one painted piece of art (1852×849). Everything interactive
 // is laid out in the art's own pixel coordinates and mapped onto the screen,
 // so boxes, cards and chips always sit exactly on the painted spots.
-const TABLE_BG = require('../../assets/dragon-tiger/table.jpg');
+const TABLE_BG = require('../../assets/dragon-tiger/table.webp');
 const IMG_W = 1852;
 const IMG_H = 849;
 
@@ -101,24 +101,24 @@ type Rect = [number, number, number, number];
 // white silhouette that masks the winner's light sweep.
 const FIGHTER_ART = {
   DRAGON: {
-    color: require('../../assets/dragon-tiger/dragon-head.png'),
-    bw: require('../../assets/dragon-tiger/dragon-head-bw.png'),
+    color: require('../../assets/dragon-tiger/dragon-head.webp'),
+    bw: require('../../assets/dragon-tiger/dragon-head-bw.webp'),
     mask: require('../../assets/dragon-tiger/dragon-head-mask.png'),
     aspect: 560 / 500,
   },
   TIGER: {
-    color: require('../../assets/dragon-tiger/tiger-head.png'),
-    bw: require('../../assets/dragon-tiger/tiger-head-bw.png'),
+    color: require('../../assets/dragon-tiger/tiger-head.webp'),
+    bw: require('../../assets/dragon-tiger/tiger-head-bw.webp'),
     mask: require('../../assets/dragon-tiger/tiger-head-mask.png'),
     aspect: 560 / 477,
   },
 };
-const VS_ART = require('../../assets/dragon-tiger/vs.png');
+const VS_ART = require('../../assets/dragon-tiger/vs.webp');
 const VS_ASPECT = 416 / 620;
 // The same treatment for the heads painted on the table strip.
 const TABLE_HEAD: Record<'DRAGON' | 'TIGER', { bw: number; mask: number; r: Rect }> = {
-  DRAGON: { bw: require('../../assets/dragon-tiger/table-dragon-bw.png'), mask: require('../../assets/dragon-tiger/table-dragon-mask.png'), r: [395, 0, 700, 200] },
-  TIGER: { bw: require('../../assets/dragon-tiger/table-tiger-bw.png'), mask: require('../../assets/dragon-tiger/table-tiger-mask.png'), r: [1020, 0, 1325, 200] },
+  DRAGON: { bw: require('../../assets/dragon-tiger/table-dragon-bw.webp'), mask: require('../../assets/dragon-tiger/table-dragon-mask.png'), r: [395, 0, 700, 200] },
+  TIGER: { bw: require('../../assets/dragon-tiger/table-tiger-bw.webp'), mask: require('../../assets/dragon-tiger/table-tiger-mask.png'), r: [1020, 0, 1325, 200] },
 };
 const BOXES: { area: DragonTigerArea; title: string; mark: string; big: boolean; r: Rect }[] = [
   { area: 'DRAGON', title: 'DRAGON', mark: '龍', big: true, r: [276, 220, 669, 664] },

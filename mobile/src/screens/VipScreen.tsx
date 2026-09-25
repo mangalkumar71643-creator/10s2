@@ -355,7 +355,7 @@ export default function VipScreen() {
               <MaterialCommunityIcons name="close-circle" size={28} color={colors.gold} />
             </Pressable>
             <Image
-              source={require('../../assets/vip-level-description.jpg')}
+              source={require('../../assets/vip-level-description.webp')}
               style={{ width: descriptionImageWidthCapped, height: descriptionImageHeight, borderRadius: radius.lg }}
               resizeMode="contain"
             />
