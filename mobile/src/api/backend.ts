@@ -1295,3 +1295,84 @@ export function placeFiveDBets(duration: FiveDDuration, bets: { area: string; am
 export function fetchFiveDMyBets(limit = 50) {
   return apiFetch<FiveDMyBet[]>(`/5d/my-bets?limit=${limit}`);
 }
+
+// ---- Trx Win Go (Win Go numbers from TRON block hashes) ----------------------
+
+export type TrxDuration = 60 | 180 | 300 | 600;
+
+export interface TrxConfig {
+  durations: TrxDuration[];
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  lockSeconds: number;
+  rtpPercent: number;
+  payouts: { number: number; size: number; violet: number; color: number; colorMixed: number };
+  /** A round whose block can't be read for this long is refunded. */
+  voidAfterMinutes: number;
+}
+
+export interface TrxRoundView {
+  periodNumber: string;
+  durationSeconds: TrxDuration;
+  startTime: string;
+  /** The draw: the first TRON block at or after this time decides the number. */
+  endTime: string;
+  serverTime: string;
+  locked: boolean;
+}
+
+export interface TrxBlock {
+  blockNumber: number;
+  /** 64 hex characters; the number is its last decimal digit. */
+  blockHash: string;
+  blockTime: string;
+}
+
+export interface TrxResult extends TrxBlock {
+  number: number;
+  size: 'BIG' | 'SMALL';
+  colors: ('GREEN' | 'RED' | 'VIOLET')[];
+}
+
+export interface TrxHistoryEntry extends TrxResult {
+  periodNumber: string;
+  drawAt: string;
+}
+
+export interface TrxMyBet {
+  id: string;
+  /** NUM:0-9, GREEN, RED, VIOLET, BIG or SMALL. */
+  area: string;
+  amount: string;
+  paidMultiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+  createdAt: string;
+  periodNumber: string;
+  durationSeconds: TrxDuration;
+  result: TrxResult | null;
+}
+
+export function fetchTrxConfig() {
+  return apiFetch<TrxConfig>('/trx/config');
+}
+
+export function fetchTrxCurrent(duration: TrxDuration) {
+  return apiFetch<TrxRoundView>(`/trx/${duration}/current`);
+}
+
+export function fetchTrxHistory(duration: TrxDuration, limit = 100) {
+  return apiFetch<TrxHistoryEntry[]>(`/trx/${duration}/history?limit=${limit}`);
+}
+
+export function placeTrxBets(duration: TrxDuration, bets: { area: string; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: TrxMyBet[] }>(`/trx/${duration}/bet`, {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function fetchTrxMyBets(limit = 50) {
+  return apiFetch<TrxMyBet[]>(`/trx/my-bets?limit=${limit}`);
+}

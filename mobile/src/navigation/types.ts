@@ -38,4 +38,5 @@ export type RootStackParamList = {
   K3Lottery: undefined;
   WinGo: undefined;
   FiveDLottery: undefined;
+  TrxWin: undefined;
 };
