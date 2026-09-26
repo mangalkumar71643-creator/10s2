@@ -2,6 +2,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { SymbolIcon } from './JhandiMundaScreen';
 import { RouletteTileArt } from './RouletteScreen';
 import { K3TileArt } from './K3LotteryScreen';
+import { FiveDTileArt } from './FiveDLotteryScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -98,7 +99,9 @@ export default function HomeScreen() {
   const rouletteTileLeft = GAME_GRID_LEFT;
   const k3TileTop = 6 * GAME_GRID_CELL;
   const k3TileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 7;
+  const fiveDTileTop = 7 * GAME_GRID_CELL;
+  const fiveDTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 8;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -537,6 +540,28 @@ export default function HomeScreen() {
         <K3TileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1, marginTop: 8 }}>
           K3 <Text style={{ color: '#F4CF6A' }}>LOTTERY</Text>
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('FiveDLottery')}
+        style={{
+          position: 'absolute',
+          top: fiveDTileTop,
+          left: fiveDTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#F4CF6A',
+          backgroundColor: '#12743F',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <FiveDTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1, marginTop: 10 }}>
+          5D <Text style={{ color: '#F4CF6A' }}>LOTTERY</Text>
         </Text>
       </Pressable>
       </ScrollView>

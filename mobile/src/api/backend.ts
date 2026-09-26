@@ -1221,3 +1221,77 @@ export function placeWinGoBets(duration: WinGoDuration, bets: { area: string; am
 export function fetchWinGoMyBets(limit = 50) {
   return apiFetch<WinGoMyBet[]>(`/wingo/my-bets?limit=${limit}`);
 }
+
+// ---- 5D Lottery (five digits A-E, Win Go style duration tracks) --------------
+
+export type FiveDDuration = 60 | 180 | 300 | 600;
+
+export interface FiveDConfig {
+  durations: FiveDDuration[];
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  lockSeconds: number;
+  rtpPercent: number;
+  /** Total return per unit staked, by bet key (e.g. "A:7", "B:BIG", "SUM:ODD"). */
+  multipliers: Record<string, number>;
+}
+
+export interface FiveDRoundView {
+  periodNumber: string;
+  durationSeconds: FiveDDuration;
+  startTime: string;
+  endTime: string;
+  serverTime: string;
+  serverSeedHash: string;
+  locked: boolean;
+}
+
+export interface FiveDResult {
+  digits: number[];
+  sum: number;
+  sumSize: 'BIG' | 'SMALL';
+  sumParity: 'ODD' | 'EVEN';
+}
+
+export interface FiveDHistoryEntry extends FiveDResult {
+  periodNumber: string;
+  serverSeed: string;
+  serverSeedHash: string;
+}
+
+export interface FiveDMyBet {
+  id: string;
+  area: string;
+  amount: string;
+  multiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+  createdAt: string;
+  periodNumber: string;
+  durationSeconds: FiveDDuration;
+  result: FiveDResult | null;
+}
+
+export function fetchFiveDConfig() {
+  return apiFetch<FiveDConfig>('/5d/config');
+}
+
+export function fetchFiveDCurrent(duration: FiveDDuration) {
+  return apiFetch<FiveDRoundView>(`/5d/${duration}/current`);
+}
+
+export function fetchFiveDHistory(duration: FiveDDuration, limit = 50) {
+  return apiFetch<FiveDHistoryEntry[]>(`/5d/${duration}/history?limit=${limit}`);
+}
+
+export function placeFiveDBets(duration: FiveDDuration, bets: { area: string; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: FiveDMyBet[] }>(`/5d/${duration}/bet`, {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function fetchFiveDMyBets(limit = 50) {
+  return apiFetch<FiveDMyBet[]>(`/5d/my-bets?limit=${limit}`);
+}
