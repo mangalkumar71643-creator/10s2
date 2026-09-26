@@ -178,10 +178,30 @@ export default function HomeScreen() {
           />
         </Pressable>
         <Pressable
-          onPress={() => (navigation as any).navigate('Profile')}
+          onPress={() => navigation.navigate('Vip')}
           style={{
             position: 'absolute',
             left: walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP + GIFT_ICON_SIZE + TOP_BAR_ICON_GAP,
+            top: (TOP_BAR_HEIGHT - 36) / 2 + TOP_BAR_ICON_OFFSET_Y,
+            backgroundColor: '#3D1A24',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            borderWidth: 1.5,
+            borderColor: '#D4A056',
+          }}
+        >
+          <MaterialCommunityIcons name="crown" size={16} color="#FFD66B" />
+          <Text style={{ color: '#FFD66B', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>VIP</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => (navigation as any).navigate('Profile')}
+          style={{
+            position: 'absolute',
+            left: walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP + GIFT_ICON_SIZE + TOP_BAR_ICON_GAP + 50 + TOP_BAR_ICON_GAP,
             top: (TOP_BAR_HEIGHT - PROFILE_ICON_SIZE) / 2 + TOP_BAR_ICON_OFFSET_Y,
           }}
         >
