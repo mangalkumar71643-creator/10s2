@@ -33,6 +33,14 @@ export const env = {
     maxPayout: Number(process.env.GAME_MAX_PAYOUT ?? 10000),
   },
 
+  tron: {
+    // Trx Win Go reads its results from TRON blocks through a full node API.
+    // TronGrid works without a key at low volume; set TRONGRID_API_KEY for
+    // its higher rate limits.
+    apiUrl: process.env.TRON_API_URL ?? "https://api.trongrid.io",
+    apiKey: process.env.TRONGRID_API_KEY ?? "",
+  },
+
   wallet: {
     // First-deposit-only bonus: min(amount * percent, cap). Credited
     // straight into balance (so it's immediately playable) but locked

@@ -188,6 +188,7 @@ model User {
   K3Bet             K3Bet[]
   WinGoBet          WinGoBet[]
   FiveDBet          FiveDBet[]
+  TrxBet            TrxBet[]
 }
 
 model KycVerification {
@@ -954,6 +955,53 @@ model FiveDBet {
   status     BetStatus  @default(PENDING)
   payout     Decimal    @default(0) @db.Decimal(12, 2)
   createdAt  DateTime   @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
+}
+
+// Trx Win Go: Win Go's bets and odds, but each round's number is the last
+// decimal digit of the hash of the first TRON block produced at or after the
+// round's end, so anyone can check it on a TRON explorer. The block (and so
+// the number) is unknown until the round is over; it is filled in at
+// settlement. If the block can't be read for an hour the round is voided and
+// every bet refunded.
+model TrxRound {
+  id              String    @id @default(uuid())
+  durationSeconds Int
+  periodNumber    String
+  startTime       DateTime
+  endTime         DateTime
+  result          Int?
+  blockNumber     Int?
+  blockHash       String?
+  blockTime       DateTime?
+  voided          Boolean   @default(false)
+  settled         Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  bets            TrxBet[]
+
+  @@unique([durationSeconds, periodNumber])
+  @@index([durationSeconds, startTime])
+  @@index([settled, endTime])
+  @@index([endTime])
+}
+
+// One Trx Win Go bet (same keys as WinGoBet: NUM:0-9, GREEN, RED, VIOLET,
+// BIG, SMALL). The rate paid depends on the number drawn, so it is recorded
+// at settlement in paidMultiplier.
+model TrxBet {
+  id             String    @id @default(uuid())
+  roundId        String
+  round          TrxRound  @relation(fields: [roundId], references: [id])
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  area           String
+  amount         Decimal   @db.Decimal(12, 2)
+  paidMultiplier Decimal   @default(0) @db.Decimal(8, 2)
+  status         BetStatus @default(PENDING)
+  payout         Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime  @default(now())
 
   @@index([userId])
   @@index([roundId, userId])

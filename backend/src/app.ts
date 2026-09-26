@@ -24,6 +24,7 @@ import rouletteRoutes from "./routes/roulette.routes";
 import k3Routes from "./routes/k3.routes";
 import winGoRoutes from "./routes/winGo.routes";
 import fiveDRoutes from "./routes/fiveD.routes";
+import trxRoutes from "./routes/trx.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
@@ -55,6 +56,7 @@ app.use("/roulette", rouletteRoutes);
 app.use("/k3", k3Routes);
 app.use("/wingo", winGoRoutes);
 app.use("/5d", fiveDRoutes);
+app.use("/trx", trxRoutes);
 
 app.use(errorHandler);
 

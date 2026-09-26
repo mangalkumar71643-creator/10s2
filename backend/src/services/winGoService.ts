@@ -89,7 +89,7 @@ function assertValidDuration(d: number): asserts d is WinGoDuration {
 /** IST date (YYMMDD) + the duration's 1-based round index for the day. */
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
-function periodNumberFor(durationSeconds: number, startTime: Date): string {
+export function periodNumberFor(durationSeconds: number, startTime: Date): string {
   const ist = new Date(startTime.getTime() + IST_OFFSET_MS);
   const y = String(ist.getUTCFullYear()).slice(-2);
   const m = String(ist.getUTCMonth() + 1).padStart(2, "0");
