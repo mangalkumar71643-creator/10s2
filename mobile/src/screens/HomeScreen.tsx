@@ -4,6 +4,7 @@ import { RouletteTileArt } from './RouletteScreen';
 import { K3TileArt } from './K3LotteryScreen';
 import { FiveDTileArt } from './FiveDLotteryScreen';
 import { TrxTileArt } from './TrxWinScreen';
+import { BaccaratTileArt } from './BaccaratScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -104,7 +105,9 @@ export default function HomeScreen() {
   const fiveDTileLeft = GAME_GRID_LEFT;
   const trxTileTop = 7 * GAME_GRID_CELL;
   const trxTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 8;
+  const baccaratTileTop = 8 * GAME_GRID_CELL;
+  const baccaratTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 9;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -608,6 +611,27 @@ export default function HomeScreen() {
         <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1, marginTop: 14 }}>
           TRX <Text style={{ color: '#F4CF6A' }}>WIN GO</Text>
         </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Baccarat')}
+        style={{
+          position: 'absolute',
+          top: baccaratTileTop,
+          left: baccaratTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFD66B',
+          backgroundColor: '#0C1538',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '42%', backgroundColor: '#4A0B1E', borderTopWidth: 2, borderTopColor: '#E9B949' }} />
+        <BaccaratTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 2, marginTop: 10, fontFamily: 'serif' }}>BACCARAT</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

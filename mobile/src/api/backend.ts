@@ -1376,3 +1376,98 @@ export function placeTrxBets(duration: TrxDuration, bets: { area: string; amount
 export function fetchTrxMyBets(limit = 50) {
   return apiFetch<TrxMyBet[]>(`/trx/my-bets?limit=${limit}`);
 }
+
+// ---- Baccarat ----
+
+export type BaccaratArea = 'PLAYER' | 'BANKER' | 'TIE' | 'PLAYER_PAIR' | 'BANKER_PAIR';
+export type BaccaratWinner = 'PLAYER' | 'BANKER' | 'TIE';
+
+export interface BaccaratConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  roundSeconds: number;
+  betSeconds: number;
+  resultAtSeconds: number;
+  rtpPercent: number;
+  multipliers: Record<BaccaratArea, number>;
+}
+
+export interface BaccaratHand {
+  player: PlayingCard[];
+  banker: PlayingCard[];
+  playerTotal: number;
+  bankerTotal: number;
+  winner: BaccaratWinner;
+  playerPair: boolean;
+  bankerPair: boolean;
+  natural: boolean;
+}
+
+export interface BaccaratRoundView {
+  periodNumber: string;
+  startTime: string;
+  betEndTime: string;
+  resultTime: string;
+  endTime: string;
+  serverTime: string;
+  phase: 'BETTING' | 'DEALING' | 'RESULT';
+  serverSeedHash: string;
+  hand: BaccaratHand | null;
+  serverSeed: string | null;
+}
+
+export interface BaccaratBet {
+  id: string;
+  area: BaccaratArea;
+  amount: string;
+  multiplier: string;
+  paidMultiplier: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  payout: string;
+  createdAt: string;
+}
+
+export interface BaccaratHistoryEntry extends BaccaratHand {
+  periodNumber: string;
+}
+
+export interface BaccaratMyBet extends BaccaratBet {
+  periodNumber: string;
+  hand: BaccaratHand | null;
+}
+
+export function fetchBaccaratConfig() {
+  return apiFetch<BaccaratConfig>('/baccarat/config');
+}
+
+export function fetchBaccaratCurrent() {
+  return apiFetch<BaccaratRoundView>('/baccarat/current');
+}
+
+export function fetchBaccaratHistory(limit = 100) {
+  return apiFetch<BaccaratHistoryEntry[]>(`/baccarat/history?limit=${limit}`);
+}
+
+export function placeBaccaratBets(bets: { area: BaccaratArea; amount: number }[]) {
+  return apiFetch<{ periodNumber: string; bets: BaccaratBet[] }>('/baccarat/bet', {
+    method: 'POST',
+    body: JSON.stringify({ bets }),
+  });
+}
+
+export function cancelBaccaratBets(betIds?: string[]) {
+  return apiFetch<{ cancelled: string[]; refund: number }>('/baccarat/cancel', {
+    method: 'POST',
+    body: JSON.stringify(betIds ? { betIds } : {}),
+  });
+}
+
+export function fetchBaccaratMyRound(periodNumber?: string) {
+  const q = periodNumber ? `?periodNumber=${encodeURIComponent(periodNumber)}` : '';
+  return apiFetch<{ periodNumber: string | null; bets: BaccaratBet[] }>(`/baccarat/my-round${q}`);
+}
+
+export function fetchBaccaratMyBets(limit = 50) {
+  return apiFetch<BaccaratMyBet[]>(`/baccarat/my-bets?limit=${limit}`);
+}
