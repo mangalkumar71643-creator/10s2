@@ -189,6 +189,7 @@ model User {
   WinGoBet          WinGoBet[]
   FiveDBet          FiveDBet[]
   TrxBet            TrxBet[]
+  BaccaratBet       BaccaratBet[]
 }
 
 model KycVerification {
@@ -1002,6 +1003,54 @@ model TrxBet {
   status         BetStatus @default(PENDING)
   payout         Decimal   @default(0) @db.Decimal(12, 2)
   createdAt      DateTime  @default(now())
+
+  @@index([userId])
+  @@index([roundId, userId])
+}
+
+// "Baccarat" (punto banco) — shared, slot-aligned rounds (see
+// baccaratService.ts). All six possible cards are drawn from serverSeed when
+// the round is created (0..51, rank = index % 13 + 1, suit = index / 13);
+// the third-card rule then decides how many of them are used. playerCards /
+// bankerCards hold the cards actually dealt (2 or 3 each) and are only
+// exposed once resultTime has passed.
+model BaccaratRound {
+  id             String        @id @default(uuid())
+  periodNumber   String        @unique
+  startTime      DateTime
+  betEndTime     DateTime
+  resultTime     DateTime
+  endTime        DateTime
+  playerCards    Int[]
+  bankerCards    Int[]
+  serverSeed     String
+  serverSeedHash String
+  settled        Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  bets           BaccaratBet[]
+
+  @@index([startTime])
+  @@index([settled, resultTime])
+}
+
+// area is PLAYER | BANKER | TIE | PLAYER_PAIR | BANKER_PAIR; multiplier is
+// the total return locked in when the bet was placed. paidMultiplier is what
+// was actually paid: the multiplier on a win, 1 when a Player/Banker bet is
+// returned on a tie, 0 on a loss. VOID marks a bet taken back (undo /
+// clear) during the betting window.
+model BaccaratBet {
+  id             String        @id @default(uuid())
+  roundId        String
+  round          BaccaratRound @relation(fields: [roundId], references: [id])
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  area           String
+  amount         Decimal       @db.Decimal(12, 2)
+  multiplier     Decimal       @db.Decimal(8, 2)
+  paidMultiplier Decimal       @default(0) @db.Decimal(8, 2)
+  status         BetStatus     @default(PENDING)
+  payout         Decimal       @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime      @default(now())
 
   @@index([userId])
   @@index([roundId, userId])
