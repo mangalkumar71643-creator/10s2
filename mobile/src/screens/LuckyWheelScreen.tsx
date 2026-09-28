@@ -2,7 +2,8 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useRef, useState } from 'react';
-import { Animated, Dimensions, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated, Dimensions, Easing, Pressable, ScrollView, Text, View } from 'react-native';
+import Svg, { G, Path, Text as SvgText } from 'react-native-svg';
 import ScreenContainer from '../components/ScreenContainer';
 import { useGameState } from '../state/GameStateContext';
 
@@ -22,12 +23,20 @@ const WHEEL_SECTIONS = [
   { id: 8, label: '4X', color: '#FF7675', multiplier: 4 },
 ];
 
+const SEGMENT_DEG = 360 / WHEEL_SECTIONS.length;
+
+// Angle is measured clockwise from 12 o'clock.
+function polar(angleDeg: number, r: number): [number, number] {
+  const rad = (angleDeg * Math.PI) / 180;
+  return [WHEEL_RADIUS + r * Math.sin(rad), WHEEL_RADIUS - r * Math.cos(rad)];
+}
+
 const BET_AMOUNTS = [10, 50, 100, 500, 1000];
 
 export default function LuckyWheelScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { coins, refreshWallet } = useGameState();
+  const { coins } = useGameState();
   const [selectedBet, setSelectedBet] = useState(100);
   const [isSpinning, setIsSpinning] = useState(false);
   const [result, setResult] = useState<{
@@ -36,9 +45,10 @@ export default function LuckyWheelScreen() {
     section: string;
   } | null>(null);
   const spinAnim = useRef(new Animated.Value(0)).current;
+  const rotationRef = useRef(0);
 
   const handleSpin = async () => {
-    if (isSpinning || coins < selectedBet) return;
+    if (isSpinning) return;
 
     setIsSpinning(true);
     setResult(null);
@@ -47,22 +57,21 @@ export default function LuckyWheelScreen() {
     const randomIndex = Math.floor(Math.random() * WHEEL_SECTIONS.length);
     const winningSection = WHEEL_SECTIONS[randomIndex];
 
-    // Spin animation (multiple rotations + final angle)
-    const finalRotation = (randomIndex * (360 / WHEEL_SECTIONS.length)) + 360 * 3;
+    // Pointer is fixed at 12 o'clock, so rotate the wheel until the winning
+    // wedge's centre sits under it, plus a few full turns for show.
+    const base = Math.ceil(rotationRef.current / 360) * 360;
+    const finalRotation = base + 360 * 5 + (360 - (randomIndex + 0.5) * SEGMENT_DEG);
+    rotationRef.current = finalRotation;
 
     Animated.timing(spinAnim, {
       toValue: finalRotation,
-      duration: 3000,
-      useNativeDriver: false,
+      duration: 4000,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
     }).start(() => {
       setIsSpinning(false);
 
-      // Calculate win amount
       const winAmount = selectedBet * winningSection.multiplier;
-      const netWin = winAmount - selectedBet;
-
-      // Refresh wallet from backend to get updated balance
-      refreshWallet().catch(() => {});
 
       setResult({
         multiplier: winningSection.multiplier,
@@ -126,94 +135,59 @@ export default function LuckyWheelScreen() {
             <View
               style={{
                 position: 'absolute',
-                top: -10,
+                top: -6,
                 width: 0,
                 height: 0,
                 backgroundColor: 'transparent',
                 borderLeftColor: 'transparent',
                 borderRightColor: 'transparent',
-                borderBottomColor: '#FFD66B',
-                borderLeftWidth: 10,
-                borderRightWidth: 10,
-                borderBottomWidth: 15,
+                borderTopColor: '#FFD66B',
+                borderLeftWidth: 12,
+                borderRightWidth: 12,
+                borderTopWidth: 22,
                 zIndex: 10,
               }}
             />
 
-            {/* Wheel */}
             <Animated.View
-              style={[
-                {
-                  width: WHEEL_SIZE,
-                  height: WHEEL_SIZE,
-                  borderRadius: WHEEL_RADIUS,
-                  overflow: 'hidden',
-                },
-                {
-                  transform: [
-                    {
-                      rotate: spinInterpolation,
-                    },
-                  ],
-                },
-              ]}
+              style={{
+                width: WHEEL_SIZE,
+                height: WHEEL_SIZE,
+                transform: [{ rotate: spinInterpolation }],
+              }}
             >
-              {WHEEL_SECTIONS.map((section, index) => {
-                const angle = (index * 360) / WHEEL_SECTIONS.length;
-                return (
-                  <View
-                    key={section.id}
-                    style={{
-                      position: 'absolute',
-                      width: WHEEL_SIZE,
-                      height: WHEEL_SIZE,
-                      borderRadius: WHEEL_RADIUS,
-                    }}
-                  >
-                    <View
-                      style={{
-                        position: 'absolute',
-                        width: '100%',
-                        height: '100%',
-                        backgroundColor: section.color,
-                        transform: [
-                          {
-                            rotate: `${angle}deg`,
-                          },
-                        ],
-                        transformOrigin: `${WHEEL_RADIUS}px ${WHEEL_RADIUS}px`,
-                        opacity: 0.9,
-                      }}
-                    />
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: WHEEL_RADIUS * 0.15,
-                        left: '50%',
-                        marginLeft: -20,
-                        width: 40,
-                        alignItems: 'center',
-                        transform: [
-                          {
-                            rotate: `${angle + 22.5}deg`,
-                          },
-                        ],
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 18,
-                          fontWeight: '900',
-                          color: '#000',
-                          textAlign: 'center',
-                        }}
+              <Svg width={WHEEL_SIZE} height={WHEEL_SIZE}>
+                {WHEEL_SECTIONS.map((section, index) => {
+                  const a0 = index * SEGMENT_DEG;
+                  const a1 = a0 + SEGMENT_DEG;
+                  const [x0, y0] = polar(a0, WHEEL_RADIUS);
+                  const [x1, y1] = polar(a1, WHEEL_RADIUS);
+                  const mid = a0 + SEGMENT_DEG / 2;
+                  const [tx, ty] = polar(mid, WHEEL_RADIUS * 0.7);
+                  return (
+                    <G key={section.id}>
+                      <Path
+                        d={`M${WHEEL_RADIUS},${WHEEL_RADIUS} L${x0},${y0} A${WHEEL_RADIUS},${WHEEL_RADIUS} 0 0 1 ${x1},${y1} Z`}
+                        fill={section.color}
+                        stroke="#1a1a1a"
+                        strokeWidth={2}
+                      />
+                      <SvgText
+                        x={tx}
+                        y={ty}
+                        fill="#000"
+                        fontSize={18}
+                        fontWeight="900"
+                        textAnchor="middle"
+                        alignmentBaseline="middle"
+                        transform={`rotate(${mid}, ${tx}, ${ty})`}
                       >
                         {section.label}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
+                      </SvgText>
+                    </G>
+                  );
+                })}
+              </Svg>
             </Animated.View>
 
             {/* Center Circle */}
@@ -298,19 +272,19 @@ export default function LuckyWheelScreen() {
           {/* Spin Button */}
           <Pressable
             onPress={handleSpin}
-            disabled={isSpinning || coins < selectedBet}
+            disabled={isSpinning}
             style={{
               width: '100%',
               paddingVertical: 16,
               borderRadius: 12,
-              backgroundColor: isSpinning || coins < selectedBet ? '#666' : '#FFD66B',
+              backgroundColor: isSpinning ? '#666' : '#FFD66B',
               alignItems: 'center',
               marginBottom: 20,
             }}
           >
             <Text
               style={{
-                color: isSpinning || coins < selectedBet ? '#999' : '#000',
+                color: isSpinning ? '#999' : '#000',
                 fontSize: 16,
                 fontWeight: '800',
                 letterSpacing: 1,
@@ -335,21 +309,14 @@ export default function LuckyWheelScreen() {
             >
               <Text style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>RESULT</Text>
               <Text style={{ color: '#FFD66B', fontSize: 24, fontWeight: '900', marginBottom: 8 }}>
-                {result.section} - {result.multiplier}X
+                {result.section}
               </Text>
               <Text style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>
-                Win Amount: {result.winAmount.toLocaleString('en-IN')}
+                Payout: {result.winAmount.toLocaleString('en-IN')}
               </Text>
-              {result.multiplier > 1 && (
-                <Text style={{ color: '#4ECB71', fontSize: 13, fontWeight: '600' }}>
-                  ✓ You won {(result.winAmount - selectedBet).toLocaleString('en-IN')}!
-                </Text>
-              )}
-              {result.multiplier === 1 && (
-                <Text style={{ color: '#FF6B6B', fontSize: 13, fontWeight: '600' }}>
-                  Better luck next time!
-                </Text>
-              )}
+              <Text style={{ color: '#888', fontSize: 12 }}>
+                Practice mode — your wallet balance is not affected.
+              </Text>
             </View>
           )}
         </View>
