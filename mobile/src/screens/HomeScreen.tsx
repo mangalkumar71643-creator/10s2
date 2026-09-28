@@ -104,7 +104,9 @@ export default function HomeScreen() {
   const fiveDTileLeft = GAME_GRID_LEFT;
   const trxTileTop = 7 * GAME_GRID_CELL;
   const trxTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 8;
+  const luckyWheelTileTop = 8 * GAME_GRID_CELL;
+  const luckyWheelTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 9;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -607,6 +609,28 @@ export default function HomeScreen() {
         <TrxTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 1, marginTop: 14 }}>
           TRX <Text style={{ color: '#F4CF6A' }}>WIN GO</Text>
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('LuckyWheel')}
+        style={{
+          position: 'absolute',
+          top: luckyWheelTileTop,
+          left: luckyWheelTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFD66B',
+          backgroundColor: '#1F1038',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <MaterialCommunityIcons name="star-four-points" size={GAME_ICON_SIZE * 0.4} color="#FFD66B" />
+        <Text style={{ color: '#FFD66B', fontSize: 14, fontWeight: '900', letterSpacing: 1, marginTop: 8 }}>
+          LUCKY <Text style={{ color: '#FF6B9D' }}>WHEEL</Text>
         </Text>
       </Pressable>
       </ScrollView>
