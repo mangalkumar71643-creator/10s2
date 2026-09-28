@@ -20,7 +20,6 @@ import K3LotteryScreen from '../screens/K3LotteryScreen';
 import WinGoScreen from '../screens/WinGoScreen';
 import FiveDLotteryScreen from '../screens/FiveDLotteryScreen';
 import TrxWinScreen from '../screens/TrxWinScreen';
-import LuckyWheelScreen from '../screens/LuckyWheelScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -88,7 +87,6 @@ function MainNavigator() {
       <Stack.Screen name="WinGo" component={WinGoScreen} />
       <Stack.Screen name="FiveDLottery" component={FiveDLotteryScreen} />
       <Stack.Screen name="TrxWin" component={TrxWinScreen} />
-      <Stack.Screen name="LuckyWheel" component={LuckyWheelScreen} />
     </Stack.Navigator>
   );
 }

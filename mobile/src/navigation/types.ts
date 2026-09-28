@@ -39,5 +39,4 @@ export type RootStackParamList = {
   WinGo: undefined;
   FiveDLottery: undefined;
   TrxWin: undefined;
-  LuckyWheel: undefined;
 };
