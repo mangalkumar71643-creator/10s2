@@ -7,6 +7,8 @@ import { TrxTileArt } from './TrxWinScreen';
 import { BaccaratTileArt } from './BaccaratScreen';
 import { SlotTileArt } from './SlotScreen';
 import { AcesTileArt } from './AcesScreen';
+import { DiceTileArt } from './DiceScreen';
+import { LimboTileArt } from './LimboScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -113,7 +115,11 @@ export default function HomeScreen() {
   const slotTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const acesTileTop = 9 * GAME_GRID_CELL;
   const acesTileLeft = GAME_GRID_LEFT;
-  const gameGridRows = 10;
+  const diceTileTop = 9 * GAME_GRID_CELL;
+  const diceTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
+  const limboTileTop = 10 * GAME_GRID_CELL;
+  const limboTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 11;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -660,6 +666,48 @@ export default function HomeScreen() {
         <AcesTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1.5, marginTop: 6, fontFamily: 'serif' }}>GOLDEN ACES</Text>
         <Text style={{ color: 'rgba(255,225,215,0.75)', fontSize: 10, fontWeight: '800', letterSpacing: 2 }}>SLOT</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Dice')}
+        style={{
+          position: 'absolute',
+          top: diceTileTop,
+          left: diceTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#3DF2FF',
+          backgroundColor: '#031423',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 18,
+        }}
+      >
+        <DiceTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#E9FBFF', fontSize: 22, fontWeight: '900', letterSpacing: 6, fontFamily: 'serif', textShadowColor: '#0E7490', textShadowRadius: 8 }}>DICE</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Limbo')}
+        style={{
+          position: 'absolute',
+          top: limboTileTop,
+          left: limboTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FF5FD2',
+          backgroundColor: '#0A0320',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 18,
+        }}
+      >
+        <LimboTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#F5EEFF', fontSize: 22, fontWeight: '900', letterSpacing: 6, fontFamily: 'serif', textShadowColor: '#C026D3', textShadowRadius: 8 }}>LIMBO</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

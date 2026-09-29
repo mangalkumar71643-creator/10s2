@@ -1585,3 +1585,75 @@ export function spinAces(stake: number) {
 export function fetchAcesHistory(limit = 30) {
   return apiFetch<AcesSpinRow[]>(`/aces/my-history?limit=${limit}`);
 }
+
+// ---- Dice ----
+
+export interface DiceBet {
+  id: string;
+  stake: string;
+  target: string;
+  rollOver: boolean;
+  multiplier: string;
+  result: string;
+  won: boolean;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface DiceConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  minChance: number;
+  maxChance: number;
+  rtpPercent: number;
+}
+
+export function fetchDiceConfig() {
+  return apiFetch<DiceConfig>('/dice/config');
+}
+
+export function rollDice(stake: number, target: number, rollOver: boolean) {
+  return apiFetch<DiceBet>('/dice/roll', { method: 'POST', body: JSON.stringify({ stake, target, rollOver }) });
+}
+
+export function fetchDiceHistory(limit = 30) {
+  return apiFetch<DiceBet[]>(`/dice/my-history?limit=${limit}`);
+}
+
+// ---- Limbo ----
+
+export interface LimboBet {
+  id: string;
+  stake: string;
+  target: string;
+  result: string;
+  won: boolean;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface LimboConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  minTarget: number;
+  maxTarget: number;
+  rtpPercent: number;
+}
+
+export function fetchLimboConfig() {
+  return apiFetch<LimboConfig>('/limbo/config');
+}
+
+export function playLimbo(stake: number, target: number) {
+  return apiFetch<LimboBet>('/limbo/play', { method: 'POST', body: JSON.stringify({ stake, target }) });
+}
+
+export function fetchLimboHistory(limit = 30) {
+  return apiFetch<LimboBet[]>(`/limbo/my-history?limit=${limit}`);
+}

@@ -42,4 +42,6 @@ export type RootStackParamList = {
   Baccarat: undefined;
   Slot: undefined;
   Aces: undefined;
+  Dice: undefined;
+  Limbo: undefined;
 };

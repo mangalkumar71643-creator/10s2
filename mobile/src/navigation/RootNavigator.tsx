@@ -23,6 +23,8 @@ import TrxWinScreen from '../screens/TrxWinScreen';
 import BaccaratScreen from '../screens/BaccaratScreen';
 import SlotScreen from '../screens/SlotScreen';
 import AcesScreen from '../screens/AcesScreen';
+import DiceScreen from '../screens/DiceScreen';
+import LimboScreen from '../screens/LimboScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -93,6 +95,8 @@ function MainNavigator() {
       <Stack.Screen name="Baccarat" component={BaccaratScreen} />
       <Stack.Screen name="Slot" component={SlotScreen} />
       <Stack.Screen name="Aces" component={AcesScreen} />
+      <Stack.Screen name="Dice" component={DiceScreen} />
+      <Stack.Screen name="Limbo" component={LimboScreen} />
     </Stack.Navigator>
   );
 }
