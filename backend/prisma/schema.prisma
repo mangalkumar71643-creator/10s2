@@ -190,6 +190,7 @@ model User {
   FiveDBet          FiveDBet[]
   TrxBet            TrxBet[]
   BaccaratBet       BaccaratBet[]
+  SlotSpin          SlotSpin[]
 }
 
 model KycVerification {
@@ -1054,4 +1055,28 @@ model BaccaratBet {
 
   @@index([userId])
   @@index([roundId, userId])
+}
+
+// One spin of the "Royal Gems" slot (see slotService.ts): three 3-row reels
+// plus a multiplier reel. stops are the strip index shown on the top row of
+// each reel, grid is the 3x3 result row by row, winLines the paylines that
+// paid, baseWin the line total (x stake) before the multiplier.
+model SlotSpin {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  stops          Int[]
+  grid           String[]
+  winLines       Int[]
+  baseWin        Decimal  @db.Decimal(10, 2)
+  multiplier     Int
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

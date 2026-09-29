@@ -26,6 +26,7 @@ import winGoRoutes from "./routes/winGo.routes";
 import fiveDRoutes from "./routes/fiveD.routes";
 import trxRoutes from "./routes/trx.routes";
 import baccaratRoutes from "./routes/baccarat.routes";
+import slotRoutes from "./routes/slot.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
@@ -59,6 +60,7 @@ app.use("/wingo", winGoRoutes);
 app.use("/5d", fiveDRoutes);
 app.use("/trx", trxRoutes);
 app.use("/baccarat", baccaratRoutes);
+app.use("/slot", slotRoutes);
 
 app.use(errorHandler);
 
