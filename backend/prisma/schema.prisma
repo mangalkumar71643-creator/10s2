@@ -195,6 +195,7 @@ model User {
   DiceBet           DiceBet[]
   LimboBet          LimboBet[]
   BlackjackHand     BlackjackHand[]
+  KenoBet           KenoBet[]
 }
 
 model KycVerification {
@@ -1163,5 +1164,25 @@ model BlackjackHand {
   updatedAt      DateTime @updatedAt
 
   @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model KenoBet {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  picks          Int[]
+  risk           String
+  drawn          Int[]
+  hits           Int
+  multiplier     Decimal  @db.Decimal(12, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
   @@index([userId, createdAt])
 }
