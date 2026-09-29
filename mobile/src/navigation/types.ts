@@ -49,4 +49,5 @@ export type RootStackParamList = {
   Hilo: undefined;
   DragonTower: undefined;
   VideoPoker: undefined;
+  Diamonds: undefined;
 };

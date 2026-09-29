@@ -14,6 +14,7 @@ import { KenoTileArt } from './KenoScreen';
 import { HiloTileArt } from './HiloScreen';
 import { DragonTowerTileArt } from './DragonTowerScreen';
 import { VideoPokerTileArt } from './VideoPokerScreen';
+import { DiamondsTileArt } from './DiamondsScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -134,7 +135,9 @@ export default function HomeScreen() {
   const towerTileLeft = GAME_GRID_LEFT;
   const pokerTileTop = 12 * GAME_GRID_CELL;
   const pokerTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 13;
+  const diamondsTileTop = 13 * GAME_GRID_CELL;
+  const diamondsTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 14;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -832,6 +835,27 @@ export default function HomeScreen() {
       >
         <VideoPokerTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFE58A', fontSize: 15, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 17, textShadowColor: '#000', textShadowRadius: 6 }}>{'VIDEO\nPOKER'}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Diamonds')}
+        style={{
+          position: 'absolute',
+          top: diamondsTileTop,
+          left: diamondsTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#D8B4FE',
+          backgroundColor: '#12051F',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 16,
+        }}
+      >
+        <DiamondsTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#F5EEFF', fontSize: 19, fontWeight: '900', letterSpacing: 3, fontFamily: 'serif', textShadowColor: '#A855F7', textShadowRadius: 10 }}>DIAMONDS</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

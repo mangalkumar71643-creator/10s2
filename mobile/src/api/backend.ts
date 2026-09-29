@@ -1929,3 +1929,41 @@ export function fetchActivePoker() {
 export function fetchPokerHistory(limit = 30) {
   return apiFetch<PokerRound[]>(`/video-poker/my-history?limit=${limit}`);
 }
+
+// ---- Diamonds ----
+
+export type DiamondsResult = 'NONE' | 'PAIR' | 'TWO_PAIR' | 'THREE_OF_A_KIND' | 'FULL_HOUSE' | 'FOUR_OF_A_KIND' | 'FIVE_OF_A_KIND';
+export interface DiamondsBet {
+  id: string;
+  stake: string;
+  /** Colour (0-6) of each of the five gems, left to right. */
+  gems: number[];
+  result: DiamondsResult;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface DiamondsConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  colors: number;
+  /** Best result first. */
+  paytable: { result: DiamondsResult; multiplier: number; chancePercent: number }[];
+  rtpPercent: number;
+}
+
+export function fetchDiamondsConfig() {
+  return apiFetch<DiamondsConfig>('/diamonds/config');
+}
+
+export function playDiamonds(stake: number) {
+  return apiFetch<DiamondsBet>('/diamonds/play', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchDiamondsHistory(limit = 30) {
+  return apiFetch<DiamondsBet[]>(`/diamonds/my-history?limit=${limit}`);
+}
