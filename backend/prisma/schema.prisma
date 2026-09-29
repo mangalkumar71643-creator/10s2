@@ -200,6 +200,7 @@ model User {
   DragonTowerRound  DragonTowerRound[]
   VideoPokerRound   VideoPokerRound[]
   DiamondsBet       DiamondsBet[]
+  PumpRound         PumpRound[]
 }
 
 model KycVerification {
@@ -1279,5 +1280,29 @@ model DiamondsBet {
   nonce          Int
   createdAt      DateTime @default(now())
 
+  @@index([userId, createdAt])
+}
+
+model PumpRound {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  difficulty     String
+  status         String // "ACTIVE" | "WON" | "LOST"
+  pumps          Int
+  /// The pump the balloon pops on; only shown once the round is over.
+  popAt          Int
+  multiplier     Decimal  @db.Decimal(16, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  version        Int      @default(0)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
   @@index([userId, createdAt])
 }
