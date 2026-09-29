@@ -1765,3 +1765,58 @@ export function playKeno(stake: number, picks: number[], risk: KenoRisk) {
 export function fetchKenoHistory(limit = 30) {
   return apiFetch<KenoBet[]>(`/keno/my-history?limit=${limit}`);
 }
+
+// ---- Hi-Lo ----
+
+export type HiloChoice = 'HIGHER' | 'LOWER' | 'SAME';
+export type HiloAction = HiloChoice | 'SKIP' | 'CASHOUT';
+export interface HiloStep {
+  /** Card 0-51: rank = card % 13 (0 = Ace ... 12 = King), suit = floor(card / 13). */
+  card: number;
+  action: 'START' | 'SKIP' | HiloChoice;
+  correct: boolean | null;
+}
+export interface HiloRound {
+  id: string;
+  stake: string;
+  status: 'ACTIVE' | 'WON' | 'LOST';
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  steps: HiloStep[];
+  wins: number;
+  skipsLeft: number;
+  currentMultiplier: number;
+  cashOut: number;
+  options: { choice: HiloChoice; chance: number; multiplier: number }[];
+}
+export interface HiloConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  maxSkips: number;
+  rtpPercent: number;
+}
+
+export function fetchHiloConfig() {
+  return apiFetch<HiloConfig>('/hilo/config');
+}
+
+export function startHilo(stake: number) {
+  return apiFetch<HiloRound>('/hilo/start', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function hiloAction(roundId: string, action: HiloAction) {
+  return apiFetch<HiloRound>('/hilo/action', { method: 'POST', body: JSON.stringify({ roundId, action }) });
+}
+
+export function fetchActiveHilo() {
+  return apiFetch<{ round: HiloRound | null }>('/hilo/active');
+}
+
+export function fetchHiloHistory(limit = 30) {
+  return apiFetch<HiloRound[]>(`/hilo/my-history?limit=${limit}`);
+}

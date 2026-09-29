@@ -11,6 +11,7 @@ import { DiceTileArt } from './DiceScreen';
 import { LimboTileArt } from './LimboScreen';
 import { BlackjackTileArt } from './BlackjackScreen';
 import { KenoTileArt } from './KenoScreen';
+import { HiloTileArt } from './HiloScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -125,6 +126,8 @@ export default function HomeScreen() {
   const blackjackTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const kenoTileTop = 11 * GAME_GRID_CELL;
   const kenoTileLeft = GAME_GRID_LEFT;
+  const hiloTileTop = 11 * GAME_GRID_CELL;
+  const hiloTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 12;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -756,6 +759,31 @@ export default function HomeScreen() {
       >
         <KenoTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFD08A', fontSize: 24, fontWeight: '900', letterSpacing: 7, fontFamily: 'serif', textShadowColor: '#B45309', textShadowRadius: 8 }}>KENO</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Hilo')}
+        style={{
+          position: 'absolute',
+          top: hiloTileTop,
+          left: hiloTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FF6B4A',
+          backgroundColor: '#0C0E12',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 14,
+        }}
+      >
+        <HiloTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ fontSize: 24, fontWeight: '900', letterSpacing: 4, fontFamily: 'serif' }}>
+          <Text style={{ color: '#7CF5C9' }}>HI</Text>
+          <Text style={{ color: '#FFD66B' }}>·</Text>
+          <Text style={{ color: '#FF9C84' }}>LO</Text>
+        </Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
