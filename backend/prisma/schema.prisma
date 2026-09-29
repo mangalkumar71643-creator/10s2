@@ -196,6 +196,7 @@ model User {
   LimboBet          LimboBet[]
   BlackjackHand     BlackjackHand[]
   KenoBet           KenoBet[]
+  HiloRound         HiloRound[]
 }
 
 model KycVerification {
@@ -1184,5 +1185,26 @@ model KenoBet {
   nonce          Int
   createdAt      DateTime @default(now())
 
+  @@index([userId, createdAt])
+}
+
+model HiloRound {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  status         String // "ACTIVE" | "WON" | "LOST"
+  state          Json
+  multiplier     Decimal  @db.Decimal(16, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  version        Int      @default(0)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
   @@index([userId, createdAt])
 }

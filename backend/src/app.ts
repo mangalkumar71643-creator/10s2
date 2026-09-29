@@ -32,6 +32,7 @@ import diceRoutes from "./routes/dice.routes";
 import limboRoutes from "./routes/limbo.routes";
 import blackjackRoutes from "./routes/blackjack.routes";
 import kenoRoutes from "./routes/keno.routes";
+import hiloRoutes from "./routes/hilo.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
@@ -71,6 +72,7 @@ app.use("/dice", diceRoutes);
 app.use("/limbo", limboRoutes);
 app.use("/blackjack", blackjackRoutes);
 app.use("/keno", kenoRoutes);
+app.use("/hilo", hiloRoutes);
 
 app.use(errorHandler);
 
