@@ -1657,3 +1657,68 @@ export function playLimbo(stake: number, target: number) {
 export function fetchLimboHistory(limit = 30) {
   return apiFetch<LimboBet[]>(`/limbo/my-history?limit=${limit}`);
 }
+
+// ---- Blackjack ----
+
+export type BlackjackAction = 'hit' | 'stand' | 'double' | 'split' | 'insurance' | 'noInsurance';
+export type BlackjackOutcome = 'BLACKJACK' | 'WIN' | 'PUSH' | 'LOSE' | 'BUST';
+export interface BlackjackSeat {
+  cards: number[];
+  stake: number;
+  doubled: boolean;
+  fromSplit: boolean;
+  done: boolean;
+  outcome: BlackjackOutcome | null;
+  payout: number;
+  total: number;
+  soft: boolean;
+}
+export interface BlackjackHand {
+  id: string;
+  stake: string;
+  totalStake: string;
+  payout: string;
+  status: 'ACTIVE' | 'SETTLED';
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  phase: 'INSURANCE' | 'PLAYER' | 'DONE';
+  /** Card numbers 0-51 (rank = card % 13, 0 = Ace; suit = floor(card / 13)); only the up card while the hand is live. */
+  dealer: number[];
+  dealerHidden: boolean;
+  dealerTotal: number;
+  dealerBlackjack: boolean | null;
+  hands: BlackjackSeat[];
+  active: number;
+  insurance: { offered: boolean; taken: boolean | null; stake: number; payout: number };
+  actions: BlackjackAction[];
+}
+export interface BlackjackConfig {
+  minStake: number;
+  maxStake: number;
+  winPays: number;
+  blackjackPays: number;
+  insurancePays: number;
+  rtpPercent: number;
+}
+
+export function fetchBlackjackConfig() {
+  return apiFetch<BlackjackConfig>('/blackjack/config');
+}
+
+export function dealBlackjack(stake: number) {
+  return apiFetch<BlackjackHand>('/blackjack/deal', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function blackjackAction(handId: string, action: BlackjackAction) {
+  return apiFetch<BlackjackHand>('/blackjack/action', { method: 'POST', body: JSON.stringify({ handId, action }) });
+}
+
+export function fetchActiveBlackjack() {
+  return apiFetch<{ hand: BlackjackHand | null }>('/blackjack/active');
+}
+
+export function fetchBlackjackHistory(limit = 30) {
+  return apiFetch<BlackjackHand[]>(`/blackjack/my-history?limit=${limit}`);
+}

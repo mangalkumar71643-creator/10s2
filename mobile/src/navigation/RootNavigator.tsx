@@ -25,6 +25,7 @@ import SlotScreen from '../screens/SlotScreen';
 import AcesScreen from '../screens/AcesScreen';
 import DiceScreen from '../screens/DiceScreen';
 import LimboScreen from '../screens/LimboScreen';
+import BlackjackScreen from '../screens/BlackjackScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -97,6 +98,7 @@ function MainNavigator() {
       <Stack.Screen name="Aces" component={AcesScreen} />
       <Stack.Screen name="Dice" component={DiceScreen} />
       <Stack.Screen name="Limbo" component={LimboScreen} />
+      <Stack.Screen name="Blackjack" component={BlackjackScreen} />
     </Stack.Navigator>
   );
 }

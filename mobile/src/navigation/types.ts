@@ -44,4 +44,5 @@ export type RootStackParamList = {
   Aces: undefined;
   Dice: undefined;
   Limbo: undefined;
+  Blackjack: undefined;
 };
