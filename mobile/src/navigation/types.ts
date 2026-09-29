@@ -50,4 +50,5 @@ export type RootStackParamList = {
   DragonTower: undefined;
   VideoPoker: undefined;
   Diamonds: undefined;
+  Pump: undefined;
 };

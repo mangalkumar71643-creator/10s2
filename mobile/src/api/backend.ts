@@ -1967,3 +1967,62 @@ export function playDiamonds(stake: number) {
 export function fetchDiamondsHistory(limit = 30) {
   return apiFetch<DiamondsBet[]>(`/diamonds/my-history?limit=${limit}`);
 }
+
+// ---- Pump ----
+
+export type PumpDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
+export interface PumpRound {
+  id: string;
+  stake: string;
+  difficulty: PumpDifficulty;
+  status: 'ACTIVE' | 'WON' | 'LOST';
+  pumps: number;
+  /** The pump the balloon pops on — only once the round is over. */
+  popAt: number | null;
+  multiplier: string;
+  payout: string;
+  maxPumps: number;
+  currentMultiplier: number;
+  nextMultiplier: number;
+  /** Chance the next pump doesn't pop, in percent. */
+  nextChance: number;
+  cashOut: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface PumpConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  slots: number;
+  difficulties: Record<PumpDifficulty, { pops: number; maxPumps: number }>;
+  /** multipliers[difficulty][pumps - 1] */
+  multipliers: Record<PumpDifficulty, number[]>;
+  rtpPercent: number;
+}
+
+export function fetchPumpConfig() {
+  return apiFetch<PumpConfig>('/pump/config');
+}
+
+export function startPump(stake: number, difficulty: PumpDifficulty) {
+  return apiFetch<PumpRound>('/pump/start', { method: 'POST', body: JSON.stringify({ stake, difficulty }) });
+}
+
+export function pumpOnce(roundId: string) {
+  return apiFetch<PumpRound>('/pump/pump', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
+export function cashOutPump(roundId: string) {
+  return apiFetch<PumpRound>('/pump/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
+export function fetchActivePump() {
+  return apiFetch<{ round: PumpRound | null }>('/pump/active');
+}
+
+export function fetchPumpHistory(limit = 30) {
+  return apiFetch<PumpRound[]>(`/pump/my-history?limit=${limit}`);
+}

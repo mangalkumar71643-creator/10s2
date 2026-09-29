@@ -15,6 +15,7 @@ import { HiloTileArt } from './HiloScreen';
 import { DragonTowerTileArt } from './DragonTowerScreen';
 import { VideoPokerTileArt } from './VideoPokerScreen';
 import { DiamondsTileArt } from './DiamondsScreen';
+import { PumpTileArt } from './PumpScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -137,6 +138,8 @@ export default function HomeScreen() {
   const pokerTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const diamondsTileTop = 13 * GAME_GRID_CELL;
   const diamondsTileLeft = GAME_GRID_LEFT;
+  const pumpTileTop = 13 * GAME_GRID_CELL;
+  const pumpTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 14;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -856,6 +859,27 @@ export default function HomeScreen() {
       >
         <DiamondsTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#F5EEFF', fontSize: 19, fontWeight: '900', letterSpacing: 3, fontFamily: 'serif', textShadowColor: '#A855F7', textShadowRadius: 10 }}>DIAMONDS</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Pump')}
+        style={{
+          position: 'absolute',
+          top: pumpTileTop,
+          left: pumpTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#F472B6',
+          backgroundColor: '#0B0822',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 14,
+        }}
+      >
+        <PumpTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FDF2F8', fontSize: 24, fontWeight: '900', letterSpacing: 6, textShadowColor: '#EC4899', textShadowRadius: 10 }}>PUMP</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
