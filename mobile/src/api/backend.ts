@@ -1880,3 +1880,52 @@ export function fetchActiveTower() {
 export function fetchTowerHistory(limit = 30) {
   return apiFetch<TowerRound[]>(`/dragon-tower/my-history?limit=${limit}`);
 }
+
+// ---- Video Poker ----
+
+export type PokerHand = 'NOTHING' | 'JACKS_OR_BETTER' | 'TWO_PAIR' | 'THREE_OF_A_KIND' | 'STRAIGHT' | 'FLUSH' | 'FULL_HOUSE' | 'FOUR_OF_A_KIND' | 'STRAIGHT_FLUSH' | 'ROYAL_FLUSH';
+export interface PokerRound {
+  id: string;
+  stake: string;
+  status: 'ACTIVE' | 'WON' | 'LOST';
+  /** Cards 0-51 (rank = card % 13, Ace = 0; suit = floor(card / 13)): as dealt while active, the final hand after the draw. */
+  hand: number[];
+  /** Positions (0-4) kept at the draw. */
+  held: number[];
+  /** The hand the five cards make: the dealt hand while active, the paid hand after the draw. */
+  result: PokerHand;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface PokerConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  /** Best hand first; multiplier is the total returned per unit bet. */
+  paytable: { hand: PokerHand; multiplier: number }[];
+  rtpPercent: number;
+}
+
+export function fetchPokerConfig() {
+  return apiFetch<PokerConfig>('/video-poker/config');
+}
+
+export function dealPoker(stake: number) {
+  return apiFetch<PokerRound>('/video-poker/deal', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function drawPoker(roundId: string, held: number[]) {
+  return apiFetch<PokerRound>('/video-poker/draw', { method: 'POST', body: JSON.stringify({ roundId, held }) });
+}
+
+export function fetchActivePoker() {
+  return apiFetch<{ round: PokerRound | null }>('/video-poker/active');
+}
+
+export function fetchPokerHistory(limit = 30) {
+  return apiFetch<PokerRound[]>(`/video-poker/my-history?limit=${limit}`);
+}

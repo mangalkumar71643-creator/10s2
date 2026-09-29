@@ -13,6 +13,7 @@ import { BlackjackTileArt } from './BlackjackScreen';
 import { KenoTileArt } from './KenoScreen';
 import { HiloTileArt } from './HiloScreen';
 import { DragonTowerTileArt } from './DragonTowerScreen';
+import { VideoPokerTileArt } from './VideoPokerScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -131,6 +132,8 @@ export default function HomeScreen() {
   const hiloTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const towerTileTop = 12 * GAME_GRID_CELL;
   const towerTileLeft = GAME_GRID_LEFT;
+  const pokerTileTop = 12 * GAME_GRID_CELL;
+  const pokerTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 13;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -808,6 +811,27 @@ export default function HomeScreen() {
       >
         <DragonTowerTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 17, textShadowColor: '#000', textShadowRadius: 6 }}>{'DRAGON\nTOWER'}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('VideoPoker')}
+        style={{
+          position: 'absolute',
+          top: pokerTileTop,
+          left: pokerTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFD66B',
+          backgroundColor: '#060C3A',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 10,
+        }}
+      >
+        <VideoPokerTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFE58A', fontSize: 15, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 17, textShadowColor: '#000', textShadowRadius: 6 }}>{'VIDEO\nPOKER'}</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
