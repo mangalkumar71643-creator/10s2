@@ -1722,3 +1722,46 @@ export function fetchActiveBlackjack() {
 export function fetchBlackjackHistory(limit = 30) {
   return apiFetch<BlackjackHand[]>(`/blackjack/my-history?limit=${limit}`);
 }
+
+// ---- Keno ----
+
+export type KenoRisk = 'CLASSIC' | 'LOW' | 'MEDIUM' | 'HIGH';
+export interface KenoBet {
+  id: string;
+  stake: string;
+  picks: number[];
+  risk: KenoRisk;
+  drawn: number[];
+  hits: number;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface KenoConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  board: number;
+  drawn: number;
+  maxPicks: number;
+  risks: KenoRisk[];
+  /** tables[risk][picks - 1][hits] = multiplier */
+  tables: Record<KenoRisk, number[][]>;
+  rtpPercent: number;
+  rtpRange: [number, number];
+}
+
+export function fetchKenoConfig() {
+  return apiFetch<KenoConfig>('/keno/config');
+}
+
+export function playKeno(stake: number, picks: number[], risk: KenoRisk) {
+  return apiFetch<KenoBet>('/keno/bet', { method: 'POST', body: JSON.stringify({ stake, picks, risk }) });
+}
+
+export function fetchKenoHistory(limit = 30) {
+  return apiFetch<KenoBet[]>(`/keno/my-history?limit=${limit}`);
+}

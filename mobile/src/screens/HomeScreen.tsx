@@ -10,6 +10,7 @@ import { AcesTileArt } from './AcesScreen';
 import { DiceTileArt } from './DiceScreen';
 import { LimboTileArt } from './LimboScreen';
 import { BlackjackTileArt } from './BlackjackScreen';
+import { KenoTileArt } from './KenoScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -122,7 +123,9 @@ export default function HomeScreen() {
   const limboTileLeft = GAME_GRID_LEFT;
   const blackjackTileTop = 10 * GAME_GRID_CELL;
   const blackjackTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 11;
+  const kenoTileTop = 11 * GAME_GRID_CELL;
+  const kenoTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 12;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -732,6 +735,27 @@ export default function HomeScreen() {
       >
         <BlackjackTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#F4CF6B', fontSize: 18, fontWeight: '900', letterSpacing: 3, fontFamily: 'serif', textShadowColor: '#000', textShadowRadius: 6 }}>BLACKJACK</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Keno')}
+        style={{
+          position: 'absolute',
+          top: kenoTileTop,
+          left: kenoTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFB547',
+          backgroundColor: '#050A24',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 16,
+        }}
+      >
+        <KenoTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFD08A', fontSize: 24, fontWeight: '900', letterSpacing: 7, fontFamily: 'serif', textShadowColor: '#B45309', textShadowRadius: 8 }}>KENO</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
