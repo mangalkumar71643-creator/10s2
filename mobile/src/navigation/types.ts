@@ -40,4 +40,5 @@ export type RootStackParamList = {
   FiveDLottery: undefined;
   TrxWin: undefined;
   Baccarat: undefined;
+  Slot: undefined;
 };

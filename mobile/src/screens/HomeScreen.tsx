@@ -5,6 +5,7 @@ import { K3TileArt } from './K3LotteryScreen';
 import { FiveDTileArt } from './FiveDLotteryScreen';
 import { TrxTileArt } from './TrxWinScreen';
 import { BaccaratTileArt } from './BaccaratScreen';
+import { SlotTileArt } from './SlotScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -107,6 +108,8 @@ export default function HomeScreen() {
   const trxTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const baccaratTileTop = 8 * GAME_GRID_CELL;
   const baccaratTileLeft = GAME_GRID_LEFT;
+  const slotTileTop = 8 * GAME_GRID_CELL;
+  const slotTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 9;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -612,6 +615,27 @@ export default function HomeScreen() {
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '42%', backgroundColor: '#4A0B1E', borderTopWidth: 2, borderTopColor: '#E9B949' }} />
         <BaccaratTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 2, marginTop: 10, fontFamily: 'serif' }}>BACCARAT</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Slot')}
+        style={{
+          position: 'absolute',
+          top: slotTileTop,
+          left: slotTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFD66B',
+          backgroundColor: '#2A0B45',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <SlotTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1.5, marginTop: 8, fontFamily: 'serif' }}>ROYAL GEMS</Text>
+        <Text style={{ color: 'rgba(235,220,255,0.75)', fontSize: 10, fontWeight: '800', letterSpacing: 2 }}>SLOT</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

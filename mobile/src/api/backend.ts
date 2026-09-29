@@ -1471,3 +1471,46 @@ export function fetchBaccaratMyRound(periodNumber?: string) {
 export function fetchBaccaratMyBets(limit = 50) {
   return apiFetch<BaccaratMyBet[]>(`/baccarat/my-bets?limit=${limit}`);
 }
+
+// ---- Royal Gems slot ----
+
+export type SlotSymbol = 'J' | 'Q' | 'K' | 'A' | 'EMERALD' | 'SAPPHIRE' | 'RUBY' | 'WILD';
+
+export interface SlotConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  symbols: SlotSymbol[];
+  paytable: Record<SlotSymbol, number>;
+  reels: SlotSymbol[][];
+  paylines: [number, number, number][];
+  multipliers: number[];
+}
+
+export interface SlotSpin {
+  id: string;
+  stake: string;
+  stops: number[];
+  grid: SlotSymbol[];
+  winLines: number[];
+  baseWin: string;
+  multiplier: number;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export function fetchSlotConfig() {
+  return apiFetch<SlotConfig>('/slot/config');
+}
+
+export function spinSlot(stake: number) {
+  return apiFetch<SlotSpin>('/slot/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchSlotHistory(limit = 30) {
+  return apiFetch<SlotSpin[]>(`/slot/my-history?limit=${limit}`);
+}
