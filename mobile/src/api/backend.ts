@@ -1514,3 +1514,74 @@ export function spinSlot(stake: number) {
 export function fetchSlotHistory(limit = 30) {
   return apiFetch<SlotSpin[]>(`/slot/my-history?limit=${limit}`);
 }
+
+// ---- Golden Aces (cascading slot) ----
+
+export type AcesCard = 'CLUB' | 'DIAMOND' | 'HEART' | 'SPADE' | 'J' | 'Q' | 'K' | 'A';
+export type AcesSym = AcesCard | 'SCATTER' | 'WILD';
+export interface AcesCell {
+  s: AcesSym;
+  g: boolean;
+}
+export interface AcesWayWin {
+  symbol: AcesCard;
+  reels: number;
+  ways: number;
+  pay: number;
+}
+export interface AcesStep {
+  grid: AcesCell[][];
+  multiplier: number;
+  wins: AcesWayWin[];
+  win: number;
+  winning: [number, number][];
+  flipped: [number, number][];
+  bigJokers: [number, number][];
+}
+export interface AcesRound {
+  steps: AcesStep[];
+  final: AcesCell[][];
+  scatters: number;
+  win: number;
+}
+export interface AcesOutcome {
+  base: AcesRound;
+  freeGames: AcesRound[];
+  totalWin: number;
+}
+export interface AcesSpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  cascades: number;
+  freeGames: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface AcesConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  paytable: Record<AcesCard, [number, number, number]>;
+  baseMultipliers: number[];
+  freeMultipliers: number[];
+  freeGames: number;
+  freeRetrigger: number;
+  scattersToTrigger: number;
+}
+
+export function fetchAcesConfig() {
+  return apiFetch<AcesConfig>('/aces/config');
+}
+
+export function spinAces(stake: number) {
+  return apiFetch<{ spin: AcesSpinRow; outcome: AcesOutcome }>('/aces/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchAcesHistory(limit = 30) {
+  return apiFetch<AcesSpinRow[]>(`/aces/my-history?limit=${limit}`);
+}

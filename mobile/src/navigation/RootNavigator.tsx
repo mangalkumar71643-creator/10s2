@@ -22,6 +22,7 @@ import FiveDLotteryScreen from '../screens/FiveDLotteryScreen';
 import TrxWinScreen from '../screens/TrxWinScreen';
 import BaccaratScreen from '../screens/BaccaratScreen';
 import SlotScreen from '../screens/SlotScreen';
+import AcesScreen from '../screens/AcesScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -91,6 +92,7 @@ function MainNavigator() {
       <Stack.Screen name="TrxWin" component={TrxWinScreen} />
       <Stack.Screen name="Baccarat" component={BaccaratScreen} />
       <Stack.Screen name="Slot" component={SlotScreen} />
+      <Stack.Screen name="Aces" component={AcesScreen} />
     </Stack.Navigator>
   );
 }
