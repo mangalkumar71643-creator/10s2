@@ -199,6 +199,7 @@ model User {
   HiloRound         HiloRound[]
   DragonTowerRound  DragonTowerRound[]
   VideoPokerRound   VideoPokerRound[]
+  DiamondsBet       DiamondsBet[]
 }
 
 model KycVerification {
@@ -1259,5 +1260,24 @@ model VideoPokerRound {
   updatedAt      DateTime @updatedAt
 
   @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model DiamondsBet {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// Colour (0-6) of each of the five gems, left to right.
+  gems           Int[]
+  result         String
+  multiplier     Decimal  @db.Decimal(16, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
   @@index([userId, createdAt])
 }
