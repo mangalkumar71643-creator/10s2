@@ -28,6 +28,8 @@ import trxRoutes from "./routes/trx.routes";
 import baccaratRoutes from "./routes/baccarat.routes";
 import slotRoutes from "./routes/slot.routes";
 import acesRoutes from "./routes/aces.routes";
+import diceRoutes from "./routes/dice.routes";
+import limboRoutes from "./routes/limbo.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
@@ -63,6 +65,8 @@ app.use("/trx", trxRoutes);
 app.use("/baccarat", baccaratRoutes);
 app.use("/slot", slotRoutes);
 app.use("/aces", acesRoutes);
+app.use("/dice", diceRoutes);
+app.use("/limbo", limboRoutes);
 
 app.use(errorHandler);
 

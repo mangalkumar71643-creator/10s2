@@ -35,3 +35,14 @@ export function fairRandomFloat(serverSeed: string, clientSeed: string, nonce: n
   const intVal = parseInt(digest.slice(0, 8), 16);
   return intVal / 0x100000000;
 }
+
+/**
+ * Same construction as `fairRandomFloat`, but the message carries a game
+ * name (`${clientSeed}:${game}:${nonce}`) so single-draw games never share
+ * a draw with the `nonce * 1000 + i` slices other games use under the same
+ * seeds, and it takes 52 bits for a finer, less biased float.
+ */
+export function fairGameFloat(serverSeed: string, clientSeed: string, game: string, nonce: number): number {
+  const digest = createHmac("sha256", serverSeed).update(`${clientSeed}:${game}:${nonce}`).digest("hex");
+  return parseInt(digest.slice(0, 13), 16) / 2 ** 52;
+}
