@@ -191,6 +191,7 @@ model User {
   TrxBet            TrxBet[]
   BaccaratBet       BaccaratBet[]
   SlotSpin          SlotSpin[]
+  AcesSpin          AcesSpin[]
 }
 
 model KycVerification {
@@ -1072,6 +1073,27 @@ model SlotSpin {
   baseWin        Decimal  @db.Decimal(10, 2)
   multiplier     Int
   payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// One spin of "Golden Aces" (see acesService.ts / acesEngine.ts). The full
+// cascade sequence is not stored: it replays exactly from the seeds, so a
+// row keeps the stake, the result and what is needed to verify it.
+model AcesSpin {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  totalWin       Decimal  @db.Decimal(12, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  cascades       Int
+  freeGames      Int
   serverSeed     String
   serverSeedHash String
   clientSeed     String
