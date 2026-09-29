@@ -51,4 +51,5 @@ export type RootStackParamList = {
   VideoPoker: undefined;
   Diamonds: undefined;
   Pump: undefined;
+  CoinFlip: undefined;
 };

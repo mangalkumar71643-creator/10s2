@@ -16,6 +16,7 @@ import { DragonTowerTileArt } from './DragonTowerScreen';
 import { VideoPokerTileArt } from './VideoPokerScreen';
 import { DiamondsTileArt } from './DiamondsScreen';
 import { PumpTileArt } from './PumpScreen';
+import { CoinFlipTileArt } from './CoinFlipScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -140,7 +141,9 @@ export default function HomeScreen() {
   const diamondsTileLeft = GAME_GRID_LEFT;
   const pumpTileTop = 13 * GAME_GRID_CELL;
   const pumpTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 14;
+  const coinFlipTileTop = 14 * GAME_GRID_CELL;
+  const coinFlipTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 15;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -880,6 +883,27 @@ export default function HomeScreen() {
       >
         <PumpTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FDF2F8', fontSize: 24, fontWeight: '900', letterSpacing: 6, textShadowColor: '#EC4899', textShadowRadius: 10 }}>PUMP</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('CoinFlip')}
+        style={{
+          position: 'absolute',
+          top: coinFlipTileTop,
+          left: coinFlipTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFD66B',
+          backgroundColor: '#12040A',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 12,
+        }}
+      >
+        <CoinFlipTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFE58A', fontSize: 16, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 18, textShadowColor: '#000', textShadowRadius: 6 }}>{'COIN\nFLIP'}</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

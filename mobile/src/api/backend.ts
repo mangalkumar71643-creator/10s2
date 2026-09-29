@@ -2026,3 +2026,59 @@ export function fetchActivePump() {
 export function fetchPumpHistory(limit = 30) {
   return apiFetch<PumpRound[]>(`/pump/my-history?limit=${limit}`);
 }
+
+// ---- Coin Flip ----
+
+export type CoinSide = 'HEADS' | 'TAILS';
+export interface CoinFlipRound {
+  id: string;
+  stake: string;
+  status: 'ACTIVE' | 'WON' | 'LOST';
+  wins: number;
+  /** The side called on each flip and where it landed: 0 heads, 1 tails. */
+  picks: number[];
+  results: number[];
+  multiplier: string;
+  payout: string;
+  maxFlips: number;
+  currentMultiplier: number;
+  nextMultiplier: number;
+  cashOut: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface CoinFlipConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  maxFlips: number;
+  /** multipliers[wins - 1] */
+  multipliers: number[];
+  rtpPercent: number;
+}
+
+export function fetchCoinFlipConfig() {
+  return apiFetch<CoinFlipConfig>('/coinflip/config');
+}
+
+export function startCoinFlip(stake: number) {
+  return apiFetch<CoinFlipRound>('/coinflip/start', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function flipCoin(roundId: string, side: CoinSide) {
+  return apiFetch<CoinFlipRound>('/coinflip/flip', { method: 'POST', body: JSON.stringify({ roundId, side }) });
+}
+
+export function cashOutCoinFlip(roundId: string) {
+  return apiFetch<CoinFlipRound>('/coinflip/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
+export function fetchActiveCoinFlip() {
+  return apiFetch<{ round: CoinFlipRound | null }>('/coinflip/active');
+}
+
+export function fetchCoinFlipHistory(limit = 30) {
+  return apiFetch<CoinFlipRound[]>(`/coinflip/my-history?limit=${limit}`);
+}
