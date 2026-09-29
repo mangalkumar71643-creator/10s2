@@ -194,6 +194,7 @@ model User {
   AcesSpin          AcesSpin[]
   DiceBet           DiceBet[]
   LimboBet          LimboBet[]
+  BlackjackHand     BlackjackHand[]
 }
 
 model KycVerification {
@@ -1140,5 +1141,27 @@ model LimboBet {
   nonce          Int
   createdAt      DateTime @default(now())
 
+  @@index([userId, createdAt])
+}
+
+model BlackjackHand {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  /// First bet; totalStake adds doubles, splits and insurance.
+  stake          Decimal  @db.Decimal(12, 2)
+  totalStake     Decimal  @db.Decimal(12, 2)
+  payout         Decimal  @db.Decimal(12, 2)
+  status         String // "ACTIVE" | "SETTLED"
+  state          Json
+  version        Int      @default(0)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
   @@index([userId, createdAt])
 }
