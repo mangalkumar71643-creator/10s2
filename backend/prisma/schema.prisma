@@ -198,6 +198,7 @@ model User {
   KenoBet           KenoBet[]
   HiloRound         HiloRound[]
   DragonTowerRound  DragonTowerRound[]
+  VideoPokerRound   VideoPokerRound[]
 }
 
 model KycVerification {
@@ -1221,6 +1222,32 @@ model DragonTowerRound {
   picks          Int[]
   /// Egg tiles on every level; only shown once the round is over.
   layout         Json
+  multiplier     Decimal  @db.Decimal(16, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  version        Int      @default(0)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model VideoPokerRound {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  status         String // "ACTIVE" | "WON" | "LOST"
+  /// The first ten cards of the shuffled deck: 0-4 dealt, 5-9 the replacements in order. Never shown.
+  cards          Int[]
+  /// The five cards on screen: as dealt while active, the final hand after the draw.
+  hand           Int[]
+  held           Int[]
+  result         String
   multiplier     Decimal  @db.Decimal(16, 4)
   payout         Decimal  @db.Decimal(12, 2)
   version        Int      @default(0)
