@@ -37,6 +37,7 @@ import dragonTowerRoutes from "./routes/dragonTower.routes";
 import videoPokerRoutes from "./routes/videoPoker.routes";
 import diamondsRoutes from "./routes/diamonds.routes";
 import pumpRoutes from "./routes/pump.routes";
+import coinFlipRoutes from "./routes/coinFlip.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
@@ -81,6 +82,7 @@ app.use("/dragon-tower", dragonTowerRoutes);
 app.use("/video-poker", videoPokerRoutes);
 app.use("/diamonds", diamondsRoutes);
 app.use("/pump", pumpRoutes);
+app.use("/coinflip", coinFlipRoutes);
 
 app.use(errorHandler);
 
