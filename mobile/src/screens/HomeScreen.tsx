@@ -34,6 +34,8 @@ const TOP_BAR_ICON_OFFSET_Y = 7;
 const NOVAPLAY_BADGE_SIZE = 40;
 const GIFT_ICON_SIZE = 40;
 const PROFILE_ICON_SIZE = 44;
+const VIP_BUTTON_SIZE = 40;
+const TOP_BAR_EDGE = 8;
 
 const CONTROL_PANEL_ASPECT = 1536 / 530;
 
@@ -109,7 +111,17 @@ export default function HomeScreen() {
   const baccaratTileLeft = GAME_GRID_LEFT;
   const gameGridRows = 9;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
-  const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
+  // Shift the row left only when badge + wallet + gift + VIP + profile
+  // would otherwise run past the right edge of a narrow phone.
+  // Phones too narrow for the whole row get it laid out at the minimum
+  // width that fits, then scaled down to the screen.
+  const rowMinWidth = TOP_BAR_EDGE * 2 + NOVAPLAY_BADGE_SIZE + walletButtonWidth + GIFT_ICON_SIZE + VIP_BUTTON_SIZE + PROFILE_ICON_SIZE + TOP_BAR_ICON_GAP * 4;
+  const barWidth = Math.max(screenWidth, rowMinWidth);
+  const barScale = screenWidth / barWidth;
+  const preferredWalletLeft = (barWidth - walletButtonWidth) / 2 - 25;
+  const rowRight = preferredWalletLeft + walletButtonWidth + TOP_BAR_ICON_GAP + GIFT_ICON_SIZE + TOP_BAR_ICON_GAP + VIP_BUTTON_SIZE + TOP_BAR_ICON_GAP + PROFILE_ICON_SIZE;
+  const walletButtonLeft = preferredWalletLeft - Math.max(0, rowRight - (barWidth - TOP_BAR_EDGE));
+  const vipLeft = walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP + GIFT_ICON_SIZE + TOP_BAR_ICON_GAP;
 
   return (
     <ScreenContainer scroll={false} backgroundImage={require('../../assets/home-background.webp')}>
@@ -123,6 +135,7 @@ export default function HomeScreen() {
           backgroundColor: '#151112',
         }}
       >
+        <View style={{ position: 'absolute', top: 0, left: (screenWidth - barWidth) / 2, width: barWidth, height: TOP_BAR_HEIGHT, transform: [{ scale: barScale }] }}>
         <Image
           source={require('../../assets/novaplay-badge.webp')}
           style={{
@@ -184,27 +197,26 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate('Vip')}
           style={{
             position: 'absolute',
-            left: walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP + GIFT_ICON_SIZE + TOP_BAR_ICON_GAP,
-            top: (TOP_BAR_HEIGHT - 36) / 2 + TOP_BAR_ICON_OFFSET_Y,
+            left: vipLeft,
+            top: (TOP_BAR_HEIGHT - VIP_BUTTON_SIZE) / 2 + TOP_BAR_ICON_OFFSET_Y,
+            width: VIP_BUTTON_SIZE,
+            height: VIP_BUTTON_SIZE,
             backgroundColor: '#3D1A24',
             borderRadius: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            flexDirection: 'row',
             alignItems: 'center',
-            gap: 6,
+            justifyContent: 'center',
             borderWidth: 1.5,
             borderColor: '#D4A056',
           }}
         >
           <MaterialCommunityIcons name="crown" size={16} color="#FFD66B" />
-          <Text style={{ color: '#FFD66B', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>VIP</Text>
+          <Text style={{ color: '#FFD66B', fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginTop: -2 }}>VIP</Text>
         </Pressable>
         <Pressable
           onPress={() => (navigation as any).navigate('Profile')}
           style={{
             position: 'absolute',
-            left: walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP + GIFT_ICON_SIZE + TOP_BAR_ICON_GAP + 50 + TOP_BAR_ICON_GAP,
+            left: vipLeft + VIP_BUTTON_SIZE + TOP_BAR_ICON_GAP,
             top: (TOP_BAR_HEIGHT - PROFILE_ICON_SIZE) / 2 + TOP_BAR_ICON_OFFSET_Y,
           }}
         >
@@ -214,6 +226,7 @@ export default function HomeScreen() {
             resizeMode="cover"
           />
         </Pressable>
+        </View>
       </View>
       <Image
         source={require('../../assets/control-panel.webp')}
