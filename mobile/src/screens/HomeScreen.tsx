@@ -12,6 +12,7 @@ import { LimboTileArt } from './LimboScreen';
 import { BlackjackTileArt } from './BlackjackScreen';
 import { KenoTileArt } from './KenoScreen';
 import { HiloTileArt } from './HiloScreen';
+import { DragonTowerTileArt } from './DragonTowerScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -128,7 +129,9 @@ export default function HomeScreen() {
   const kenoTileLeft = GAME_GRID_LEFT;
   const hiloTileTop = 11 * GAME_GRID_CELL;
   const hiloTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 12;
+  const towerTileTop = 12 * GAME_GRID_CELL;
+  const towerTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 13;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -784,6 +787,27 @@ export default function HomeScreen() {
           <Text style={{ color: '#FFD66B' }}>·</Text>
           <Text style={{ color: '#FF9C84' }}>LO</Text>
         </Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('DragonTower')}
+        style={{
+          position: 'absolute',
+          top: towerTileTop,
+          left: towerTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFD66B',
+          backgroundColor: '#031416',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 10,
+        }}
+      >
+        <DragonTowerTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 17, textShadowColor: '#000', textShadowRadius: 6 }}>{'DRAGON\nTOWER'}</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

@@ -28,6 +28,7 @@ import LimboScreen from '../screens/LimboScreen';
 import BlackjackScreen from '../screens/BlackjackScreen';
 import KenoScreen from '../screens/KenoScreen';
 import HiloScreen from '../screens/HiloScreen';
+import DragonTowerScreen from '../screens/DragonTowerScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -103,6 +104,7 @@ function MainNavigator() {
       <Stack.Screen name="Blackjack" component={BlackjackScreen} />
       <Stack.Screen name="Keno" component={KenoScreen} />
       <Stack.Screen name="Hilo" component={HiloScreen} />
+      <Stack.Screen name="DragonTower" component={DragonTowerScreen} />
     </Stack.Navigator>
   );
 }

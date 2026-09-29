@@ -1820,3 +1820,63 @@ export function fetchActiveHilo() {
 export function fetchHiloHistory(limit = 30) {
   return apiFetch<HiloRound[]>(`/hilo/my-history?limit=${limit}`);
 }
+
+// ---- Dragon Tower ----
+
+export type TowerDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT' | 'MASTER';
+export interface TowerRound {
+  id: string;
+  stake: string;
+  difficulty: TowerDifficulty;
+  status: 'ACTIVE' | 'WON' | 'LOST';
+  level: number;
+  /** Tile picked on each level, bottom first. */
+  picks: number[];
+  /** Egg tiles on every level (bottom first) — only once the round is over. */
+  layout: number[][] | null;
+  multiplier: string;
+  payout: string;
+  tiles: number;
+  eggs: number;
+  currentMultiplier: number;
+  nextMultiplier: number;
+  cashOut: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface TowerConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rows: number;
+  difficulties: Record<TowerDifficulty, { tiles: number; eggs: number }>;
+  /** multipliers[difficulty][level - 1] */
+  multipliers: Record<TowerDifficulty, number[]>;
+  rtpPercent: number;
+}
+
+export function fetchTowerConfig() {
+  return apiFetch<TowerConfig>('/dragon-tower/config');
+}
+
+export function startTower(stake: number, difficulty: TowerDifficulty) {
+  return apiFetch<TowerRound>('/dragon-tower/start', { method: 'POST', body: JSON.stringify({ stake, difficulty }) });
+}
+
+export function pickTower(roundId: string, tile: number) {
+  return apiFetch<TowerRound>('/dragon-tower/pick', { method: 'POST', body: JSON.stringify({ roundId, tile }) });
+}
+
+export function cashOutTower(roundId: string) {
+  return apiFetch<TowerRound>('/dragon-tower/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
+export function fetchActiveTower() {
+  return apiFetch<{ round: TowerRound | null }>('/dragon-tower/active');
+}
+
+export function fetchTowerHistory(limit = 30) {
+  return apiFetch<TowerRound[]>(`/dragon-tower/my-history?limit=${limit}`);
+}
