@@ -81,9 +81,38 @@ export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
 ];
 
-/** One game's tile; tapping it opens the game. */
-export function GameTile({ id }: { id: GameId }) {
+/** Games drawn with a supplied icon image instead of their built-in tile art. */
+const ICONS: Partial<Record<GameId, ImageSourcePropType>> = {
+  Aviator: require('../../assets/icons/aviator.webp'),
+  Vortex: require('../../assets/icons/vortex.webp'),
+  ChickenRoad: require('../../assets/icons/chicken-road.webp'),
+  Mines: require('../../assets/icons/mines.webp'),
+};
+
+/** One game's tile at `size` points square; tapping it opens the game. */
+export function GameTile({ id, size = GAME_ICON_SIZE }: { id: GameId; size?: number }) {
   const navigation = useNavigation();
+  const icon = ICONS[id];
+  if (icon) {
+    return (
+      <Pressable onPress={() => (navigation as any).navigate(id)} style={{ width: size, height: size }} accessibilityRole="button">
+        <Image source={icon} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+      </Pressable>
+    );
+  }
+  // The built-in tiles are laid out at GAME_ICON_SIZE; shrink or grow them as a whole.
+  const k = size / GAME_ICON_SIZE;
+  const shift = (size - GAME_ICON_SIZE) / 2;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={{ width: GAME_ICON_SIZE, height: GAME_ICON_SIZE, transform: [{ translateX: shift }, { translateY: shift }, { scale: k }] }}>
+        {builtInTile(id, navigation)}
+      </View>
+    </View>
+  );
+}
+
+function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
   switch (id) {
     case 'WinGo':
       return (
@@ -100,55 +129,6 @@ export function GameTile({ id }: { id: GameId }) {
             style={{ width: '100%', height: '100%' }}
             resizeMode="contain"
           />
-        </Pressable>
-      );
-    case 'Aviator':
-      return (
-        <Pressable
-          onPress={() => (navigation as any).navigate('Aviator')}
-          style={{
-            width: GAME_ICON_SIZE,
-            height: GAME_ICON_SIZE,
-            overflow: 'hidden',
-          }}
-        >
-          <Image
-            source={require('../../assets/aviator-home-icon.webp')}
-            style={{ width: '100%', height: '100%' }}
-            resizeMode="contain"
-          />
-        </Pressable>
-      );
-    case 'ChickenRoad':
-      return (
-        <Pressable
-          onPress={() => (navigation as any).navigate('ChickenRoad')}
-          style={{
-            width: GAME_ICON_SIZE,
-            height: GAME_ICON_SIZE,
-            borderRadius: 20,
-            backgroundColor: '#1A1B1E',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ fontSize: GAME_ICON_SIZE * 0.5 }}>🐔</Text>
-        </Pressable>
-      );
-    case 'Mines':
-      return (
-        <Pressable
-          onPress={() => (navigation as any).navigate('Mines')}
-          style={{
-            width: GAME_ICON_SIZE,
-            height: GAME_ICON_SIZE,
-            borderRadius: 20,
-            backgroundColor: '#0B4FB8',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ fontSize: GAME_ICON_SIZE * 0.5 }}>💣</Text>
         </Pressable>
       );
     case 'SevenUpDown':
@@ -220,30 +200,6 @@ export function GameTile({ id }: { id: GameId }) {
           <View style={{ position: 'absolute', bottom: 8, left: 0, right: 0, alignItems: 'center' }}>
             <Text style={{ color: '#FFD66B', fontSize: 15, fontWeight: '900', letterSpacing: 1 }}>DRAGON TIGER</Text>
           </View>
-        </Pressable>
-      );
-    case 'Vortex':
-      return (
-        <Pressable
-          onPress={() => (navigation as any).navigate('Vortex')}
-          style={{
-            width: GAME_ICON_SIZE,
-            height: GAME_ICON_SIZE,
-            borderRadius: 20,
-            backgroundColor: '#1A0038',
-            borderWidth: 2,
-            borderColor: '#B24DFF',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <MaterialCommunityIcons name="weather-hurricane" size={GAME_ICON_SIZE * 0.42} color="#D08CFF" />
-          <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
-            <MaterialCommunityIcons name="water" size={16} color="#3FA2FF" />
-            <MaterialCommunityIcons name="leaf" size={16} color="#39D67A" />
-            <MaterialCommunityIcons name="fire" size={16} color="#FF8A2A" />
-          </View>
-          <Text style={{ color: '#FFD66B', fontSize: 18, fontWeight: '900', letterSpacing: 3, marginTop: 2 }}>VORTEX</Text>
         </Pressable>
       );
     case 'AndarBahar':

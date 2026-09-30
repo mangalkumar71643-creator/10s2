@@ -7,7 +7,8 @@ import { GAME_CATEGORIES, GAME_ICON_SIZE, GameTile } from '../components/GameTil
 import { RootStackParamList } from '../navigation/types';
 
 const SIDE = 12;
-const TILE_GAP = 16;
+const TILE_GAP = 10;
+const PER_ROW = 3;
 
 /** Every game in one category, opened from its banner on the home screen. */
 export default function GameCategoryScreen() {
@@ -16,9 +17,9 @@ export default function GameCategoryScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const category = GAME_CATEGORIES.find((c) => c.id === route.params?.categoryId) ?? GAME_CATEGORIES[0];
-  // As many 150px tiles per row as fit, the grid centred.
-  const perRow = Math.max(2, Math.floor((width - SIDE * 2 + TILE_GAP) / (GAME_ICON_SIZE + TILE_GAP)));
-  const gridWidth = perRow * GAME_ICON_SIZE + (perRow - 1) * TILE_GAP;
+  // Three tiles a row across the screen, capped at their full size on wide screens.
+  const tile = Math.min(GAME_ICON_SIZE, Math.floor((width - SIDE * 2 - TILE_GAP * (PER_ROW - 1)) / PER_ROW));
+  const gridWidth = PER_ROW * tile + (PER_ROW - 1) * TILE_GAP;
 
   return (
     <ImageBackground source={require('../../assets/home-background.webp')} style={styles.fill} resizeMode="cover">
@@ -30,9 +31,7 @@ export default function GameCategoryScreen() {
         </View>
         <View style={[styles.grid, { width: gridWidth }]}>
           {category.games.map((id) => (
-            <View key={id} style={{ width: GAME_ICON_SIZE, height: GAME_ICON_SIZE }}>
-              <GameTile id={id} />
-            </View>
+            <GameTile key={id} id={id} size={tile} />
           ))}
         </View>
       </ScrollView>
