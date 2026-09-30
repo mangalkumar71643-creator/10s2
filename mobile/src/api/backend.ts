@@ -2283,3 +2283,60 @@ export function spinCandy(stake: number) {
 export function fetchCandyHistory(limit = 30) {
   return apiFetch<CandySpinRow[]>(`/candy-blast/my-history?limit=${limit}`);
 }
+
+// ---------- Neon 777 (classic one-line slot with a Special Reel) ----------
+
+export type Neon777Symbol = 'BLANK' | 'BAR1' | 'BAR2' | 'BAR3' | 'BLUE7' | 'RED7';
+export type Neon777Result = 'RED7' | 'BLUE7' | 'ANY7' | 'BAR3' | 'BAR2' | 'BAR1' | 'ANYBAR' | 'NONE';
+export interface Neon777Special {
+  kind: 'NONE' | 'MULT' | 'BONUS' | 'RESPIN';
+  value: number;
+  chancePercent: number;
+}
+export interface Neon777Round {
+  /** Stop of each main reel on its strip (the middle row). */
+  stops: number[];
+  /** Index into the config's special list. */
+  special: number;
+  result: Neon777Result;
+  linePays: number;
+  win: number;
+}
+export interface Neon777Outcome {
+  rounds: Neon777Round[];
+  totalWin: number;
+}
+export interface Neon777SpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  respins: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface Neon777Config {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  strips: Neon777Symbol[][];
+  linePays: Record<Exclude<Neon777Result, 'NONE'>, number>;
+  special: Neon777Special[];
+  maxRespins: number;
+  hitRatePercent: number;
+  rtpPercent: number;
+}
+
+export function fetchNeon777Config() {
+  return apiFetch<Neon777Config>('/neon-777/config');
+}
+
+export function spinNeon777(stake: number) {
+  return apiFetch<{ spin: Neon777SpinRow; outcome: Neon777Outcome }>('/neon-777/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchNeon777History(limit = 30) {
+  return apiFetch<Neon777SpinRow[]>(`/neon-777/my-history?limit=${limit}`);
+}

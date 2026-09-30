@@ -55,4 +55,5 @@ export type RootStackParamList = {
   CasinoHoldem: undefined;
   ThreeCardPoker: undefined;
   CandyBlast: undefined;
+  Neon777: undefined;
 };

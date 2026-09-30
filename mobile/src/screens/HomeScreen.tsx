@@ -20,6 +20,7 @@ import { CoinFlipTileArt } from './CoinFlipScreen';
 import { CasinoHoldemTileArt } from './CasinoHoldemScreen';
 import { ThreeCardPokerTileArt } from './ThreeCardPokerScreen';
 import { CandyBlastTileArt } from './CandyBlastScreen';
+import { Neon777TileArt } from './Neon777Screen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -152,7 +153,9 @@ export default function HomeScreen() {
   const threeCardTileLeft = GAME_GRID_LEFT;
   const candyTileTop = 15 * GAME_GRID_CELL;
   const candyTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 16;
+  const neonTileTop = 16 * GAME_GRID_CELL;
+  const neonTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 17;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -976,6 +979,27 @@ export default function HomeScreen() {
       >
         <CandyBlastTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 2, textAlign: 'center', lineHeight: 18, textShadowColor: '#B0105E', textShadowRadius: 6 }}>{'CANDY\nBLAST'}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('Neon777')}
+        style={{
+          position: 'absolute',
+          top: neonTileTop,
+          left: neonTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FF2D95',
+          backgroundColor: '#07010F',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 10,
+        }}
+      >
+        <Neon777TileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2, textAlign: 'center', lineHeight: 19, textShadowColor: '#FF2D95', textShadowRadius: 8 }}>{'NEON\n777'}</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
