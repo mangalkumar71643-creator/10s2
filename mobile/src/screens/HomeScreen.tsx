@@ -19,6 +19,7 @@ import { PumpTileArt } from './PumpScreen';
 import { CoinFlipTileArt } from './CoinFlipScreen';
 import { CasinoHoldemTileArt } from './CasinoHoldemScreen';
 import { ThreeCardPokerTileArt } from './ThreeCardPokerScreen';
+import { CandyBlastTileArt } from './CandyBlastScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -149,6 +150,8 @@ export default function HomeScreen() {
   const holdemTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const threeCardTileTop = 15 * GAME_GRID_CELL;
   const threeCardTileLeft = GAME_GRID_LEFT;
+  const candyTileTop = 15 * GAME_GRID_CELL;
+  const candyTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 16;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -952,6 +955,27 @@ export default function HomeScreen() {
       >
         <ThreeCardPokerTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFF6DF', fontSize: 14, fontWeight: '900', letterSpacing: 1.5, fontFamily: 'serif', textAlign: 'center', lineHeight: 16, textShadowColor: '#000', textShadowRadius: 6 }}>{'THREE CARD\nPOKER'}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('CandyBlast')}
+        style={{
+          position: 'absolute',
+          top: candyTileTop,
+          left: candyTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#FFE0F0',
+          backgroundColor: '#C98BFF',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 10,
+        }}
+      >
+        <CandyBlastTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 2, textAlign: 'center', lineHeight: 18, textShadowColor: '#B0105E', textShadowRadius: 6 }}>{'CANDY\nBLAST'}</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>

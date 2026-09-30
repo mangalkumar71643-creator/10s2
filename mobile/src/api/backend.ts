@@ -2203,3 +2203,83 @@ export function fetchActiveThreeCard() {
 export function fetchThreeCardHistory(limit = 30) {
   return apiFetch<ThreeCardHand[]>(`/three-card-poker/my-history?limit=${limit}`);
 }
+
+// ---------- Candy Blast (tumbling pay-anywhere slot) ----------
+
+export type CandySymbol = 'BANANA' | 'GRAPES' | 'WATERMELON' | 'PLUM' | 'APPLE' | 'BLUE' | 'GREEN' | 'PURPLE' | 'HEART';
+export type CandySym = CandySymbol | 'SCATTER' | 'BOMB';
+export interface CandyCell {
+  s: CandySym;
+  /** A bomb's multiplier. */
+  m?: number;
+}
+export interface CandyWin {
+  symbol: CandySymbol;
+  count: number;
+  pay: number;
+}
+export interface CandyStep {
+  /** Board before this step's burst (column by column, top row first). */
+  grid: CandyCell[][];
+  wins: CandyWin[];
+  win: number;
+  /** [col, row] of every bursting symbol. */
+  burst: [number, number][];
+}
+export interface CandyRound {
+  steps: CandyStep[];
+  final: CandyCell[][];
+  tumbleWin: number;
+  /** Sum of the bombs on the final board, applied only if the tumbles won (0 = none). */
+  bombTotal: number;
+  scatters: number;
+  scatterWin: number;
+  win: number;
+}
+export interface CandyOutcome {
+  base: CandyRound;
+  freeSpins: CandyRound[];
+  totalWin: number;
+}
+export interface CandySpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  tumbles: number;
+  freeSpins: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface CandyConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  cols: number;
+  rows: number;
+  minCount: number;
+  /** Pays for [8-9, 10-11, 12+], best symbol first. */
+  paytable: { symbol: CandySymbol; pays: [number, number, number] }[];
+  /** Lollipops once the tumbles end: 4, 5, 6+. */
+  scatterPays: [number, number, number];
+  scattersToTrigger: number;
+  scattersToRetrigger: number;
+  freeSpins: number;
+  freeRetrigger: number;
+  bombValues: number[];
+}
+
+export function fetchCandyConfig() {
+  return apiFetch<CandyConfig>('/candy-blast/config');
+}
+
+export function spinCandy(stake: number) {
+  return apiFetch<{ spin: CandySpinRow; outcome: CandyOutcome }>('/candy-blast/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchCandyHistory(limit = 30) {
+  return apiFetch<CandySpinRow[]>(`/candy-blast/my-history?limit=${limit}`);
+}
