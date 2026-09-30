@@ -2139,3 +2139,67 @@ export function fetchActiveHoldem() {
 export function fetchHoldemHistory(limit = 30) {
   return apiFetch<HoldemHand[]>(`/casino-holdem/my-history?limit=${limit}`);
 }
+
+// ---------- Three Card Poker ----------
+
+export type ThreeCardHandClass = 'HIGH_CARD' | 'PAIR' | 'FLUSH' | 'STRAIGHT' | 'THREE_OF_A_KIND' | 'STRAIGHT_FLUSH';
+export type ThreeCardOutcome = 'FOLD' | 'DEALER_NOT_QUALIFIED' | 'WIN' | 'TIE' | 'LOSE';
+export interface ThreeCardHand {
+  id: string;
+  ante: string;
+  /** Pair Plus side bet, "0" if none. */
+  pairPlus: string;
+  /** Ante, Pair Plus and the play bet, if made. */
+  staked: string;
+  status: 'ACTIVE' | 'WON' | 'LOST';
+  /** Cards 0-51 (rank = card % 13, Ace = 0; suit = floor(card / 13)). */
+  playerCards: number[];
+  /** Empty while the hand is open. */
+  dealerCards: number[];
+  action: 'PLAY' | 'FOLD' | null;
+  outcome: ThreeCardOutcome | null;
+  player: { hand: ThreeCardHandClass };
+  dealer: { hand: ThreeCardHandClass; qualifies: boolean } | null;
+  /** Part of the payout that came from Pair Plus. */
+  pairPlusPayout: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface ThreeCardConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  /** Ante winnings (x to 1) when the dealer doesn't qualify or the player wins. */
+  antePays: number;
+  /** Play winnings (x to 1) when the player beats a qualifying dealer. */
+  playPays: number;
+  /** Extra ante winnings for a straight or better whenever the player plays, best first. */
+  anteBonus: { hand: ThreeCardHandClass; pays: number }[];
+  /** Pair Plus winnings by the player's hand, best first. */
+  pairPlus: { hand: ThreeCardHandClass; pays: number }[];
+  rtpPercent: number;
+  pairPlusRtpPercent: number;
+}
+
+export function fetchThreeCardConfig() {
+  return apiFetch<ThreeCardConfig>('/three-card-poker/config');
+}
+
+export function dealThreeCard(ante: number, pairPlus: number) {
+  return apiFetch<ThreeCardHand>('/three-card-poker/deal', { method: 'POST', body: JSON.stringify({ ante, pairPlus }) });
+}
+
+export function threeCardAction(handId: string, action: 'PLAY' | 'FOLD') {
+  return apiFetch<ThreeCardHand>('/three-card-poker/action', { method: 'POST', body: JSON.stringify({ handId, action }) });
+}
+
+export function fetchActiveThreeCard() {
+  return apiFetch<{ hand: ThreeCardHand | null }>('/three-card-poker/active');
+}
+
+export function fetchThreeCardHistory(limit = 30) {
+  return apiFetch<ThreeCardHand[]>(`/three-card-poker/my-history?limit=${limit}`);
+}

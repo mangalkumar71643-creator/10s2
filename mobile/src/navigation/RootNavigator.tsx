@@ -34,6 +34,7 @@ import DiamondsScreen from '../screens/DiamondsScreen';
 import PumpScreen from '../screens/PumpScreen';
 import CoinFlipScreen from '../screens/CoinFlipScreen';
 import CasinoHoldemScreen from '../screens/CasinoHoldemScreen';
+import ThreeCardPokerScreen from '../screens/ThreeCardPokerScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -115,6 +116,7 @@ function MainNavigator() {
       <Stack.Screen name="Pump" component={PumpScreen} />
       <Stack.Screen name="CoinFlip" component={CoinFlipScreen} />
       <Stack.Screen name="CasinoHoldem" component={CasinoHoldemScreen} />
+      <Stack.Screen name="ThreeCardPoker" component={ThreeCardPokerScreen} />
     </Stack.Navigator>
   );
 }

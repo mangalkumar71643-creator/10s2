@@ -18,6 +18,7 @@ import { DiamondsTileArt } from './DiamondsScreen';
 import { PumpTileArt } from './PumpScreen';
 import { CoinFlipTileArt } from './CoinFlipScreen';
 import { CasinoHoldemTileArt } from './CasinoHoldemScreen';
+import { ThreeCardPokerTileArt } from './ThreeCardPokerScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -146,7 +147,9 @@ export default function HomeScreen() {
   const coinFlipTileLeft = GAME_GRID_LEFT;
   const holdemTileTop = 14 * GAME_GRID_CELL;
   const holdemTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
-  const gameGridRows = 15;
+  const threeCardTileTop = 15 * GAME_GRID_CELL;
+  const threeCardTileLeft = GAME_GRID_LEFT;
+  const gameGridRows = 16;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -928,6 +931,27 @@ export default function HomeScreen() {
       >
         <CasinoHoldemTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFF6DF', fontSize: 15, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 17, textShadowColor: '#000', textShadowRadius: 6 }}>{"CASINO\nHOLD'EM"}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('ThreeCardPoker')}
+        style={{
+          position: 'absolute',
+          top: threeCardTileTop,
+          left: threeCardTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#E9C46A',
+          backgroundColor: '#081336',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 10,
+        }}
+      >
+        <ThreeCardPokerTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFF6DF', fontSize: 14, fontWeight: '900', letterSpacing: 1.5, fontFamily: 'serif', textAlign: 'center', lineHeight: 16, textShadowColor: '#000', textShadowRadius: 6 }}>{'THREE CARD\nPOKER'}</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
