@@ -2082,3 +2082,60 @@ export function fetchActiveCoinFlip() {
 export function fetchCoinFlipHistory(limit = 30) {
   return apiFetch<CoinFlipRound[]>(`/coinflip/my-history?limit=${limit}`);
 }
+
+// ---- Casino Hold'em ----
+
+export type HoldemHandClass = 'HIGH_CARD' | 'PAIR' | 'TWO_PAIR' | 'THREE_OF_A_KIND' | 'STRAIGHT' | 'FLUSH' | 'FULL_HOUSE' | 'FOUR_OF_A_KIND' | 'STRAIGHT_FLUSH' | 'ROYAL_FLUSH';
+export type HoldemOutcome = 'FOLD' | 'DEALER_NOT_QUALIFIED' | 'WIN' | 'TIE' | 'LOSE';
+export interface HoldemHand {
+  id: string;
+  ante: string;
+  /** Ante plus the call, if made. */
+  staked: string;
+  status: 'ACTIVE' | 'WON' | 'LOST';
+  /** Cards 0-51 (rank = card % 13, Ace = 0; suit = floor(card / 13)). */
+  playerCards: number[];
+  /** The flop while the hand is open, all five once it's over. */
+  board: number[];
+  /** Empty while the hand is open. */
+  dealerCards: number[];
+  action: 'CALL' | 'FOLD' | null;
+  outcome: HoldemOutcome | null;
+  player: { hand: HoldemHandClass; best: number[] } | null;
+  dealer: { hand: HoldemHandClass; best: number[]; qualifies: boolean } | null;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface HoldemConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  /** Ante winnings (x to 1) by the player's hand, best first. */
+  antePays: { hand: HoldemHandClass; pays: number }[];
+  /** Call winnings (x to 1) when the player beats a qualifying dealer. */
+  callPays: number;
+  rtpPercent: number;
+}
+
+export function fetchHoldemConfig() {
+  return apiFetch<HoldemConfig>('/casino-holdem/config');
+}
+
+export function dealHoldem(ante: number) {
+  return apiFetch<HoldemHand>('/casino-holdem/deal', { method: 'POST', body: JSON.stringify({ ante }) });
+}
+
+export function holdemAction(handId: string, action: 'CALL' | 'FOLD') {
+  return apiFetch<HoldemHand>('/casino-holdem/action', { method: 'POST', body: JSON.stringify({ handId, action }) });
+}
+
+export function fetchActiveHoldem() {
+  return apiFetch<{ hand: HoldemHand | null }>('/casino-holdem/active');
+}
+
+export function fetchHoldemHistory(limit = 30) {
+  return apiFetch<HoldemHand[]>(`/casino-holdem/my-history?limit=${limit}`);
+}

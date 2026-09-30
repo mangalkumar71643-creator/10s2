@@ -17,6 +17,7 @@ import { VideoPokerTileArt } from './VideoPokerScreen';
 import { DiamondsTileArt } from './DiamondsScreen';
 import { PumpTileArt } from './PumpScreen';
 import { CoinFlipTileArt } from './CoinFlipScreen';
+import { CasinoHoldemTileArt } from './CasinoHoldemScreen';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -143,6 +144,8 @@ export default function HomeScreen() {
   const pumpTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const coinFlipTileTop = 14 * GAME_GRID_CELL;
   const coinFlipTileLeft = GAME_GRID_LEFT;
+  const holdemTileTop = 14 * GAME_GRID_CELL;
+  const holdemTileLeft = GAME_GRID_LEFT + GAME_GRID_CELL;
   const gameGridRows = 15;
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
@@ -904,6 +907,27 @@ export default function HomeScreen() {
       >
         <CoinFlipTileArt size={GAME_ICON_SIZE} />
         <Text style={{ color: '#FFE58A', fontSize: 16, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 18, textShadowColor: '#000', textShadowRadius: 6 }}>{'COIN\nFLIP'}</Text>
+      </Pressable>
+      <Pressable
+        onPress={() => (navigation as any).navigate('CasinoHoldem')}
+        style={{
+          position: 'absolute',
+          top: holdemTileTop,
+          left: holdemTileLeft,
+          width: GAME_ICON_SIZE,
+          height: GAME_ICON_SIZE,
+          borderRadius: 20,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: '#F5C84C',
+          backgroundColor: '#2A0606',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          paddingBottom: 10,
+        }}
+      >
+        <CasinoHoldemTileArt size={GAME_ICON_SIZE} />
+        <Text style={{ color: '#FFF6DF', fontSize: 15, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif', textAlign: 'center', lineHeight: 17, textShadowColor: '#000', textShadowRadius: 6 }}>{"CASINO\nHOLD'EM"}</Text>
       </Pressable>
       </ScrollView>
     </ScreenContainer>
