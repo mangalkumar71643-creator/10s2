@@ -165,44 +165,45 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  wallet            Wallet?
-  revealedSeeds     RevealedServerSeed[]
-  transactions      Transaction[]
-  bets              Bet[]
-  gameRounds        GameRound[]
-  kycVerifications  KycVerification[]
-  supportTickets    SupportTicket[]
-  colorGameBets     ColorGameBet[]
-  aviatorBets       AviatorBet[]
-  chickenRoadRounds ChickenRoadRound[]
-  minesRounds       MinesRound[]
-  sevenUpDownBets   SevenUpDownBet[]
-  plinkoBets        PlinkoBet[]
-  dragonTigerBets   DragonTigerBet[]
-  vortexRounds      VortexRound[]
-  AndarBaharBet     AndarBaharBet[]
-  TeenPattiBet      TeenPattiBet[]
-  CricketXBet       CricketXBet[]
-  JhandiMundaBet    JhandiMundaBet[]
-  RouletteBet       RouletteBet[]
-  K3Bet             K3Bet[]
-  WinGoBet          WinGoBet[]
-  FiveDBet          FiveDBet[]
-  TrxBet            TrxBet[]
-  BaccaratBet       BaccaratBet[]
-  SlotSpin          SlotSpin[]
-  AcesSpin          AcesSpin[]
-  DiceBet           DiceBet[]
-  LimboBet          LimboBet[]
-  BlackjackHand     BlackjackHand[]
-  KenoBet           KenoBet[]
-  HiloRound         HiloRound[]
-  DragonTowerRound  DragonTowerRound[]
-  VideoPokerRound   VideoPokerRound[]
-  DiamondsBet       DiamondsBet[]
-  PumpRound         PumpRound[]
-  CoinFlipRound     CoinFlipRound[]
-  CasinoHoldemHand  CasinoHoldemHand[]
+  wallet             Wallet?
+  revealedSeeds      RevealedServerSeed[]
+  transactions       Transaction[]
+  bets               Bet[]
+  gameRounds         GameRound[]
+  kycVerifications   KycVerification[]
+  supportTickets     SupportTicket[]
+  colorGameBets      ColorGameBet[]
+  aviatorBets        AviatorBet[]
+  chickenRoadRounds  ChickenRoadRound[]
+  minesRounds        MinesRound[]
+  sevenUpDownBets    SevenUpDownBet[]
+  plinkoBets         PlinkoBet[]
+  dragonTigerBets    DragonTigerBet[]
+  vortexRounds       VortexRound[]
+  AndarBaharBet      AndarBaharBet[]
+  TeenPattiBet       TeenPattiBet[]
+  CricketXBet        CricketXBet[]
+  JhandiMundaBet     JhandiMundaBet[]
+  RouletteBet        RouletteBet[]
+  K3Bet              K3Bet[]
+  WinGoBet           WinGoBet[]
+  FiveDBet           FiveDBet[]
+  TrxBet             TrxBet[]
+  BaccaratBet        BaccaratBet[]
+  SlotSpin           SlotSpin[]
+  AcesSpin           AcesSpin[]
+  DiceBet            DiceBet[]
+  LimboBet           LimboBet[]
+  BlackjackHand      BlackjackHand[]
+  KenoBet            KenoBet[]
+  HiloRound          HiloRound[]
+  DragonTowerRound   DragonTowerRound[]
+  VideoPokerRound    VideoPokerRound[]
+  DiamondsBet        DiamondsBet[]
+  PumpRound          PumpRound[]
+  CoinFlipRound      CoinFlipRound[]
+  CasinoHoldemHand   CasinoHoldemHand[]
+  ThreeCardPokerHand ThreeCardPokerHand[]
 }
 
 model KycVerification {
@@ -1347,6 +1348,37 @@ model CasinoHoldemHand {
   outcome        String? // "FOLD" | "DEALER_NOT_QUALIFIED" | "WIN" | "TIE" | "LOSE"
   playerHand     String?
   dealerHand     String?
+  payout         Decimal  @db.Decimal(12, 2)
+  version        Int      @default(0)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model ThreeCardPokerHand {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  ante           Decimal  @db.Decimal(12, 2)
+  /// Pair Plus side bet, 0 if none.
+  pairPlus       Decimal  @db.Decimal(12, 2)
+  /// Ante, Pair Plus and the play bet, if made.
+  staked         Decimal  @db.Decimal(12, 2)
+  status         String // "ACTIVE" | "WON" | "LOST"
+  /// Player's three, then the dealer's three. The dealer's are never shown while the hand is open.
+  cards          Int[]
+  action         String? // "PLAY" | "FOLD"
+  outcome        String? // "FOLD" | "DEALER_NOT_QUALIFIED" | "WIN" | "TIE" | "LOSE"
+  playerHand     String?
+  dealerHand     String?
+  /// Part of the payout that came from Pair Plus.
+  pairPlusPayout Decimal  @default(0) @db.Decimal(12, 2)
   payout         Decimal  @db.Decimal(12, 2)
   version        Int      @default(0)
   serverSeed     String
