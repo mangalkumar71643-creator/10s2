@@ -38,6 +38,7 @@ import videoPokerRoutes from "./routes/videoPoker.routes";
 import diamondsRoutes from "./routes/diamonds.routes";
 import pumpRoutes from "./routes/pump.routes";
 import coinFlipRoutes from "./routes/coinFlip.routes";
+import casinoHoldemRoutes from "./routes/casinoHoldem.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
@@ -83,6 +84,7 @@ app.use("/video-poker", videoPokerRoutes);
 app.use("/diamonds", diamondsRoutes);
 app.use("/pump", pumpRoutes);
 app.use("/coinflip", coinFlipRoutes);
+app.use("/casino-holdem", casinoHoldemRoutes);
 
 app.use(errorHandler);
 

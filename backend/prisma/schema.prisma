@@ -202,6 +202,7 @@ model User {
   DiamondsBet       DiamondsBet[]
   PumpRound         PumpRound[]
   CoinFlipRound     CoinFlipRound[]
+  CasinoHoldemHand  CasinoHoldemHand[]
 }
 
 model KycVerification {
@@ -1319,6 +1320,33 @@ model CoinFlipRound {
   picks          Int[]
   results        Int[]
   multiplier     Decimal  @db.Decimal(16, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  version        Int      @default(0)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model CasinoHoldemHand {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  ante           Decimal  @db.Decimal(12, 2)
+  /// Ante plus the call, if made.
+  staked         Decimal  @db.Decimal(12, 2)
+  status         String // "ACTIVE" | "WON" | "LOST"
+  /// Player's two, flop, turn, river, dealer's two. Undealt cards are never shown while the hand is open.
+  cards          Int[]
+  action         String? // "CALL" | "FOLD"
+  outcome        String? // "FOLD" | "DEALER_NOT_QUALIFIED" | "WIN" | "TIE" | "LOSE"
+  playerHand     String?
+  dealerHand     String?
   payout         Decimal  @db.Decimal(12, 2)
   version        Int      @default(0)
   serverSeed     String
