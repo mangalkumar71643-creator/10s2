@@ -37,6 +37,7 @@ import CasinoHoldemScreen from '../screens/CasinoHoldemScreen';
 import ThreeCardPokerScreen from '../screens/ThreeCardPokerScreen';
 import CandyBlastScreen from '../screens/CandyBlastScreen';
 import Neon777Screen from '../screens/Neon777Screen';
+import GameCategoryScreen from '../screens/GameCategoryScreen';
 import CompleteProfileScreen from '../screens/CompleteProfileScreen';
 import DepositScreen from '../screens/DepositScreen';
 import HelpScreen from '../screens/HelpScreen';
@@ -121,6 +122,7 @@ function MainNavigator() {
       <Stack.Screen name="ThreeCardPoker" component={ThreeCardPokerScreen} />
       <Stack.Screen name="CandyBlast" component={CandyBlastScreen} />
       <Stack.Screen name="Neon777" component={Neon777Screen} />
+      <Stack.Screen name="GameCategory" component={GameCategoryScreen} />
     </Stack.Navigator>
   );
 }

@@ -67,6 +67,8 @@ const wrap = (s: unknown[], i: number) => ((i % s.length) + s.length) % s.length
 // ---------- symbol art ----------
 
 export const ReelArt = memo(function ReelArt({ s, size }: { s: Neon777Symbol; size: number }) {
+  // Gradient ids unique to this drawing, so copies elsewhere on screen never borrow each other's.
+  const uid = React.useId().replace(/[^a-zA-Z0-9]/g, '');
   if (s === 'BLANK') return <View style={{ width: size, height: size }} />;
   let body: React.ReactNode;
   if (s === 'RED7' || s === 'BLUE7') {
@@ -76,7 +78,7 @@ export const ReelArt = memo(function ReelArt({ s, size }: { s: Neon777Symbol; si
         <SvgText x={54} y={88} fontSize={96} fontWeight="900" fontStyle="italic" fill="#000" opacity={0.25} textAnchor="middle">
           7
         </SvgText>
-        <SvgText x={50} y={84} fontSize={96} fontWeight="900" fontStyle="italic" fill={red ? 'url(#n7Red)' : 'url(#n7Blue)'} stroke={GOLD} strokeWidth={4} textAnchor="middle">
+        <SvgText x={50} y={84} fontSize={96} fontWeight="900" fontStyle="italic" fill={red ? `url(#n7Red${uid})` : `url(#n7Blue${uid})`} stroke={GOLD} strokeWidth={4} textAnchor="middle">
           7
         </SvgText>
       </G>
@@ -102,12 +104,12 @@ export const ReelArt = memo(function ReelArt({ s, size }: { s: Neon777Symbol; si
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <Defs>
-        <SvgLinearGradient id="n7Red" x1="0" y1="0" x2="0" y2="1">
+        <SvgLinearGradient id={`n7Red${uid}`} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#FF8A8A" />
           <Stop offset="0.5" stopColor="#E0101F" />
           <Stop offset="1" stopColor="#7A0010" />
         </SvgLinearGradient>
-        <SvgLinearGradient id="n7Blue" x1="0" y1="0" x2="0" y2="1">
+        <SvgLinearGradient id={`n7Blue${uid}`} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor="#9BD8FF" />
           <Stop offset="0.5" stopColor="#1565E0" />
           <Stop offset="1" stopColor="#0A2A7A" />
@@ -119,6 +121,7 @@ export const ReelArt = memo(function ReelArt({ s, size }: { s: Neon777Symbol; si
 });
 
 export const SpecialArt = memo(function SpecialArt({ sp, size, dim }: { sp: Neon777Special; size: number; dim?: boolean }) {
+  const uid = React.useId().replace(/[^a-zA-Z0-9]/g, '');
   let body: React.ReactNode;
   if (sp.kind === 'MULT') {
     body = (
@@ -133,7 +136,7 @@ export const SpecialArt = memo(function SpecialArt({ sp, size, dim }: { sp: Neon
   } else if (sp.kind === 'BONUS') {
     body = (
       <G>
-        <Circle cx={50} cy={50} r={40} fill="url(#n7Coin)" stroke="#8A5A00" strokeWidth={3} />
+        <Circle cx={50} cy={50} r={40} fill={`url(#n7Coin${uid})`} stroke="#8A5A00" strokeWidth={3} />
         <Circle cx={50} cy={50} r={32} fill="none" stroke="#8A5A00" strokeWidth={1.5} strokeDasharray="4 3" />
         <SvgText x={50} y={42} fontSize={14} fontWeight="900" fill="#5A3200" textAnchor="middle" letterSpacing={1}>
           BONUS
@@ -167,7 +170,7 @@ export const SpecialArt = memo(function SpecialArt({ sp, size, dim }: { sp: Neon
     <View style={{ opacity: dim ? 0.45 : 1 }}>
       <Svg width={size} height={size} viewBox="0 0 100 100">
         <Defs>
-          <RadialGradient id="n7Coin" cx="40%" cy="35%" r="70%">
+          <RadialGradient id={`n7Coin${uid}`} cx="40%" cy="35%" r="70%">
             <Stop offset="0" stopColor="#FFF6C8" />
             <Stop offset="0.6" stopColor="#FFC93C" />
             <Stop offset="1" stopColor="#B7791F" />
