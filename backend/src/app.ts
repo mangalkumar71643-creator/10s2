@@ -41,6 +41,7 @@ import coinFlipRoutes from "./routes/coinFlip.routes";
 import casinoHoldemRoutes from "./routes/casinoHoldem.routes";
 import threeCardPokerRoutes from "./routes/threeCardPoker.routes";
 import candyBlastRoutes from "./routes/candyBlast.routes";
+import neon777Routes from "./routes/neon777.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
@@ -89,6 +90,7 @@ app.use("/coinflip", coinFlipRoutes);
 app.use("/casino-holdem", casinoHoldemRoutes);
 app.use("/three-card-poker", threeCardPokerRoutes);
 app.use("/candy-blast", candyBlastRoutes);
+app.use("/neon-777", neon777Routes);
 
 app.use(errorHandler);
 

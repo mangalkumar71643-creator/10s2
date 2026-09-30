@@ -205,6 +205,7 @@ model User {
   CasinoHoldemHand   CasinoHoldemHand[]
   ThreeCardPokerHand ThreeCardPokerHand[]
   CandyBlastSpin     CandyBlastSpin[]
+  Neon777Spin        Neon777Spin[]
 }
 
 model KycVerification {
@@ -1403,6 +1404,24 @@ model CandyBlastSpin {
   payout         Decimal  @db.Decimal(12, 2)
   tumbles        Int
   freeSpins      Int
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Neon777Spin {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// Whole spin's win in bets (respins included), before the payout cap.
+  totalWin       Decimal  @db.Decimal(12, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  respins        Int
   serverSeed     String
   serverSeedHash String
   clientSeed     String
