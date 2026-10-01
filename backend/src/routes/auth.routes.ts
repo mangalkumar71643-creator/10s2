@@ -10,7 +10,7 @@ import {
 } from "../services/authService";
 import { requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
-import { sanitizeUser } from "../services/authService";
+import { changeAdminCredentials, sanitizeUser } from "../services/authService";
 
 const router = Router();
 
@@ -33,7 +33,7 @@ router.post(
 );
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().email(),
   password: z.string(),
 });
 
@@ -43,6 +43,24 @@ router.post(
     const { email, password } = loginSchema.parse(req.body);
     const result = await loginUser(email, password);
     res.json(result);
+  })
+);
+
+const credentialsSchema = z
+  .object({
+    currentPassword: z.string().min(1),
+    email: z.string().trim().toLowerCase().email().optional(),
+    newPassword: z.string().min(8, "New password must be at least 8 characters.").optional(),
+  })
+  .refine((v) => v.email || v.newPassword, { message: "Nothing to change." });
+
+/** The admin panel's own login: change its email and/or password (needs the current password). */
+router.patch(
+  "/me/credentials",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const input = credentialsSchema.parse(req.body);
+    res.json(await changeAdminCredentials(req.user!.userId, input));
   })
 );
 

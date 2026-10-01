@@ -82,13 +82,34 @@ function assertNotBanned(user: { isBanned: boolean; banReason: string | null }) 
 }
 
 export async function loginUser(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  // Case-insensitive, so a phone keyboard's capital first letter still logs in.
+  const user = await prisma.user.findFirst({ where: { email: { equals: email.trim(), mode: "insensitive" } } });
   if (!user || !user.passwordHash || !(await comparePassword(password, user.passwordHash))) {
     throw new ApiError(401, "Invalid email or password");
   }
   assertNotBanned(user);
   const token = signToken({ userId: user.id, role: user.role });
   return { user: sanitizeUser(user), token };
+}
+
+export async function changeAdminCredentials(userId: string, input: { currentPassword: string; email?: string; newPassword?: string }) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || user.role !== "ADMIN") throw new ApiError(403, "Admins only");
+  if (!user.passwordHash || !(await comparePassword(input.currentPassword, user.passwordHash))) {
+    throw new ApiError(400, "Current password is wrong.");
+  }
+  if (input.email && input.email !== user.email?.toLowerCase()) {
+    const taken = await prisma.user.findFirst({ where: { id: { not: userId }, email: { equals: input.email, mode: "insensitive" } }, select: { id: true } });
+    if (taken) throw new ApiError(409, "Another account already uses that email.");
+  }
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(input.email ? { email: input.email } : {}),
+      ...(input.newPassword ? { passwordHash: await hashPassword(input.newPassword) } : {}),
+    },
+  });
+  return sanitizeUser(updated);
 }
 
 export function sanitizeUser<T extends { passwordHash: string | null }>(user: T) {

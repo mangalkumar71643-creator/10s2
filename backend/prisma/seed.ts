@@ -38,23 +38,29 @@ async function backfillUids() {
 }
 
 async function main() {
-  const admin = await prisma.user.upsert({
-    where: { email: "admin@novaplay.test" },
-    update: {},
-    create: {
-      uid: randomFiveDigitUid(),
-      email: "admin@novaplay.test",
-      passwordHash: await hashPassword("ChangeMe123!"),
-      firstName: "Nova",
-      lastName: "Admin",
-      dateOfBirth: new Date("1990-01-01"),
-      country: "GB",
-      role: "ADMIN",
-      kycStatus: "APPROVED",
-      wallet: { create: { balance: 0 } },
-    },
-  });
-  console.log(`Admin ready: ${admin.email} / ChangeMe123! (change this immediately)`);
+  // A default admin only on a brand-new database. Once any admin exists (even
+  // after it changes its email from the panel's Settings), this never runs again,
+  // so the well-known default login can't come back.
+  const existingAdmin = await prisma.user.findFirst({ where: { role: "ADMIN" }, orderBy: { createdAt: "asc" }, select: { email: true, uid: true } });
+  if (existingAdmin) {
+    console.log(`Admin exists: ${existingAdmin.email ?? `uid ${existingAdmin.uid}`}`);
+  } else {
+    const admin = await prisma.user.create({
+      data: {
+        uid: randomFiveDigitUid(),
+        email: "admin@novaplay.test",
+        passwordHash: await hashPassword("ChangeMe123!"),
+        firstName: "Nova",
+        lastName: "Admin",
+        dateOfBirth: new Date("1990-01-01"),
+        country: "GB",
+        role: "ADMIN",
+        kycStatus: "APPROVED",
+        wallet: { create: { balance: 0 } },
+      },
+    });
+    console.log(`Admin ready: ${admin.email} / ChangeMe123! (change this immediately)`);
+  }
 
   await backfillUids();
   await seedDepositBonusPopup();

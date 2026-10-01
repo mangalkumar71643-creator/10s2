@@ -1345,9 +1345,40 @@
           '<div><div style="font-weight:800;font-size:15px;">' + escapeHtml([user.firstName, user.lastName].filter(Boolean).join(' ')) + '</div>' +
           '<div class="profile-role">' + (user.role === 'ADMIN' ? 'Super Administrator' : user.role) + '</div></div>' +
         '</div>' +
-        (user.email ? '<div class="detail-box" style="margin-bottom:10px;">Email<br/><b>' + escapeHtml(user.email) + '</b></div>' : '') +
+        (user.email ? '<div class="detail-box" style="margin-bottom:10px;">Email<br/><b id="settingsEmail">' + escapeHtml(user.email) + '</b></div>' : '') +
+        '<div class="card-head" style="margin-top:18px;"><h2>Change login</h2></div>' +
+        '<input id="credEmail" type="email" placeholder="Login email" value="' + escapeHtml(user.email || '') + '" style="width:100%;margin-bottom:10px;" />' +
+        '<input id="credNewPassword" type="password" placeholder="New password (leave empty to keep)" style="width:100%;margin-bottom:10px;" />' +
+        '<input id="credCurrentPassword" type="password" placeholder="Current password" style="width:100%;margin-bottom:10px;" />' +
+        '<button class="btn" id="credSave">Save</button>' +
+        '<div class="item-meta" id="credStatus"></div>' +
         '<button class="btn danger full" id="settingsLogout">Log Out</button>';
       document.getElementById('settingsLogout').addEventListener('click', doLogout);
+      document.getElementById('credSave').addEventListener('click', function () {
+        var btn = this;
+        var status = document.getElementById('credStatus');
+        var email = document.getElementById('credEmail').value.trim();
+        var newPassword = document.getElementById('credNewPassword').value;
+        var currentPassword = document.getElementById('credCurrentPassword').value;
+        if (!currentPassword) { status.textContent = 'Enter your current password.'; return; }
+        var body = { currentPassword: currentPassword };
+        if (email && email.toLowerCase() !== (user.email || '').toLowerCase()) body.email = email;
+        if (newPassword) body.newPassword = newPassword;
+        if (!body.email && !body.newPassword) { status.textContent = 'Nothing changed.'; return; }
+        btn.disabled = true;
+        api('/auth/me/credentials', { method: 'PATCH', body: JSON.stringify(body) })
+          .then(function (u) {
+            me = u;
+            user = u;
+            var shown = document.getElementById('settingsEmail');
+            if (shown) shown.textContent = u.email;
+            document.getElementById('credNewPassword').value = '';
+            document.getElementById('credCurrentPassword').value = '';
+            status.textContent = 'Saved. Use ' + u.email + ' and your password next time you log in.';
+          })
+          .catch(function (err) { status.textContent = err.message; })
+          .finally(function () { btn.disabled = false; });
+      });
     }).catch(function (err) { if (err.authError) doLogout(); });
   }
 
