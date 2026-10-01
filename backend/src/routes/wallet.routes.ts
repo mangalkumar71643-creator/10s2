@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/auth";
@@ -79,10 +78,7 @@ router.post(
     await assertCanTransact(userId);
     await assertWithinDepositLimits(userId, amount);
 
-    const [wallet, user] = await Promise.all([
-      prisma.wallet.findUniqueOrThrow({ where: { userId } }),
-      prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { firstDepositBonusClaimed: true } }),
-    ]);
+    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId } });
     const result = await paymentProvider.deposit({ userId, amount, currency: wallet.currency });
 
     if (result.status !== "COMPLETED") {
@@ -99,17 +95,21 @@ router.post(
       throw new ApiError(402, "Deposit could not be completed by the payment provider.");
     }
 
-    // First-deposit-only bonus: min(amount * percent, cap), credited into
-    // balance (immediately playable) and locked from withdrawal until
-    // wageringMultiplier x the bonus has been staked in games — each game
-    // service (e.g. vortexService.ts, andarBaharService.ts) advances
-    // wageringProgress and releases the lock.
-    const bonus = user.firstDepositBonusClaimed
-      ? 0
-      : Math.round(Math.min(amount * env.wallet.firstDepositBonusPercent, env.wallet.firstDepositBonusCap) * 100) / 100;
+    const bonus = await prisma.$transaction(async (tx) => {
+      // Lock the wallet so two deposits at once can't both count as the
+      // first (or second) and both take that bonus.
+      await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+      const previousDeposits = await tx.transaction.count({ where: { userId, type: "DEPOSIT", status: "COMPLETED" } });
+      // First deposit firstDepositBonusPercent, second secondDepositBonusPercent,
+      // none after: min(amount * percent, cap), credited into balance
+      // (immediately playable) and locked from withdrawal until
+      // wageringMultiplier x the bonus has been staked in games — each game
+      // service (e.g. vortexService.ts, andarBaharService.ts) advances
+      // wageringProgress and releases the lock.
+      const percent = previousDeposits === 0 ? env.wallet.firstDepositBonusPercent : previousDeposits === 1 ? env.wallet.secondDepositBonusPercent : 0;
+      const granted = Math.round(Math.min(amount * percent, env.wallet.firstDepositBonusCap) * 100) / 100;
 
-    const ops: Prisma.PrismaPromise<unknown>[] = [
-      prisma.transaction.create({
+      await tx.transaction.create({
         data: {
           userId,
           type: "DEPOSIT",
@@ -118,31 +118,25 @@ router.post(
           provider: result.provider,
           providerReferenceId: result.providerReferenceId,
         },
-      }),
-      prisma.wallet.update({
-        where: { userId },
-        data: { balance: { increment: amount } },
-      }),
-    ];
+      });
+      await tx.wallet.update({ where: { userId }, data: { balance: { increment: amount } } });
 
-    if (bonus > 0) {
-      ops.push(
-        prisma.transaction.create({
-          data: { userId, type: "DEPOSIT_BONUS", amount: bonus, status: "COMPLETED", provider: "novaplay-promo" },
-        }),
-        prisma.wallet.update({
+      if (granted > 0) {
+        await tx.transaction.create({
+          data: { userId, type: "DEPOSIT_BONUS", amount: granted, status: "COMPLETED", provider: "novaplay-promo" },
+        });
+        await tx.wallet.update({
           where: { userId },
           data: {
-            balance: { increment: bonus },
-            lockedBonus: { increment: bonus },
-            wageringRequired: { increment: bonus * env.wallet.wageringMultiplier },
+            balance: { increment: granted },
+            lockedBonus: { increment: granted },
+            wageringRequired: { increment: granted * env.wallet.wageringMultiplier },
           },
-        }),
-        prisma.user.update({ where: { id: userId }, data: { firstDepositBonusClaimed: true } })
-      );
-    }
-
-    await prisma.$transaction(ops);
+        });
+      }
+      if (previousDeposits === 0) await tx.user.update({ where: { id: userId }, data: { firstDepositBonusClaimed: true } });
+      return granted;
+    });
     res.json({ ...(await buildWalletView(userId)), bonusGranted: bonus });
   })
 );

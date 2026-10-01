@@ -42,11 +42,13 @@ export const env = {
   },
 
   wallet: {
-    // First-deposit-only bonus: min(amount * percent, cap). Credited
-    // straight into balance (so it's immediately playable) but locked
-    // from withdrawal until wageringMultiplier x the bonus is staked —
-    // see paymentService.ts and each game service (e.g. vortexService.ts).
-    firstDepositBonusPercent: Number(process.env.FIRST_DEPOSIT_BONUS_PERCENT ?? 0.15),
+    // Deposit bonus on a player's first and second deposits only:
+    // min(amount * percent, cap). Credited straight into balance (so it's
+    // immediately playable) but locked from withdrawal until
+    // wageringMultiplier x the bonus is staked — see each game service
+    // (e.g. vortexService.ts).
+    firstDepositBonusPercent: Number(process.env.FIRST_DEPOSIT_BONUS_PERCENT ?? 0.07),
+    secondDepositBonusPercent: Number(process.env.SECOND_DEPOSIT_BONUS_PERCENT ?? 0.05),
     firstDepositBonusCap: Number(process.env.FIRST_DEPOSIT_BONUS_CAP ?? 500),
     wageringMultiplier: Number(process.env.WAGERING_MULTIPLIER ?? 3),
     // Total COMPLETED withdrawals per calendar day, across all payment
