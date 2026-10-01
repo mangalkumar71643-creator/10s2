@@ -146,22 +146,22 @@ export default function HomeScreen() {
           />
         </Pressable>
       </View>
-      <Image
-        source={require('../../assets/control-panel.webp')}
-        style={{
-          position: 'absolute',
-          top: panelTop,
-          left: (screenWidth - panelWidth) / 2,
-          width: panelWidth,
-          height: panelHeight,
-        }}
-        resizeMode="contain"
-      />
+      {/* Everything under the top bar scrolls together: the control panel, then the banners. */}
       <ScrollView
-        style={{ position: 'absolute', top: gameGridTop, left: 0, right: 0, bottom: 0 }}
-        contentContainerStyle={{ paddingHorizontal: BANNER_SIDE, paddingBottom: BANNER_GAP * 2, gap: BANNER_GAP }}
+        style={{ position: 'absolute', top: TOP_BAR_HEIGHT, left: 0, right: 0, bottom: 0 }}
+        contentContainerStyle={{ paddingHorizontal: BANNER_SIDE, paddingTop: panelTop - TOP_BAR_HEIGHT, paddingBottom: BANNER_GAP * 2, gap: BANNER_GAP }}
         showsVerticalScrollIndicator={false}
       >
+        <Image
+          source={require('../../assets/control-panel.webp')}
+          style={{
+            alignSelf: 'center',
+            width: panelWidth,
+            height: panelHeight,
+            marginBottom: gameGridTop - panelTop - panelHeight - BANNER_GAP,
+          }}
+          resizeMode="contain"
+        />
         {GAME_CATEGORIES.map((category) => (
           <Pressable
             key={category.id}
