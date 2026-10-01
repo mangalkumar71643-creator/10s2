@@ -22,6 +22,7 @@ import { ThreeCardPokerTileArt } from '../screens/ThreeCardPokerScreen';
 import { CandyBlastTileArt } from '../screens/CandyBlastScreen';
 import { Neon777TileArt } from '../screens/Neon777Screen';
 import { RocketTileArt } from '../screens/RocketScreen';
+import { MoneyComingTileArt } from '../screens/MoneyComingScreen';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Image, ImageSourcePropType, Pressable, Text, View } from 'react-native';
@@ -63,7 +64,8 @@ export type GameId =
   | 'ThreeCardPoker'
   | 'CandyBlast'
   | 'Neon777'
-  | 'Rocket';
+  | 'Rocket'
+  | 'MoneyComing';
 
 export type GameCategory = {
   id: string;
@@ -79,7 +81,7 @@ export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'dice-instant', title: 'Dice & Instant', games: ['Dice', 'Limbo', 'Plinko', 'SevenUpDown', 'Diamonds', 'Keno'], banner: require('../../assets/banners/dice-instant.webp'), bannerAspect: 763 / 143 },
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
   { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
-  { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
+  { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777', 'MoneyComing'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
   { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
 ];
 
@@ -801,6 +803,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <RocketTileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFFFFF', fontSize: 19, fontWeight: '900', fontStyle: 'italic', letterSpacing: 3, textShadowColor: '#FF3DA6', textShadowRadius: 8 }}>ROCKET</Text>
+        </Pressable>
+      );
+    case 'MoneyComing':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('MoneyComing')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#FFD24A',
+            backgroundColor: '#03180C',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 10,
+          }}
+        >
+          <MoneyComingTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFE58A', fontSize: 16, fontWeight: '900', letterSpacing: 1.5, textAlign: 'center', lineHeight: 18, textShadowColor: '#000', textShadowRadius: 6 }}>{'MONEY\nCOMING'}</Text>
         </Pressable>
       );
   }

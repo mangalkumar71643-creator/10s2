@@ -2374,3 +2374,63 @@ export function spinNeon777(stake: number) {
 export function fetchNeon777History(limit = 30) {
   return apiFetch<Neon777SpinRow[]>(`/neon-777/my-history?limit=${limit}`);
 }
+
+// ---- Money Coming --------------------------------------------------------------
+
+export interface MoneyComingSpecial {
+  kind: 'NONE' | 'MULT' | 'WHEEL' | 'RESPIN';
+  value: number;
+  chancePercent: number;
+}
+
+export interface MoneyComingRound {
+  stops: number[];
+  special: number;
+  /** Index into the wheel when the Lucky Wheel spun, else null. */
+  wheel: number | null;
+  /** The number the middle row reads (0 for no win). */
+  reads: number;
+  linePays: number;
+  win: number;
+}
+
+export interface MoneyComingOutcome {
+  rounds: MoneyComingRound[];
+  totalWin: number;
+}
+
+export interface MoneyComingSpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  respins: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export interface MoneyComingConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  strips: string[][];
+  special: MoneyComingSpecial[];
+  wheel: number[];
+  maxRespins: number;
+  hitRatePercent: number;
+  rtpPercent: number;
+}
+
+export function fetchMoneyComingConfig() {
+  return apiFetch<MoneyComingConfig>('/money-coming/config');
+}
+
+export function spinMoneyComing(stake: number) {
+  return apiFetch<{ spin: MoneyComingSpinRow; outcome: MoneyComingOutcome }>('/money-coming/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchMoneyComingHistory(limit = 30) {
+  return apiFetch<MoneyComingSpinRow[]>(`/money-coming/my-history?limit=${limit}`);
+}

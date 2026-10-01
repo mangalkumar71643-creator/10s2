@@ -207,6 +207,7 @@ model User {
   ThreeCardPokerHand ThreeCardPokerHand[]
   CandyBlastSpin     CandyBlastSpin[]
   Neon777Spin        Neon777Spin[]
+  MoneyComingSpin    MoneyComingSpin[]
 }
 
 model KycVerification {
@@ -1491,4 +1492,23 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// Money Coming: one row per spin (respins included), same shape as Neon777Spin.
+model MoneyComingSpin {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// Whole spin's win in bets (respins included), before the payout cap.
+  totalWin       Decimal  @db.Decimal(12, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  respins        Int
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
