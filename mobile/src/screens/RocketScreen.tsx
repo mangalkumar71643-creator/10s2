@@ -779,7 +779,7 @@ export default function RocketScreen() {
             );
           })
         )}
-        <Text style={styles.footNote}>Provably fair · bet ₹{minStake}–₹{maxStake}</Text>
+        <Text style={styles.footNote}>Provably fair · bet ₹{minStake}–₹{maxStake} · max win ₹{config?.maxPayout ?? 10000} per bet</Text>
       </ScrollView>
 
       {toast && (

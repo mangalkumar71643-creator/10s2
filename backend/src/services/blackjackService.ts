@@ -64,6 +64,7 @@ export function getBlackjackConfig() {
   return {
     minStake: env.games.minStake,
     maxStake: env.games.maxStake,
+    maxPayout: env.games.maxPayout,
     winPays: WIN_PAYS,
     blackjackPays: BLACKJACK_PAYS,
     insurancePays: INSURANCE_PAYS,
@@ -118,7 +119,7 @@ export async function dealBlackjack(userId: string, stake: number) {
     const open = await tx.blackjackHand.findFirst({ where: { userId, status: "ACTIVE" }, select: { id: true } });
     if (open) throw new ApiError(400, "Finish your current hand before dealing a new one.");
     await takeStake(tx, userId, stake);
-    const payout = done ? totalPayout(state) : 0;
+    const payout = done ? Math.min(totalPayout(state), env.games.maxPayout) : 0;
     await payOut(tx, userId, payout);
     return tx.blackjackHand.create({
       data: {
@@ -153,7 +154,7 @@ export async function actBlackjack(userId: string, handId: string, action: Actio
     const extra = extraStake(state, action);
     applyAction(state, action, cardStream(hand.serverSeed, hand.clientSeed, hand.nonce));
     const done = state.phase === "DONE";
-    const payout = done ? totalPayout(state) : 0;
+    const payout = done ? Math.min(totalPayout(state), env.games.maxPayout) : 0;
 
     // Only one request can move a hand on from a given version.
     const moved = await tx.blackjackHand.updateMany({

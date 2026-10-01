@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { runtimeSettings } from "./runtimeSettings";
 
 function required(name: string, fallback?: string): string {
   const value = process.env[name] ?? fallback;
@@ -28,9 +29,12 @@ export const env = {
     // Win pays out at this multiple of the stake; win probability is derived
     // from rtp / winMultiplier so the long-run expected value matches rtp.
     winMultiplier: Number(process.env.GAME_WIN_MULTIPLIER ?? 2),
-    // Most a single Chicken Road round can pay out, whatever the stake and
-    // multiplier — bounds the house's worst single-round loss.
-    maxPayout: Number(process.env.GAME_MAX_PAYOUT ?? 10000),
+    // Most a single bet can pay out in any game, whatever the stake and
+    // multiplier — bounds the house's worst single-bet loss. The admin can
+    // change it from the panel; this is the default until they do.
+    get maxPayout(): number {
+      return runtimeSettings.maxPayout ?? Number(process.env.GAME_MAX_PAYOUT ?? 10000);
+    },
   },
 
   tron: {

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../navigation/types';
 import { ApiClientError } from '../api/client';
 import {
+  fetchAviatorConfig,
   AviatorPublicBet,
   AviatorRoundView,
   cashOutAviatorBet,
@@ -1032,6 +1033,12 @@ export default function AviatorScreen() {
   const [autoCashOutOn1, setAutoCashOutOn1] = useState(false);
   const [autoCashOutOn2, setAutoCashOutOn2] = useState(false);
   const [round, setRound] = useState<AviatorRoundView | null>(null);
+  const [maxWin, setMaxWin] = useState<number | null>(null);
+  useEffect(() => {
+    fetchAviatorConfig()
+      .then((c) => setMaxWin(c.maxPayout ?? null))
+      .catch(() => {});
+  }, []);
   const [history, setHistory] = useState<number[]>(HISTORY_SAMPLE);
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [fullHistory, setFullHistory] = useState<number[]>([]);
@@ -1409,6 +1416,7 @@ export default function AviatorScreen() {
         )}
       </View>
 
+      {maxWin !== null && <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, textAlign: 'center', marginTop: 8 }}>Max win ₹{maxWin} per bet</Text>}
       <AviatorBetsPanel
         currentPeriodNumber={round?.periodNumber ?? null}
         minHeight={scrollViewportHeight}

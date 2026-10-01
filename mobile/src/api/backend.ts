@@ -216,6 +216,7 @@ export function claimBackendDailyBonus() {
 export interface AviatorConfig {
   minStake: number;
   maxStake: number;
+  maxPayout?: number;
   bettingDurationSeconds: number;
   resultPauseSeconds: number;
   growthRate: number;
@@ -1729,6 +1730,7 @@ export interface BlackjackHand {
 export interface BlackjackConfig {
   minStake: number;
   maxStake: number;
+  maxPayout?: number;
   winPays: number;
   blackjackPays: number;
   insurancePays: number;

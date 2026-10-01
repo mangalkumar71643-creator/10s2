@@ -874,7 +874,7 @@ export default function JhandiMundaScreen() {
             loses.
           </Text>
           <Text style={styles.rulesText}>
-            Bet ₹{minStake}–₹{maxStake} per symbol · Provably fair: every throw comes from a server seed published after the round.
+            Bet ₹{minStake}–₹{maxStake} per symbol · max win ₹{config?.maxPayout ?? 10000} per bet · Provably fair: every throw comes from a server seed published after the round.
           </Text>
         </View>
       </ScrollView>

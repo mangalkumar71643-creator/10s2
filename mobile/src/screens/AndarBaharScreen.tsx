@@ -971,6 +971,7 @@ export default function AndarBaharScreen() {
                 <Text style={styles.balanceLabel}>Balance</Text>
                 <Text style={styles.balanceValue}>₹{displayBalance.toFixed(2)}</Text>
                 <Text style={styles.balanceLabel}>My bet ₹{myTotal.toFixed(2)}</Text>
+                <Text style={styles.balanceLabel}>Max win ₹{config?.maxPayout ?? 10000}</Text>
               </View>
             )}
             <View style={styles.sideCtrl}>

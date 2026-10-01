@@ -958,6 +958,7 @@ function Rules({ config }: { config: BlackjackConfig | null }) {
           ['Win', `${win}x`],
           ['Push (same total)', 'bet back'],
           ['Insurance', `${ins} to 1`],
+          ['Max win per hand', `₹${config?.maxPayout ?? 10000}`],
         ].map(([k, v]) => (
           <View key={k} style={styles.payRow}>
             <Text style={styles.payKey}>{k}</Text>

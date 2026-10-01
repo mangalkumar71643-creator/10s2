@@ -398,6 +398,7 @@ export function getRocketConfig() {
   return {
     minStake: env.games.minStake,
     maxStake: env.games.maxStake,
+    maxPayout: env.games.maxPayout,
     bettingDurationSeconds: BETTING_DURATION_SECONDS,
     resultPauseSeconds: RESULT_PAUSE_SECONDS,
     growthRate: GROWTH_RATE,

@@ -3,12 +3,14 @@ import { z } from "zod";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
+import { env } from "../config/env";
 import { paymentProvider } from "../services/paymentService";
 import * as winGoService from "../services/winGoService";
 import * as aviatorService from "../services/aviatorService";
 import { getChickenRoadConfig } from "../services/chickenRoadService";
 import { getMinesConfig } from "../services/minesService";
 import * as popupService from "../services/popupService";
+import { getGameSettings, MAX_MAX_PAYOUT, MIN_MAX_PAYOUT, setMaxPayout } from "../services/settingsService";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -154,21 +156,64 @@ router.get(
   })
 );
 
+type DayRow = { day: string; staked: unknown; paid: unknown; bets: bigint; players: bigint };
+
+/**
+ * House result from every game, per day (India time): what was staked, what
+ * was paid back, and the profit. Built from the GAME_STAKE / GAME_PAYOUT
+ * wallet transactions every game writes, so it covers all games at once.
+ */
 router.get(
-  "/reports/summary",
-  asyncHandler(async (_req, res) => {
-    const [totalStaked, totalPayout, betCount, userCount] = await Promise.all([
-      prisma.transaction.aggregate({ where: { type: "BET_STAKE" }, _sum: { amount: true } }),
-      prisma.transaction.aggregate({ where: { type: "BET_PAYOUT" }, _sum: { amount: true } }),
-      prisma.bet.count(),
-      prisma.user.count(),
+  "/reports/daily",
+  asyncHandler(async (req, res) => {
+    const days = Math.min(90, Math.max(1, Number(req.query.days) || 30));
+    const rows = await prisma.$queryRaw<DayRow[]>`
+      SELECT to_char(("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date, 'YYYY-MM-DD') AS day,
+             COALESCE(SUM(amount) FILTER (WHERE type = 'GAME_STAKE'), 0) AS staked,
+             COALESCE(SUM(amount) FILTER (WHERE type = 'GAME_PAYOUT'), 0) AS paid,
+             COUNT(*) FILTER (WHERE type = 'GAME_STAKE') AS bets,
+             COUNT(DISTINCT "userId") FILTER (WHERE type = 'GAME_STAKE') AS players
+      FROM "Transaction"
+      WHERE type IN ('GAME_STAKE', 'GAME_PAYOUT') AND status = 'COMPLETED'
+        AND "createdAt" >= (date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') - make_interval(days => ${days - 1}::int)) AT TIME ZONE 'Asia/Kolkata' AT TIME ZONE 'UTC'
+      GROUP BY 1
+      ORDER BY 1 DESC`;
+    const [allStaked, allPaid] = await Promise.all([
+      prisma.transaction.aggregate({ where: { type: "GAME_STAKE", status: "COMPLETED" }, _sum: { amount: true } }),
+      prisma.transaction.aggregate({ where: { type: "GAME_PAYOUT", status: "COMPLETED" }, _sum: { amount: true } }),
     ]);
+    const toDay = (r: DayRow) => {
+      const staked = Number(r.staked);
+      const paid = Number(r.paid);
+      return { day: r.day, staked, paid, profit: Math.round((staked - paid) * 100) / 100, bets: Number(r.bets), players: Number(r.players) };
+    };
+    const list = rows.map(toDay);
+    const sum = (k: "staked" | "paid" | "bets") => list.reduce((t, d) => t + d[k], 0);
+    const periodStaked = sum("staked");
+    const periodPaid = sum("paid");
+    const allTimeStaked = Number(allStaked._sum.amount ?? 0);
+    const allTimePaid = Number(allPaid._sum.amount ?? 0);
     res.json({
-      totalStaked: totalStaked._sum.amount ?? 0,
-      totalPayout: totalPayout._sum.amount ?? 0,
-      betCount,
-      userCount,
+      days: list,
+      period: { days, staked: periodStaked, paid: periodPaid, profit: Math.round((periodStaked - periodPaid) * 100) / 100, bets: sum("bets") },
+      allTime: { staked: allTimeStaked, paid: allTimePaid, profit: Math.round((allTimeStaked - allTimePaid) * 100) / 100 },
+      targetHouseEdgePercent: Math.round((1 - env.games.rtp) * 1000) / 10,
     });
+  })
+);
+
+// --- Game settings ---
+
+router.get("/settings", (_req, res) => {
+  res.json(getGameSettings());
+});
+
+const settingsSchema = z.object({ maxPayout: z.number().int().min(MIN_MAX_PAYOUT).max(MAX_MAX_PAYOUT) });
+router.patch(
+  "/settings",
+  asyncHandler(async (req, res) => {
+    const { maxPayout } = settingsSchema.parse(req.body);
+    res.json(await setMaxPayout(maxPayout));
   })
 );
 

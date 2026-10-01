@@ -443,9 +443,28 @@
 
       <div class="panel" id="panel-reports">
         <h1 class="page-title">Reports</h1>
-        <div class="page-sub">Platform-wide betting activity.</div>
+        <div class="page-sub">House profit from all games, day by day (India time).</div>
+        <div class="form-row" style="max-width:420px;">
+          <button class="btn secondary small" data-report-days="7">7 days</button>
+          <button class="btn secondary small" data-report-days="30">30 days</button>
+          <button class="btn secondary small" data-report-days="90">90 days</button>
+          <button class="btn secondary small" id="reportsRefresh">Refresh</button>
+        </div>
         <div class="stat-grid" id="reportsStats"></div>
-        <button class="btn secondary" id="reportsRefresh">Refresh</button>
+        <div class="card">
+          <div class="card-head"><h2>Day by day</h2></div>
+          <div class="item-meta" id="reportsNote" style="margin:-6px 0 12px;"></div>
+          <div class="table-scroll" id="reportsTable"></div>
+        </div>
+        <div class="card" style="max-width:420px;">
+          <div class="card-head"><h2>Max win per bet</h2></div>
+          <div class="item-meta" style="margin:-6px 0 12px;">The most any single bet can pay, in every game. Players see it in each game. A lower limit cuts the house's worst single loss, but also caps big wins.</div>
+          <div class="form-row">
+            <input id="maxPayoutInput" type="number" min="1000" step="500" placeholder="e.g. 10000" />
+            <button class="btn" id="maxPayoutSave" style="flex:0 0 auto;">Save</button>
+          </div>
+          <div class="item-meta" id="maxPayoutStatus"></div>
+        </div>
       </div>
 
       <div class="panel" id="panel-settings">
@@ -1204,16 +1223,53 @@
   });
 
   // ---------- Reports ----------
+  var reportDays = 30;
+  function pct(profit, staked) { return staked > 0 ? (profit / staked * 100).toFixed(1) + '%' : '—'; }
+  function profitHtml(v) { return '<span style="color:' + (v >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + (v < 0 ? '-' : '') + fmtMoney(Math.abs(v)) + '</span>'; }
   function loadReports() {
-    api('/admin/reports/summary').then(function (r) {
+    document.querySelectorAll('[data-report-days]').forEach(function (b) {
+      b.classList.toggle('secondary', Number(b.getAttribute('data-report-days')) !== reportDays);
+    });
+    api('/admin/reports/daily?days=' + reportDays).then(function (r) {
+      var p = r.period;
       document.getElementById('reportsStats').innerHTML =
-        statCardHtml('wallet', 'Total staked', fmtMoney(r.totalStaked), null) +
-        statCardHtml('trendUp', 'Total paid out', fmtMoney(r.totalPayout), null) +
-        statCardHtml('games', 'Bets placed', r.betCount.toLocaleString('en-IN'), null) +
-        statCardHtml('users', 'Registered users', r.userCount.toLocaleString('en-IN'), null);
+        statCardHtml('wallet', 'Staked (' + p.days + ' days)', fmtMoney(p.staked), p.bets.toLocaleString('en-IN') + ' bets') +
+        statCardHtml('trendUp', 'Paid to players', fmtMoney(p.paid), null) +
+        statCardHtml('reports', 'House profit (' + p.days + ' days)', (p.profit < 0 ? '-' : '') + fmtMoney(Math.abs(p.profit)), pct(p.profit, p.staked) + ' of stakes') +
+        statCardHtml('games', 'House profit (all time)', (r.allTime.profit < 0 ? '-' : '') + fmtMoney(Math.abs(r.allTime.profit)), pct(r.allTime.profit, r.allTime.staked) + ' of ' + fmtMoney(r.allTime.staked));
+      document.getElementById('reportsNote').textContent =
+        'Target: ' + r.targetHouseEdgePercent + '% of stakes. Single days swing above and below it; the more bets, the closer it gets.';
+      var rows = r.days.map(function (d) {
+        return '<tr><td>' + escapeHtml(d.day) + '</td><td>' + d.bets.toLocaleString('en-IN') + '</td><td>' + d.players + '</td><td>' + fmtMoney(d.staked) + '</td><td>' + fmtMoney(d.paid) + '</td><td>' + profitHtml(d.profit) + '</td><td>' + pct(d.profit, d.staked) + '</td></tr>';
+      }).join('');
+      document.getElementById('reportsTable').innerHTML = rows
+        ? '<table><thead><tr><th>Day</th><th>Bets</th><th>Players</th><th>Staked</th><th>Paid</th><th>Profit</th><th>Profit %</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<div class="empty">No bets in this period yet.</div>';
     }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+    api('/admin/settings').then(function (st) {
+      var input = document.getElementById('maxPayoutInput');
+      input.value = st.maxPayout;
+      input.min = st.minMaxPayout;
+      input.max = st.maxMaxPayout;
+    }).catch(function () {});
   }
   document.getElementById('reportsRefresh').addEventListener('click', loadReports);
+  document.querySelectorAll('[data-report-days]').forEach(function (b) {
+    b.addEventListener('click', function () { reportDays = Number(b.getAttribute('data-report-days')); loadReports(); });
+  });
+  document.getElementById('maxPayoutSave').addEventListener('click', function () {
+    var btn = this;
+    var status = document.getElementById('maxPayoutStatus');
+    var value = Math.round(Number(document.getElementById('maxPayoutInput').value));
+    if (!value) { status.textContent = 'Enter an amount.'; return; }
+    var input = document.getElementById('maxPayoutInput');
+    if (value < Number(input.min) || value > Number(input.max)) { status.textContent = 'Use an amount from ' + fmtMoney(input.min) + ' to ' + fmtMoney(input.max) + '.'; return; }
+    btn.disabled = true;
+    api('/admin/settings', { method: 'PATCH', body: JSON.stringify({ maxPayout: value }) })
+      .then(function (st) { status.textContent = 'Saved. Max win is now ' + fmtMoney(st.maxPayout) + ' per bet in every game.'; })
+      .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
+      .finally(function () { btn.disabled = false; });
+  });
 
   // ---------- Settings ----------
   // ---------- Popups ----------

@@ -1087,7 +1087,7 @@ export default function SevenUpDownScreen() {
           {statusText}
         </Text>
         <Text style={styles.infoLimits} numberOfLines={1}>
-          Min <Text style={styles.infoMin}>{minStake}</Text>  Max <Text style={styles.infoMax}>{maxStake}</Text>
+          Min <Text style={styles.infoMin}>{minStake}</Text>  Max <Text style={styles.infoMax}>{maxStake}</Text>  Max win <Text style={styles.infoMax}>{config?.maxPayout ?? 10000}</Text>
         </Text>
       </LinearGradient>
 

@@ -1485,3 +1485,10 @@ model RocketBet {
   @@index([userId])
   @@index([roundId])
 }
+
+// Admin-changeable settings, one row per key (e.g. "maxPayout").
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

@@ -45,6 +45,7 @@ import neon777Routes from "./routes/neon777.routes";
 import popupsRoutes from "./routes/popups.routes";
 import rocketRoutes from "./routes/rocket.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
+import { refreshSettingsIfStale } from "./services/settingsService";
 
 export const app = express();
 
@@ -53,6 +54,11 @@ app.use(cors());
 app.use(express.json({ limit: "4mb" }));
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+// Admin-changed settings (e.g. the max win per bet) take effect within seconds on every instance.
+app.use((_req, _res, next) => {
+  refreshSettingsIfStale().then(() => next(), next);
+});
 
 app.use("/auth", authRoutes);
 app.use("/kyc", kycRoutes);
