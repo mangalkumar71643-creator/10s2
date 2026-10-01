@@ -916,6 +916,38 @@ export function fetchCricketXMyBets() {
   return apiFetch<AviatorMyBet[]>('/cricket-x/my-bets');
 }
 
+// ---- Rocket (same crash engine and shapes as Aviator) ----------------------
+
+export function fetchRocketConfig() {
+  return apiFetch<AviatorConfig>('/rocket/config');
+}
+
+export function fetchRocketCurrentRound() {
+  return apiFetch<AviatorRoundView>('/rocket/current');
+}
+
+export function fetchRocketHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/rocket/history?limit=${limit}`);
+}
+
+export function placeRocketBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<AviatorBetResult>('/rocket/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+export function cashOutRocketBet(betId: string) {
+  return apiFetch<{ multiplier: number; payout: number }>('/rocket/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+export function fetchRocketMyBets() {
+  return apiFetch<AviatorMyBet[]>('/rocket/my-bets');
+}
+
 // ---- Jhandi Munda ------------------------------------------------------------
 
 export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';

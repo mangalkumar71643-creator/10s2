@@ -21,6 +21,7 @@ import { CasinoHoldemTileArt } from '../screens/CasinoHoldemScreen';
 import { ThreeCardPokerTileArt } from '../screens/ThreeCardPokerScreen';
 import { CandyBlastTileArt } from '../screens/CandyBlastScreen';
 import { Neon777TileArt } from '../screens/Neon777Screen';
+import { RocketTileArt } from '../screens/RocketScreen';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Image, ImageSourcePropType, Pressable, Text, View } from 'react-native';
@@ -61,7 +62,8 @@ export type GameId =
   | 'CasinoHoldem'
   | 'ThreeCardPoker'
   | 'CandyBlast'
-  | 'Neon777';
+  | 'Neon777'
+  | 'Rocket';
 
 export type GameCategory = {
   id: string;
@@ -78,7 +80,7 @@ export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
   { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
   { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
-  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
+  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
 ];
 
 /** Games drawn with a supplied icon image instead of their built-in tile art. */
@@ -778,6 +780,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <Neon777TileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2, textAlign: 'center', lineHeight: 19, textShadowColor: '#FF2D95', textShadowRadius: 8 }}>{'NEON\n777'}</Text>
+        </Pressable>
+      );
+    case 'Rocket':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('Rocket')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#B06CFF',
+            backgroundColor: '#0B0420',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 10,
+          }}
+        >
+          <RocketTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFFFFF', fontSize: 19, fontWeight: '900', fontStyle: 'italic', letterSpacing: 3, textShadowColor: '#FF3DA6', textShadowRadius: 8 }}>ROCKET</Text>
         </Pressable>
       );
   }

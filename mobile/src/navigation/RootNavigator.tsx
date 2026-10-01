@@ -14,6 +14,7 @@ import VortexScreen from '../screens/VortexScreen';
 import AndarBaharScreen from '../screens/AndarBaharScreen';
 import TeenPattiScreen from '../screens/TeenPattiScreen';
 import CricketXScreen from '../screens/CricketXScreen';
+import RocketScreen from '../screens/RocketScreen';
 import JhandiMundaScreen from '../screens/JhandiMundaScreen';
 import RouletteScreen from '../screens/RouletteScreen';
 import K3LotteryScreen from '../screens/K3LotteryScreen';
@@ -99,6 +100,7 @@ function MainNavigator() {
       <Stack.Screen name="AndarBahar" component={AndarBaharScreen} />
       <Stack.Screen name="TeenPatti" component={TeenPattiScreen} />
       <Stack.Screen name="CricketX" component={CricketXScreen} />
+      <Stack.Screen name="Rocket" component={RocketScreen} />
       <Stack.Screen name="JhandiMunda" component={JhandiMundaScreen} />
       <Stack.Screen name="Roulette" component={RouletteScreen} />
       <Stack.Screen name="K3Lottery" component={K3LotteryScreen} />
