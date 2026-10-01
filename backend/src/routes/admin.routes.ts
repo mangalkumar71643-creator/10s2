@@ -8,6 +8,7 @@ import * as winGoService from "../services/winGoService";
 import * as aviatorService from "../services/aviatorService";
 import { getChickenRoadConfig } from "../services/chickenRoadService";
 import { getMinesConfig } from "../services/minesService";
+import * as popupService from "../services/popupService";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -409,6 +410,53 @@ router.get(
       include: { user: { select: userSummarySelect } },
     });
     res.json(rounds);
+  })
+);
+
+// --- Home-screen popups ---
+
+router.get(
+  "/popups",
+  asyncHandler(async (_req, res) => {
+    res.json(await popupService.listAllPopups());
+  })
+);
+
+const createPopupSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  imageBase64: z.string().min(1),
+  mimeType: z.enum(popupService.POPUP_MIME_TYPES),
+  width: z.number().int().min(50).max(4000),
+  height: z.number().int().min(50).max(4000),
+});
+router.post(
+  "/popups",
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await popupService.createPopup(createPopupSchema.parse(req.body)));
+  })
+);
+
+const updatePopupSchema = z.object({ title: z.string().trim().min(1).max(80).optional(), active: z.boolean().optional() });
+router.patch(
+  "/popups/:id",
+  asyncHandler(async (req, res) => {
+    res.json(await popupService.updatePopup(req.params.id, updatePopupSchema.parse(req.body)));
+  })
+);
+
+const reorderPopupsSchema = z.object({ ids: z.array(z.string().min(1)).max(200) });
+router.post(
+  "/popups/reorder",
+  asyncHandler(async (req, res) => {
+    res.json(await popupService.reorderPopups(reorderPopupsSchema.parse(req.body).ids));
+  })
+);
+
+router.delete(
+  "/popups/:id",
+  asyncHandler(async (req, res) => {
+    await popupService.deletePopup(req.params.id);
+    res.status(204).end();
   })
 );
 

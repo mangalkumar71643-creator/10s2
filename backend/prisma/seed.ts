@@ -1,4 +1,6 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { hashPassword } from "../src/utils/password";
 
 const prisma = new PrismaClient();
@@ -55,6 +57,21 @@ async function main() {
   console.log(`Admin ready: ${admin.email} / ChangeMe123! (change this immediately)`);
 
   await backfillUids();
+  await seedDepositBonusPopup();
+}
+
+/**
+ * The first home-screen popup, so the app keeps showing it once popups come
+ * from the admin panel. Created once under a fixed id; after that the admin
+ * owns it (a deleted popup keeps its row, so this never brings it back).
+ */
+async function seedDepositBonusPopup() {
+  const image = readFileSync(join(__dirname, "seed-assets", "deposit-bonus-popup.webp"));
+  await prisma.popup.upsert({
+    where: { id: "seed-deposit-bonus" },
+    update: {},
+    create: { id: "seed-deposit-bonus", title: "Deposit bonus 7% + 5%", image, mimeType: "image/webp", width: 832, height: 1248, sortOrder: 0 },
+  });
 }
 
 main()

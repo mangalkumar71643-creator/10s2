@@ -1430,3 +1430,22 @@ model Neon777Spin {
 
   @@index([userId, createdAt])
 }
+
+// Home-screen popups the admin manages from the panel: each is one image,
+// shown in sortOrder when the app opens. Deleting only marks the row (and
+// drops its image) so the seeded popup isn't re-created on the next deploy.
+model Popup {
+  id        String    @id @default(uuid())
+  title     String
+  image     Bytes
+  mimeType  String
+  width     Int
+  height    Int
+  sortOrder Int
+  active    Boolean   @default(true)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([deletedAt, sortOrder])
+}

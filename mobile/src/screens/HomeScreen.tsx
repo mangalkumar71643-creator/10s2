@@ -2,7 +2,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
-import DepositBonusPopup from '../components/DepositBonusPopup';
+import HomePopups from '../components/HomePopups';
 import { GAME_CATEGORIES } from '../components/GameTile';
 import ScreenContainer from '../components/ScreenContainer';
 import { AVATARS } from '../data/avatars';
@@ -175,7 +175,7 @@ export default function HomeScreen() {
           </Pressable>
         ))}
       </ScrollView>
-      <DepositBonusPopup />
+      <HomePopups />
     </ScreenContainer>
   );
 }

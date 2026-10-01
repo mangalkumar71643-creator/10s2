@@ -42,12 +42,14 @@ import casinoHoldemRoutes from "./routes/casinoHoldem.routes";
 import threeCardPokerRoutes from "./routes/threeCardPoker.routes";
 import candyBlastRoutes from "./routes/candyBlast.routes";
 import neon777Routes from "./routes/neon777.routes";
+import popupsRoutes from "./routes/popups.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 
 export const app = express();
 
 app.use(cors());
-app.use(express.json());
+// Room for popup images uploaded from the admin panel (base64, already shrunk by the panel).
+app.use(express.json({ limit: "4mb" }));
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
@@ -91,6 +93,7 @@ app.use("/casino-holdem", casinoHoldemRoutes);
 app.use("/three-card-poker", threeCardPokerRoutes);
 app.use("/candy-blast", candyBlastRoutes);
 app.use("/neon-777", neon777Routes);
+app.use("/popups", popupsRoutes);
 
 app.use(errorHandler);
 
