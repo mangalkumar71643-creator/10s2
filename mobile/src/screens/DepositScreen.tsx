@@ -56,7 +56,11 @@ export default function DepositScreen() {
           : `₹${amount.toLocaleString('en-IN')} has been added to your balance.`;
       Alert.alert('Deposit successful', message, [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch (err) {
-      Alert.alert('Deposit failed', err instanceof ApiClientError ? err.message : 'Please try again.');
+      if (err instanceof ApiClientError && err.status === 403) {
+        Alert.alert('Deposits not open yet', 'Adding money is not available right now. Please check back later.');
+      } else {
+        Alert.alert('Deposit failed', err instanceof ApiClientError ? err.message : 'Please try again.');
+      }
     } finally {
       setBusy(false);
     }

@@ -202,6 +202,42 @@ router.get(
   })
 );
 
+// --- Test balance: credit a player by their UID ---
+// Deposits are closed until a real payment provider is wired in; this is how
+// the admin tops up a balance for testing. Recorded as a BONUS transaction
+// from "admin-credit" so it never counts as a real deposit (or towards the
+// first/second deposit bonus).
+
+router.get(
+  "/users/by-uid/:uid",
+  asyncHandler(async (req, res) => {
+    const uid = Number(req.params.uid);
+    if (!Number.isInteger(uid)) throw new ApiError(400, "Enter a valid UID.");
+    const user = await prisma.user.findUnique({ where: { uid }, select: { id: true, ...userSummarySelect, wallet: { select: { balance: true } } } });
+    if (!user) throw new ApiError(404, "No player with that UID.");
+    res.json(user);
+  })
+);
+
+const creditSchema = z.object({ amount: z.number().positive().max(100000), note: z.string().trim().max(120).optional() });
+router.post(
+  "/users/by-uid/:uid/credit",
+  asyncHandler(async (req, res) => {
+    const uid = Number(req.params.uid);
+    if (!Number.isInteger(uid)) throw new ApiError(400, "Enter a valid UID.");
+    const { amount } = creditSchema.parse(req.body);
+    const rounded = Math.round(amount * 100) / 100;
+    const user = await prisma.user.findUnique({ where: { uid }, select: { id: true, ...userSummarySelect } });
+    if (!user) throw new ApiError(404, "No player with that UID.");
+    const wallet = await prisma.$transaction(async (tx) => {
+      const updated = await tx.wallet.upsert({ where: { userId: user.id }, update: { balance: { increment: rounded } }, create: { userId: user.id, balance: rounded } });
+      await tx.transaction.create({ data: { userId: user.id, type: "BONUS", amount: rounded, status: "COMPLETED", provider: "admin-credit" } });
+      return updated;
+    });
+    res.json({ user, credited: rounded, balance: wallet.balance });
+  })
+);
+
 // --- Game settings ---
 
 router.get("/settings", (_req, res) => {

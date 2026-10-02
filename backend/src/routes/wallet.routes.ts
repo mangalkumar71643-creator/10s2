@@ -72,6 +72,7 @@ router.post(
   "/deposit",
   requireAuth,
   asyncHandler(async (req, res) => {
+    if (!env.wallet.depositsEnabled) throw new ApiError(403, "Deposits are not open yet.");
     const { amount } = amountSchema.parse(req.body);
     const userId = req.user!.userId;
 

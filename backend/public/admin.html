@@ -337,6 +337,20 @@
       <div class="panel" id="panel-users">
         <h1 class="page-title">Users</h1>
         <div class="page-sub">Search, verify and manage every registered player.</div>
+        <div class="card" style="max-width:520px;">
+          <div class="card-head"><h2>Add test balance</h2></div>
+          <div class="item-meta" style="margin:-6px 0 12px;">Deposits are closed for now. Add balance to a player by their UID for testing. It is recorded as an admin credit, not a deposit.</div>
+          <div class="form-row">
+            <input id="creditUid" inputmode="numeric" placeholder="Player UID" />
+            <button class="btn secondary" id="creditFind" style="flex:0 0 auto;">Find</button>
+          </div>
+          <div class="detail-box" id="creditPlayer" style="display:none;margin-bottom:12px;"></div>
+          <div class="form-row">
+            <input id="creditAmount" type="number" min="1" max="100000" placeholder="Amount (₹)" />
+            <button class="btn" id="creditAdd" style="flex:0 0 auto;" disabled>Add</button>
+          </div>
+          <div class="item-meta" id="creditStatus"></div>
+        </div>
         <div class="card">
           <div class="form-row">
             <input id="userSearch" placeholder="Search name, email or phone…" />
@@ -1220,6 +1234,51 @@
   document.getElementById('threadResolve').addEventListener('click', function () {
     if (!openTicketId) return;
     api('/admin/support-tickets/' + openTicketId + '/resolve', { method: 'PATCH' }).then(function () { closeThread(); loadTickets(); });
+  });
+
+  // ---------- Add test balance ----------
+  var creditFound = null;
+  function showCreditPlayer(u) {
+    var box = document.getElementById('creditPlayer');
+    box.style.display = 'block';
+    box.innerHTML = 'Player<br/><b>' + escapeHtml([u.firstName, u.lastName].filter(Boolean).join(' ') || '—') + '</b> · UID ' + u.uid +
+      (u.phone ? ' · ' + escapeHtml(u.phone) : '') + '<br/>Balance <b>' + fmtMoney(u.wallet ? u.wallet.balance : 0) + '</b>';
+  }
+  document.getElementById('creditFind').addEventListener('click', function () {
+    var uid = document.getElementById('creditUid').value.trim();
+    var status = document.getElementById('creditStatus');
+    creditFound = null;
+    document.getElementById('creditAdd').disabled = true;
+    document.getElementById('creditPlayer').style.display = 'none';
+    status.textContent = '';
+    if (!/^\d+$/.test(uid)) { status.textContent = 'Enter the player\'s UID (numbers only).'; return; }
+    api('/admin/users/by-uid/' + uid).then(function (u) {
+      creditFound = u;
+      showCreditPlayer(u);
+      document.getElementById('creditAdd').disabled = false;
+    }).catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; });
+  });
+  document.getElementById('creditUid').addEventListener('input', function () {
+    creditFound = null;
+    document.getElementById('creditAdd').disabled = true;
+  });
+  document.getElementById('creditAdd').addEventListener('click', function () {
+    var btn = this;
+    var status = document.getElementById('creditStatus');
+    var amount = Math.round(Number(document.getElementById('creditAmount').value) * 100) / 100;
+    if (!creditFound) { status.textContent = 'Find the player first.'; return; }
+    if (!(amount > 0) || amount > 100000) { status.textContent = 'Enter an amount from ₹1 to ₹1,00,000.'; return; }
+    if (!confirm('Add ' + fmtMoney(amount) + ' to UID ' + creditFound.uid + '?')) return;
+    btn.disabled = true;
+    api('/admin/users/by-uid/' + creditFound.uid + '/credit', { method: 'POST', body: JSON.stringify({ amount: amount }) })
+      .then(function (r) {
+        creditFound.wallet = { balance: r.balance };
+        showCreditPlayer(creditFound);
+        document.getElementById('creditAmount').value = '';
+        status.textContent = 'Added ' + fmtMoney(r.credited) + '. New balance ' + fmtMoney(r.balance) + '.';
+      })
+      .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
+      .finally(function () { btn.disabled = !creditFound; });
   });
 
   // ---------- Reports ----------
