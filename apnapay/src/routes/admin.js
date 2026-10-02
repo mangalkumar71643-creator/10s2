@@ -168,6 +168,7 @@ router.get('/dashboard', h(async () => {
   }
   return {
     business_name: (await db.getSettings()).business_name,
+    min_order_amount: (await db.getSettings()).min_order_amount,
     today: { count: today.n, amount: rupees(today.sum) },
     week_count: week.length,
     pending: await count("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'"),
@@ -562,7 +563,7 @@ router.post('/activity/seen', h(async () => await db.run('UPDATE activity SET se
 
 // ---------- Settings & security ------------------------------------------------------------------
 
-const SETTING_KEYS = ['business_name', 'order_expiry_minutes', 'late_match_hours', 'accept_base_amount', 'telegram_bot_token', 'telegram_chat_id', 'support_phone', 'email_allowed_domains'];
+const SETTING_KEYS = ['business_name', 'min_order_amount', 'order_expiry_minutes', 'late_match_hours', 'accept_base_amount', 'telegram_bot_token', 'telegram_chat_id', 'support_phone', 'email_allowed_domains'];
 
 router.get('/settings', h(async () => {
   const s = (await db.getSettings());
@@ -581,6 +582,7 @@ router.put('/settings', h(async (req) => {
   for (const key of SETTING_KEYS) {
     if (body[key] === undefined) continue;
     let value = str(body[key], 300);
+    if (key === 'min_order_amount') value = String(Math.min(99999, Math.max(1, Math.round(Number(value)) || 100)));
     if (key === 'order_expiry_minutes') value = String(Math.min(120, Math.max(2, parseInt(value, 10) || 15)));
     if (key === 'late_match_hours') value = String(Math.min(168, Math.max(1, parseInt(value, 10) || 24)));
     if (key === 'accept_base_amount') value = body[key] === true || value === '1' ? '1' : '0';

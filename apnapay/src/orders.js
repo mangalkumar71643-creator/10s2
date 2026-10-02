@@ -87,6 +87,10 @@ async function createOrder({ siteId = null, basePaise, reference = '', customer 
   }
   reference = String(reference || '').slice(0, 80);
   const settings = await db.getSettings();
+  const minPaise = Math.max(MIN_BASE_PAISE, Math.round(Number(settings.min_order_amount || 0) * 100) || MIN_BASE_PAISE);
+  if (basePaise < minPaise) {
+    throw new OrderError(`minimum amount is ₹${(minPaise / 100).toLocaleString('en-IN')}`, 400, 'amount_too_low');
+  }
   const expiryMs = Math.max(2, Number(settings.order_expiry_minutes) || 15) * 60000;
 
   return db.tx(async () => {

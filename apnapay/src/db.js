@@ -288,6 +288,8 @@ function detached(fn) {
 const DEFAULT_SETTINGS = {
   business_name: 'My Store',
   order_expiry_minutes: '15',
+  // Smallest order (₹) a customer can be asked to pay.
+  min_order_amount: '100',
   late_match_hours: '24',
   accept_base_amount: '1',
   telegram_bot_token: '',

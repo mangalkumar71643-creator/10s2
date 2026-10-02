@@ -50,6 +50,11 @@ test('full payment flow', async (t) => {
   assert.equal((await admin('/setup', 'POST', { username: 'owner', password: 'supersecret1', business_name: 'Test Store' })).status, 200);
   assert.equal((await admin('/setup', 'POST', { username: 'x', password: 'supersecret1' })).status, 409);
 
+  // Minimum order is ₹100 by default; check it, then lower it for the small test amounts below.
+  const low = await admin('/orders', 'POST', { amount: '50' });
+  assert.equal(low.status, 400);
+  assert.match(low.data.error, /minimum amount is ₹100/);
+  await admin('/settings', 'PUT', { min_order_amount: '1' });
   const dev = (await admin('/devices', 'POST', { name: 'Phone 1' })).data;
   const acc = await admin('/accounts', 'POST', {
     label: 'Kotak Main', bank: 'kotak', upi_id: 'shop@kotak', payee_name: 'Test Store', account_last4: '1234',

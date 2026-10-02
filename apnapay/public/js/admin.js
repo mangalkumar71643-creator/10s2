@@ -321,6 +321,7 @@
   // ---------------------------------------------------------------- dashboard
   pages.dashboard = async (page) => {
     const d = await api('/dashboard');
+    if (d.min_order_amount) minOrder = d.min_order_amount;
     $('#bizName').textContent = d.business_name;
     badges.messages = d.unmatched;
     setBadges();
@@ -557,6 +558,7 @@
     });
   }
 
+  let minOrder = '100';
   function newPaymentLink() {
     let createdLink = false;
     const m = modal({
@@ -565,7 +567,8 @@
       onClose: () => createdLink && (currentPage === 'orders' || currentPage === 'dashboard') && setTimeout(route),
       body: `<form id="pl" class="stack">
         <p class="muted small" style="margin-top:-6px">Send this link on WhatsApp/Instagram. The customer pays by UPI and it confirms automatically.</p>
-        <div class="field"><label>Amount</label><div class="input-group"><span class="prefix">₹</span><input class="input" name="amount" inputmode="decimal" placeholder="499" required style="font-size:20px;font-weight:700;height:52px"></div></div>
+        <div class="field"><label>Amount</label><div class="input-group"><span class="prefix">₹</span><input class="input" name="amount" inputmode="decimal" placeholder="499" required style="font-size:20px;font-weight:700;height:52px"></div>
+          <span class="hint">Minimum ₹${esc(minOrder)} (Settings mein badal sakte ho)</span></div>
         <div class="form-grid">
           <div class="field"><label>Customer name</label><input class="input" name="customer_name" placeholder="Optional"></div>
           <div class="field"><label>Phone</label><input class="input" name="customer_phone" inputmode="tel" placeholder="Optional"></div>
@@ -1176,6 +1179,7 @@ Authorization: Bearer ak_live_…
   pages.settings = async (page) => {
     const [s, activity] = await Promise.all([api('/settings'), api('/activity')]);
     const st = s.settings;
+    minOrder = st.min_order_amount || minOrder;
     page.innerHTML = `
       ${topbar('Settings')}
       <div class="grid cols-2" style="align-items:start">
@@ -1184,6 +1188,8 @@ Authorization: Bearer ak_live_…
             <h2>Business & payments</h2>
             <div class="field"><label>Business name</label><input class="input" name="business_name" value="${esc(st.business_name)}"><span class="hint">Shown on the payment page.</span></div>
             <div class="field"><label>Support phone (optional)</label><input class="input" name="support_phone" value="${esc(st.support_phone)}"></div>
+            <div class="field"><label>Minimum order amount (₹)</label><div class="input-group"><span class="prefix">₹</span><input class="input" type="number" min="1" max="99999" name="min_order_amount" value="${esc(st.min_order_amount)}"></div>
+              <span class="hint">Isse kam ka payment link / order nahi banega.</span></div>
             <div class="form-grid">
               <div class="field"><label>Payment link valid for (minutes)</label><input class="input" type="number" min="2" max="120" name="order_expiry_minutes" value="${esc(st.order_expiry_minutes)}"></div>
               <div class="field"><label>Accept late payments for (hours)</label><input class="input" type="number" min="1" max="168" name="late_match_hours" value="${esc(st.late_match_hours)}"></div>
