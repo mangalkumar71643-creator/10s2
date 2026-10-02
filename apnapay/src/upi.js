@@ -32,6 +32,21 @@ function buildUpiUri(account, order) {
   return 'upi://pay?' + params.toString().replace(/\+/g, '%20');
 }
 
+// Plain "pay to this UPI ID" link: no amount, no note. UPI apps treat it like scanning the
+// owner's QR (no "amount request" risk check), and the customer types the exact amount.
+function buildPlainUpiUri(account) {
+  const params = new URLSearchParams();
+  params.set('pa', account.upi_id);
+  if (account.payee_name) params.set('pn', account.payee_name);
+  let extra = {};
+  try {
+    extra = JSON.parse(account.upi_params || '{}');
+  } catch {}
+  for (const [k, v] of Object.entries(extra)) if (KEEP_PARAMS.includes(k)) params.set(k, v);
+  params.set('cu', 'INR');
+  return 'upi://pay?' + params.toString().replace(/\+/g, '%20');
+}
+
 function qrSvg(text) {
   return QRCode.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#111827', light: '#ffffff' } });
 }
@@ -51,4 +66,4 @@ function isMerchant(account) {
   }
 }
 
-module.exports = { parseUpiUri, buildUpiUri, qrSvg, qrPng, isMerchant };
+module.exports = { parseUpiUri, buildUpiUri, buildPlainUpiUri, qrSvg, qrPng, isMerchant };

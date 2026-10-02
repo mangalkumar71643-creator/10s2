@@ -41,6 +41,24 @@
     toast(label + ' copied', 'ok');
   }
 
+  // Synchronous copy so it finishes before the UPI app opens and the page goes to background.
+  function copyNow(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {}
+    ta.remove();
+    if (!ok && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+    toast(`₹${text} copied — paste it in the UPI app`, 'ok');
+  }
+
   const fmt = (n) => Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -61,7 +79,7 @@
     return `₹${Number(rs).toLocaleString('en-IN')}<span class="paise">.${ps}</span>`;
   }
 
-  function appLinks(uri) {
+  function appLinks(uri, extra = '') {
     const q = uri.slice(uri.indexOf('?'));
     const apps = [
       { name: 'PhonePe', href: 'phonepe://pay' + q, bg: '#5f259f', t: 'Pe' },
@@ -70,7 +88,7 @@
       { name: 'Any UPI', href: uri, bg: 'linear-gradient(135deg,#5b4cf0,#8b5cf6)', t: '⚡' },
     ];
     return `<div class="apps">${apps
-      .map((a) => `<a class="app" href="${esc(a.href)}"><i style="background:${a.bg}">${a.t}</i>${a.name}</a>`)
+      .map((a) => `<a class="app" href="${esc(a.href)}"${extra}><i style="background:${a.bg}">${a.t}</i>${a.name}</a>`)
       .join('')}</div>`;
   }
 
@@ -101,12 +119,20 @@
     const appBlock = `
       <a class="btn btn-primary btn-lg btn-block" href="${esc(p.upi_uri)}">${icon.upi} Pay ₹${fmt(data.order.amount)} with UPI app</a>
       ${appLinks(p.upi_uri)}`;
+    // Uploaded-QR mode: open the app with only the UPI ID filled (like scanning the QR); the
+    // amount is copied on tap so the customer just pastes it.
+    const amtAttr = ` data-amt="${esc(data.order.amount)}"`;
+    const appBlockPlain = p.upi_uri_plain ? `
+      <a class="btn btn-primary btn-lg btn-block" href="${esc(p.upi_uri_plain)}"${amtAttr}>${icon.upi} Open UPI app &amp; enter ₹${fmt(data.order.amount)}</a>
+      ${appLinks(p.upi_uri_plain, amtAttr)}
+      <p class="tiny muted" style="margin:0">Amount auto-copies on tap — paste it in the app.<span class="hi">Tap karte hi amount copy ho jayega, UPI app mein paste karke pay karein. App rok de to upar wala QR save karke scan karein.</span></p>` : '';
     // Personal UPI IDs: apps often block amount links ("payment may fail"), but scanning the QR works.
     const scanHelp = `
       <div class="notice small" style="text-align:left;width:100%">${icon.upi}<div><b>Paying on this phone?</b> Tap <b>Save QR</b>, open your UPI app → <b>Scan</b> → choose the QR from <b>gallery</b>.
         <span class="hi">Isi phone se pay karna hai? QR save karo, UPI app mein Scan → Gallery se QR chuno.</span></div></div>`;
     let zone;
-    if (isStatic) zone = qrBlock + (isMobile ? scanHelp : '');
+    if (isStatic && isMobile && appBlockPlain) zone = appBlockPlain + '<div class="or">OR SCAN QR</div>' + qrBlock + scanHelp;
+    else if (isStatic) zone = qrBlock + (isMobile ? scanHelp : '');
     else if (isMobile && p.merchant) zone = appBlock + '<div class="or">OR SCAN QR</div>' + qrBlock;
     else if (isMobile) zone = qrBlock + scanHelp + '<div class="or">OR TRY</div>' + appBlock;
     else zone = qrBlock + '<div class="or">ON MOBILE?</div>' + appBlock;
@@ -134,7 +160,7 @@
         </div>
       </section>
       <div class="steps">
-        <div class="step"><span class="n">1</span><span>${isStatic ? 'Scan the QR with any UPI app' : 'Tap your UPI app or scan the QR'}</span></div>
+        <div class="step"><span class="n">1</span><span>${isStatic ? (isMobile ? 'Tap your UPI app (or scan the QR)' : 'Scan the QR with any UPI app') : 'Tap your UPI app or scan the QR'}</span></div>
         <div class="step"><span class="n">2</span><span>${isStatic ? `Enter <b>₹${fmt(data.order.amount)}</b> exactly and pay` : `Check the amount is <b>₹${fmt(data.order.amount)}</b> and pay`}</span></div>
         <div class="step"><span class="n">3</span><span>Keep this page open — it updates by itself</span></div>
       </div>
@@ -253,6 +279,8 @@
   app.addEventListener('click', (e) => {
     const b = e.target.closest('[data-copy]');
     if (b) copy(b.dataset.copy, b.dataset.label);
+    const a = e.target.closest('[data-amt]');
+    if (a) copyNow(a.dataset.amt);
   });
 
   app.addEventListener('submit', async (e) => {

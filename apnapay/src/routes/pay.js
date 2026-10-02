@@ -4,7 +4,7 @@ const path = require('node:path');
 const db = require('../db');
 const orders = require('../orders');
 const auth = require('../auth');
-const { buildUpiUri, qrPng, isMerchant } = require('../upi');
+const { buildUpiUri, buildPlainUpiUri, qrPng, isMerchant } = require('../upi');
 const { rupees } = require('../util');
 
 const router = express.Router();
@@ -62,6 +62,7 @@ router.get('/:id/data', async (req, res) => {
       upi_id: account.upi_id,
       bank: account.bank,
       upi_uri: upiUri,
+      upi_uri_plain: buildPlainUpiUri(account),
       qr_mode: staticQr ? 'static' : 'dynamic',
       qr: staticQr ? account.qr_image : await qrPng(upiUri),
       merchant: isMerchant(account),
