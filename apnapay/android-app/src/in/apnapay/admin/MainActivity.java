@@ -262,6 +262,7 @@ public class MainActivity extends Activity {
                 o.put("url", SmsStore.url(MainActivity.this));
                 o.put("enabled", SmsStore.enabled(MainActivity.this));
                 o.put("permission", hasSmsPermission());
+                o.put("read_permission", checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED);
                 PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
                 o.put("battery_ok", pm != null && pm.isIgnoringBatteryOptimizations(getPackageName()));
                 o.put("queue", SmsStore.queue(MainActivity.this).length());
@@ -287,6 +288,7 @@ public class MainActivity extends Activity {
             SmsJobs.setHeartbeat(MainActivity.this, enabled);
             SmsStore.log(MainActivity.this, enabled ? "SMS reader turned ON" : "SMS reader turned OFF");
             if (enabled) SmsJobs.scheduleRetry(MainActivity.this);
+            pingInBackground();
             return "";
         }
 
@@ -296,7 +298,7 @@ public class MainActivity extends Activity {
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    requestPermissions(new String[] { Manifest.permission.RECEIVE_SMS }, SMS_PERMISSION);
+                    requestPermissions(new String[] { Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS }, SMS_PERMISSION);
                 }
             });
         }
@@ -335,6 +337,56 @@ public class MainActivity extends Activity {
             }).start();
         }
 
+        /**
+         * Reads bank credit SMS from the inbox (last `hours`) and sends any not sent before.
+         * Result arrives in window.onSyncResult(found, sent, message).
+         */
+        @JavascriptInterface
+        public void syncInbox(final int hours) {
+            if (!trusted()) return;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    int found = 0, queued = 0;
+                    String msg;
+                    if (SmsStore.url(MainActivity.this).isEmpty()) {
+                        msg = "Pehle Step 2 mein phone link save karein.";
+                    } else if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
+                        msg = "SMS padhne ki permission nahi hai. Step 1 mein Allow karein.";
+                    } else {
+                        android.database.Cursor cur = null;
+                        try {
+                            long since = System.currentTimeMillis() - Math.max(1, Math.min(hours, 72)) * 3600000L;
+                            cur = getContentResolver().query(android.provider.Telephony.Sms.Inbox.CONTENT_URI,
+                                new String[] { "address", "body", "date" }, "date > ?", new String[] { String.valueOf(since) }, "date ASC");
+                            while (cur != null && cur.moveToNext()) {
+                                String from = cur.getString(0), body = cur.getString(1);
+                                long date = cur.getLong(2);
+                                if (!SmsFilter.shouldForward(from, body)) continue;
+                                found++;
+                                if (SmsStore.markSent(MainActivity.this, SmsStore.key(from, date, body))) {
+                                    SmsStore.enqueue(MainActivity.this, "sms", from, body, date, "");
+                                    queued++;
+                                }
+                            }
+                            SmsStore.log(MainActivity.this, "Sync: " + found + " bank credit SMS found, " + queued + " new sent");
+                            boolean ok = SmsSender.flush(MainActivity.this);
+                            if (!ok) SmsJobs.scheduleRetry(MainActivity.this);
+                            msg = found == 0 ? "Last " + hours + " ghante mein koi bank credit SMS nahi mila."
+                                : queued == 0 ? found + " bank SMS mile, sab pehle hi bheje ja chuke hain."
+                                : queued + " bank SMS server ko bheje" + (ok ? " ✓" : " (internet aate hi jayenge)");
+                        } catch (Exception e) {
+                            msg = "SMS padh nahi paye: " + e.getMessage();
+                        } finally {
+                            if (cur != null) cur.close();
+                        }
+                    }
+                    SmsSender.ping(MainActivity.this);
+                    js("window.onSyncResult && onSyncResult(" + found + "," + queued + "," + JSONObject.quote(msg) + ")");
+                }
+            }).start();
+        }
+
         /** Sends any saved SMS right now. */
         @JavascriptInterface
         public void sendNow() {
@@ -363,7 +415,18 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "Settings → Permissions → SMS → Allow karein", Toast.LENGTH_LONG).show();
             }
             web.evaluateJavascript("window.refreshState && refreshState()", null);
+            pingInBackground();
         }
+    }
+
+    /** Tells the server this phone's current permission/reader status (shown in the admin panel). */
+    private void pingInBackground() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                SmsSender.ping(MainActivity.this);
+            }
+        }).start();
     }
 
     @Override

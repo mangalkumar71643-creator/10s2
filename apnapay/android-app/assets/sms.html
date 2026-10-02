@@ -79,7 +79,8 @@
         <span class="num" id="n1">1</span>
         <div class="grow"><div class="title">SMS permission</div>
           <div class="muted">Sirf bank ke credit SMS bheje jaate hain. OTP aur personal SMS phone se bahar nahi jaate.</div>
-          <div id="permArea"></div></div>
+          <div id="permArea"></div>
+          <div id="restricted" class="note warn" hidden>Permission nahi mil rahi? Android 13+ mein: phone <b>Settings → Apps → ApnaPay Admin → ⋮ (upar right) → Allow restricted settings</b>. Phir yahan wapas aakar dobara Allow karein.</div></div>
       </div>
       <div class="sep"></div>
       <div class="step">
@@ -103,6 +104,13 @@
     </section>
 
     <section class="card">
+      <div class="title">Purane payment ke SMS bhejo</div>
+      <div class="muted">Reader ON hone se pehle jo bank SMS aaye the (jaise abhi ke test payment), unhe inbox se padh kar server ko bhej dega. Sirf bank credit SMS.</div>
+      <button class="btn primary block" id="sync">Sync last 24h SMS</button>
+      <div id="syncNote"></div>
+    </section>
+
+    <section class="card">
       <div style="display:flex;align-items:center;justify-content:space-between"><div class="title">Recent activity</div><button class="btn" id="sendNow" style="margin:0;height:34px">Send now</button></div>
       <div class="log" id="log"></div>
     </section>
@@ -116,6 +124,7 @@
     const fromLink = new URLSearchParams(location.search).get('url');
     let state = {};
     let urlTouched = false;
+    let permAsked = false;
 
     function ago(ms) {
       if (!ms) return 'never';
@@ -152,7 +161,8 @@
       $('battArea').innerHTML = state.battery_ok
         ? '<span class="chip ok" style="margin-top:8px">Battery saver off for this app</span>'
         : '<button class="btn" id="batt">Turn off battery saver for app</button>';
-      if ($('perm')) $('perm').onclick = () => B.askSmsPermission();
+      if ($('perm')) $('perm').onclick = () => { B.askSmsPermission(); permAsked = true; };
+      $('restricted').hidden = !(permAsked && !state.permission);
       if ($('appSet')) $('appSet').onclick = () => B.openAppSettings();
       if ($('batt')) $('batt').onclick = () => B.openBatterySettings();
 
@@ -193,6 +203,17 @@
       refreshState();
     };
     $('sendNow').onclick = () => B.sendNow();
+    window.onSyncResult = (found, sent, msg) => {
+      $('sync').disabled = false;
+      $('sync').textContent = 'Sync last 24h SMS';
+      $('syncNote').innerHTML = `<div class="note ${sent ? 'ok' : 'warn'}">${esc(msg)}</div>`;
+      refreshState();
+    };
+    $('sync').onclick = () => {
+      $('sync').disabled = true;
+      $('sync').textContent = 'Reading SMS…';
+      B.syncInbox(24);
+    };
     $('admin').onclick = () => B.openAdmin('#/devices');
     $('back').onclick = () => (history.length > 1 ? history.back() : B.openAdmin(''));
 

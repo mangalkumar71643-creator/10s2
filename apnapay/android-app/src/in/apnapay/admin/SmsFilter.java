@@ -32,4 +32,17 @@ final class SmsFilter {
     static boolean shouldForward(String sender, String text) {
         return isBankSender(sender) && looksLikeCredit(text);
     }
+
+    static boolean isOtp(String text) {
+        return text != null && SECRET.matcher(text.toLowerCase(Locale.ROOT)).find();
+    }
+
+    /** Why an SMS was not forwarded (shown in the admin panel). */
+    static String skipReason(String sender, String text) {
+        if (!isBankSender(sender)) return "personal SMS - not read";
+        if (isOtp(text)) return "OTP - hidden";
+        String t = text == null ? "" : text.toLowerCase(Locale.ROOT);
+        if (!AMOUNT.matcher(t).find()) return "no amount in SMS";
+        return "not a credit (debit / offer / other)";
+    }
 }

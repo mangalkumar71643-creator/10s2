@@ -36,10 +36,29 @@ async function senderAllowed(device, sender) {
   return { ok: true };
 }
 
+const flag = (v) => (v === '1' || v === 'true' ? 1 : v === '0' || v === 'false' ? 0 : null);
+
+function logSms(device, { sender = '', text = '', status, reason = '', amount = null, orderId = null, smsAt = null }) {
+  return db.run(
+    `INSERT INTO sms_events (device_id, sender, text, status, reason, amount, order_id, sms_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    device.id, String(sender).slice(0, 40), String(text).slice(0, 1000), status, String(reason).slice(0, 200),
+    amount, orderId, smsAt, Date.now(),
+  );
+}
+
 // Heartbeat, so the admin panel can show whether the phone is online (call it from MacroDroid/Tasker).
+// The ApnaPay app also reports its SMS permission and queue here (?perm=1&read=1&on=1&queue=0&v=1.3).
 router.all('/ping/:token', async (req, res) => {
   const device = await findDevice(req.params.token);
   if (!device) return res.status(404).json({ ok: false });
+  if (req.query.v) {
+    await db.run(
+      `UPDATE devices SET sms_permission = ?, read_permission = ?, reader_enabled = ?, reader_queue = ?, app_version = ? WHERE id = ?`,
+      flag(req.query.perm), flag(req.query.read), flag(req.query.on),
+      Number.isFinite(Number(req.query.queue)) ? Number(req.query.queue) : null, String(req.query.v).slice(0, 20), device.id,
+    );
+  }
   // Heartbeats arrive every 15 min, which also drives webhook retries on serverless hosting.
   background(() => webhooks.processDue());
   res.json({ ok: true, device: device.name });
@@ -54,19 +73,25 @@ router.post('/sms/:token', async (req, res) => {
   const sender = pick(body, ['from', 'sender', 'address', 'phone', 'number']) || String(req.query.from || '');
   if (!text) return res.status(400).json({ ok: false, error: 'no SMS text found (send it as "text")' });
 
+  const stamp = Number(body.receivedStamp || body.timestamp) || Date.now();
+  const receivedAt = Math.abs(stamp - Date.now()) < 7 * 86400000 ? stamp : Date.now();
+
   const allowed = await senderAllowed(device, sender);
   if (!allowed.ok) {
     await db.logActivity('alert', `Ignored SMS on ${device.name}: ${allowed.reason}`);
+    await logSms(device, { sender, text, status: 'rejected', reason: allowed.reason, smsAt: receivedAt });
     return res.json({ ok: true, ignored: allowed.reason });
   }
 
-  const receivedAt = Number(body.receivedStamp || body.timestamp) || Date.now();
-  const result = await orders.ingestMessage({
-    source: 'sms',
-    text,
+  const result = await orders.ingestMessage({ source: 'sms', text, sender, deviceId: device.id, receivedAt });
+  await logSms(device, {
     sender,
-    deviceId: device.id,
-    receivedAt: Math.abs(receivedAt - Date.now()) < 7 * 86400000 ? receivedAt : Date.now(),
+    text,
+    smsAt: receivedAt,
+    amount: result.parsed.amount,
+    orderId: result.order ? result.order.id : null,
+    status: result.parsed.type !== 'credit' ? 'not_credit' : result.duplicate ? 'duplicate' : result.order ? 'matched' : 'unmatched',
+    reason: result.parsed.type !== 'credit' ? result.parsed.reason || `${result.parsed.type} message` : '',
   });
   res.json({
     ok: true,
@@ -74,6 +99,22 @@ router.post('/sms/:token', async (req, res) => {
     duplicate: !!result.duplicate,
     matched_order: result.order ? result.order.id : null,
   });
+});
+
+// SMS the phone saw but did not forward (personal, OTP, debit...). Only for the activity view.
+router.post('/seen/:token', async (req, res) => {
+  const device = await findDevice(req.params.token);
+  if (!device) return res.status(404).json({ ok: false });
+  const body = req.body || {};
+  const stamp = Number(body.receivedStamp) || Date.now();
+  await logSms(device, {
+    sender: pick(body, ['from']) || 'unknown',
+    text: pick(body, ['text']),
+    status: 'skipped',
+    reason: pick(body, ['reason']) || 'not a bank credit SMS',
+    smsAt: Math.abs(stamp - Date.now()) < 7 * 86400000 ? stamp : Date.now(),
+  });
+  res.json({ ok: true });
 });
 
 function emailDomainAllowed(from, settings) {

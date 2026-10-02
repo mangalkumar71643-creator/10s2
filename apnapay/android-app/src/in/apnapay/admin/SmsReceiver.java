@@ -38,10 +38,24 @@ public class SmsReceiver extends BroadcastReceiver {
 
         boolean queued = false;
         for (Map.Entry<String, StringBuilder> e : bodies.entrySet()) {
+            String sender = e.getKey();
             String text = e.getValue().toString();
-            if (!SmsFilter.shouldForward(e.getKey(), text)) continue;
-            SmsStore.enqueue(c, e.getKey(), text, times.get(e.getKey()));
-            queued = true;
+            long ts = times.get(sender);
+            if (SmsFilter.shouldForward(sender, text)) {
+                if (SmsStore.markSent(c, SmsStore.key(sender, ts, text))) {
+                    SmsStore.enqueue(c, "sms", sender, text, ts, "");
+                    SmsStore.log(c, "Bank SMS received from " + sender + " - sending to server");
+                    queued = true;
+                }
+            } else {
+                // Only a note for the admin panel: personal SMS and OTPs never leave the phone.
+                String reason = SmsFilter.skipReason(sender, text);
+                boolean personal = !SmsFilter.isBankSender(sender);
+                boolean hide = personal || SmsFilter.isOtp(text);
+                SmsStore.enqueue(c, "seen", personal ? "Personal SMS" : sender, hide ? "" : text, ts, reason);
+                SmsStore.log(c, "Skipped SMS from " + (personal ? "a person" : sender) + ": " + reason);
+                queued = true;
+            }
         }
         if (!queued) return;
 

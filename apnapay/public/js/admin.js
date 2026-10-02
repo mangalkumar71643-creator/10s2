@@ -890,15 +890,79 @@
 
   // ---------------------------------------------------------------- bank messages
   let msgFilter = 'unmatched';
+  const SMS_STATUS = {
+    matched: ['paid', '✅ Payment confirmed'],
+    unmatched: ['warn', 'Money received · no order'],
+    duplicate: ['off', 'Duplicate'],
+    not_credit: ['off', 'Sent · not a credit'],
+    rejected: ['bad', 'Rejected'],
+    skipped: ['off', 'Skipped on phone'],
+  };
+
+  function smsActivityHtml(act) {
+    const yesNo = (v, yes, no) => (v === 1 ? `<span class="badge live">${yes}</span>` : v === 0 ? `<span class="badge bad">${no}</span>` : '');
+    const phones = act.phones.map((p) => {
+      const warn = [];
+      if (p.sms_permission === 0) warn.push(`<b>SMS permission OFF.</b> Phone par app → More → SMS reader → <b>Allow SMS permission</b>. Android 13+: Settings → Apps → ApnaPay Admin → ⋮ → <b>Allow restricted settings</b>, phir permission do.`);
+      if (p.reader_enabled === 0) warn.push('SMS reader is turned <b>OFF</b> on this phone.');
+      if (!p.app_version) warn.push('Status unknown — install the latest ApnaPay Admin app (v1.3+) on this phone and open SMS reader once.');
+      else if (!p.today.read && !p.last_sms_at) warn.push('Phone ne abhi tak koi SMS nahi padha. Ek ₹1 payment karke dekho, ya SMS reader mein <b>Sync last 24h SMS</b> dabao.');
+      return `
+        <div class="card stack" style="gap:12px">
+          <div class="row">
+            <div class="bank-logo" style="background:var(--brand-soft);color:var(--brand)">${icon.phone}</div>
+            <div class="grow"><div class="bold">${esc(p.name)}</div>
+              <div class="tiny muted">Online: ${when(p.last_seen_at)} · Last SMS: ${when(p.last_sms_at)}${p.app_version ? ' · app v' + esc(p.app_version) : ''}</div></div>
+            ${!p.active ? '<span class="badge off">Disconnected</span>' : p.online ? '<span class="badge online">Active</span>' : '<span class="badge warn">Quiet</span>'}
+          </div>
+          <div class="row wrap" style="gap:6px">
+            ${yesNo(p.sms_permission, 'SMS permission ✓', 'SMS permission ✗')}
+            ${yesNo(p.reader_enabled, 'Reader ON', 'Reader OFF')}
+            ${p.reader_queue ? `<span class="badge warn">${p.reader_queue} waiting for internet</span>` : ''}
+          </div>
+          <div class="kv" style="grid-template-columns:repeat(4,1fr)">
+            <div><div class="k">Read today</div><div class="v">${p.today.read}</div></div>
+            <div><div class="k">Sent</div><div class="v">${p.today.forwarded}</div></div>
+            <div><div class="k">Confirmed</div><div class="v" style="color:var(--ok)">${p.today.matched}</div></div>
+            <div><div class="k">Skipped</div><div class="v">${p.today.skipped}</div></div>
+          </div>
+          ${warn.map((w) => `<div class="notice warn small">${icon.alert}<div>${w}</div></div>`).join('')}
+        </div>`;
+    }).join('');
+    const events = act.events.map((e) => {
+      const [cls, label] = SMS_STATUS[e.status] || ['off', e.status];
+      return `<div class="list-item" style="align-items:flex-start;flex-direction:column;gap:6px">
+        <div class="row" style="width:100%">
+          <div class="grow"><span class="bold mono small">${esc(e.sender || '—')}</span>
+            <span class="tiny muted"> · ${esc(e.phone)} · ${when(e.created_at)}</span></div>
+          ${e.amount ? `<span class="amount">${inr(e.amount)}</span>` : ''}
+        </div>
+        <div class="row wrap" style="gap:6px"><span class="badge ${cls}">${label}</span>
+          ${e.reason ? `<span class="tiny muted">${esc(e.reason)}</span>` : ''}
+          ${e.order_id ? `<a href="#" class="tiny" data-open-order="${esc(e.order_id)}">view order</a>` : ''}</div>
+        ${e.text ? `<details style="width:100%"><summary class="tiny muted" style="cursor:pointer">Show SMS</summary><div class="raw" style="margin-top:6px">${esc(e.text)}</div></details>` : ''}
+      </div>`;
+    }).join('');
+    return `
+      <div class="card-head" style="margin:0 0 10px"><div><h2>📱 SMS Reader activity</h2><div class="sub">What your phones read — updates every few seconds</div></div></div>
+      ${act.phones.length ? `<div class="grid cols-2">${phones}</div>` : `<div class="notice">${icon.info}<div>No phone added yet. Go to <a href="#/devices">Phones</a>.</div></div>`}
+      <div class="card flush mt">
+        <div class="card-head" style="padding:16px 18px 0"><h3>Recent SMS seen by phones</h3><span class="tiny muted">${act.events.length} latest</span></div>
+        ${events || `<div class="empty">${icon.inbox}<div>No SMS seen yet. When a bank SMS arrives on a phone with the reader ON, it shows up here.</div></div>`}
+      </div>`;
+  }
+
   pages.messages = async (page) => {
-    const [list, devices] = await Promise.all([api('/transactions' + (msgFilter ? '?status=' + msgFilter : '')), api('/devices')]);
+    const [list, devices, act] = await Promise.all([api('/transactions' + (msgFilter ? '?status=' + msgFilter : '')), api('/devices'), api('/sms-activity')]);
     if (msgFilter === 'unmatched') {
       badges.messages = list.length;
       setBadges();
     }
     const tabs = [['unmatched', 'Needs attention'], ['matched', 'Matched'], ['', 'All']];
     page.innerHTML = `
-      ${topbar('Bank Messages', 'Every credit SMS / email we received')}
+      ${topbar('Bank Messages', 'SMS your phones read, and every bank credit we received')}
+      <div id="smsAct">${smsActivityHtml(act)}</div>
+      <h2 style="margin:26px 0 12px">💰 Bank credits</h2>
       <div class="grid cols-2" style="align-items:start">
         <div class="stack">
           <div class="tabs">${tabs.map(([v, l]) => `<button data-mf="${v}" class="${msgFilter === v ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -931,6 +995,17 @@
       </div>`;
 
     $$('[data-mf]', page).forEach((b) => b.addEventListener('click', () => { msgFilter = b.dataset.mf; route(); }));
+    const bindOrderLinks = (scope) => $$('[data-open-order]', scope).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); openOrder(a.dataset.openOrder); }));
+    refreshTimer = setInterval(async () => {
+      if (currentPage !== 'messages' || $('.overlay') || document.hidden) return;
+      try {
+        const box = $('#smsAct', page);
+        const open = $$('details[open]', box).length;
+        if (open) return; // don't collapse an SMS the admin is reading
+        box.innerHTML = smsActivityHtml(await api('/sms-activity'));
+        bindOrderLinks(box);
+      } catch {}
+    }, 8000);
     $$('[data-open-order]', page).forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); openOrder(a.dataset.openOrder); }));
     $$('[data-ignore]', page).forEach((b) => b.addEventListener('click', () => busy(b, async () => {
       await api(`/transactions/${b.dataset.ignore}/ignore`, { method: 'POST' });

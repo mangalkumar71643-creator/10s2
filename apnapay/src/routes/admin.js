@@ -496,6 +496,37 @@ router.get('/transactions', h(async (req) => {
   return rows.map((t) => ({ ...t, amount: t.amount != null ? rupees(t.amount) : null, account: names[t.account_id] || null }));
 }));
 
+// What each phone's SMS reader has seen: per-phone counts for today and the latest SMS.
+router.get('/sms-activity', h(async () => {
+  const start = istDayStart();
+  await db.run('DELETE FROM sms_events WHERE created_at < ?', Date.now() - 30 * 86400000);
+  const devices = await db.all('SELECT * FROM devices ORDER BY id');
+  const phones = [];
+  for (const d of devices) {
+    const rows = await db.all('SELECT status, COUNT(*) AS n FROM sms_events WHERE device_id = ? AND created_at >= ? GROUP BY status', d.id, start);
+    const c = Object.fromEntries(rows.map((r) => [r.status, r.n]));
+    const last = await db.get('SELECT created_at FROM sms_events WHERE device_id = ? ORDER BY id DESC LIMIT 1', d.id);
+    const forwarded = (c.matched || 0) + (c.unmatched || 0) + (c.duplicate || 0) + (c.not_credit || 0) + (c.rejected || 0);
+    phones.push({
+      ...deviceView(d),
+      sms_permission: d.sms_permission,
+      read_permission: d.read_permission,
+      reader_enabled: d.reader_enabled,
+      reader_queue: d.reader_queue,
+      app_version: d.app_version,
+      last_sms_at: last ? last.created_at : null,
+      today: { read: forwarded + (c.skipped || 0), forwarded, matched: c.matched || 0, unmatched: c.unmatched || 0, skipped: c.skipped || 0 },
+    });
+  }
+  const names = Object.fromEntries(devices.map((d) => [d.id, d.name]));
+  const events = (await db.all('SELECT * FROM sms_events ORDER BY id DESC LIMIT 60')).map((e) => ({
+    ...e,
+    amount: e.amount != null ? rupees(e.amount) : null,
+    phone: names[e.device_id] || 'Phone',
+  }));
+  return { phones, events };
+}));
+
 router.post('/transactions/:id/ignore', h(async (req) => {
   await db.run("UPDATE transactions SET status = 'ignored' WHERE id = ? AND status = 'unmatched'", Number(req.params.id));
 }));

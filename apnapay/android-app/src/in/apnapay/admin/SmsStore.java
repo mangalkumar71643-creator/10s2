@@ -49,7 +49,8 @@ final class SmsStore {
         }
     }
 
-    static synchronized void enqueue(Context c, String from, String text, long timestamp) {
+    /** kind: "sms" = bank SMS for matching, "seen" = SMS the phone skipped (for the activity view). */
+    static synchronized void enqueue(Context c, String kind, String from, String text, long timestamp, String reason) {
         JSONArray q = queue(c);
         JSONArray out = new JSONArray();
         // Drop the oldest items if the phone was offline for a very long time.
@@ -57,6 +58,8 @@ final class SmsStore {
         try {
             JSONObject item = new JSONObject();
             item.put("id", UUID.randomUUID().toString());
+            item.put("kind", kind);
+            item.put("reason", reason == null ? "" : reason);
             item.put("from", from);
             item.put("text", text);
             item.put("ts", timestamp);
@@ -74,6 +77,26 @@ final class SmsStore {
             if (item != null && !id.equals(item.optString("id"))) out.put(item);
         }
         prefs(c).edit().putString("queue", out.toString()).commit();
+    }
+
+    /** Remembers SMS already handed to the server so "Sync" never sends the same one twice. */
+    static synchronized boolean markSent(Context c, String key) {
+        JSONArray keys;
+        try {
+            keys = new JSONArray(prefs(c).getString("sent_keys", "[]"));
+        } catch (JSONException e) {
+            keys = new JSONArray();
+        }
+        for (int i = 0; i < keys.length(); i++) if (key.equals(keys.optString(i))) return false;
+        JSONArray out = new JSONArray();
+        for (int i = Math.max(0, keys.length() - 499); i < keys.length(); i++) out.put(keys.opt(i));
+        out.put(key);
+        prefs(c).edit().putString("sent_keys", out.toString()).apply();
+        return true;
+    }
+
+    static String key(String sender, long timestamp, String text) {
+        return sender + "|" + timestamp + "|" + (text == null ? 0 : text.hashCode());
     }
 
     static synchronized void log(Context c, String message) {

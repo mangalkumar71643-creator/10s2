@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 /** Sends queued bank SMS to the ApnaPay server. Anything that fails stays queued for the next try. */
 final class SmsSender {
     private static final Object LOCK = new Object();
+    static final String VERSION = "1.3";
 
     private SmsSender() {}
 
@@ -39,7 +40,7 @@ final class SmsSender {
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(20000);
             conn.setRequestMethod(method);
-            conn.setRequestProperty("User-Agent", "ApnaPayApp/1.1");
+            conn.setRequestProperty("User-Agent", "ApnaPayApp/" + VERSION);
             if (json != null) {
                 conn.setDoOutput(true);
                 conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
@@ -76,18 +77,23 @@ final class SmsSender {
                 JSONObject item = q.optJSONObject(i);
                 if (item == null) continue;
                 String from = item.optString("from");
+                boolean seen = "seen".equals(item.optString("kind"));
                 Result r;
                 try {
                     JSONObject body = new JSONObject();
                     body.put("from", from);
                     body.put("text", item.optString("text"));
                     body.put("receivedStamp", item.optLong("ts"));
-                    r = request(url, "POST", body.toString());
+                    if (seen) body.put("reason", item.optString("reason"));
+                    r = request(seen ? url.replace("/ingest/sms/", "/ingest/seen/") : url, "POST", body.toString());
                 } catch (Exception e) {
                     r = new Result(-1, e.getMessage());
                 }
 
-                if (r.ok()) {
+                if (r.ok() && seen) {
+                    SmsStore.remove(c, item.optString("id"));
+                    SmsStore.setLastContact(c, true);
+                } else if (r.ok()) {
                     SmsStore.remove(c, item.optString("id"));
                     SmsStore.setLastContact(c, true);
                     String matched = null;
@@ -121,7 +127,11 @@ final class SmsSender {
     /** Heartbeat so the admin panel shows this phone as online. */
     static Result ping(Context c) {
         if (SmsStore.url(c).isEmpty()) return new Result(-1, "no link");
-        Result r = request(SmsStore.pingUrl(c), "GET", null);
+        boolean perm = c.checkSelfPermission(android.Manifest.permission.RECEIVE_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        boolean read = c.checkSelfPermission(android.Manifest.permission.READ_SMS) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        String q = "?perm=" + (perm ? 1 : 0) + "&read=" + (read ? 1 : 0) + "&on=" + (SmsStore.enabled(c) ? 1 : 0)
+            + "&queue=" + SmsStore.queue(c).length() + "&v=" + VERSION;
+        Result r = request(SmsStore.pingUrl(c) + q, "GET", null);
         SmsStore.setLastContact(c, r.ok());
         return r;
     }
