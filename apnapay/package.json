@@ -1,0 +1,24 @@
+{
+  "name": "apnapay",
+  "version": "1.0.0",
+  "description": "Zero-fee UPI payment desk with automatic confirmation from bank SMS / email alerts",
+  "main": "src/server.js",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js",
+    "demo-shop": "node examples/shop-demo/server.js"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@vercel/functions": "^3.9.9",
+    "express": "^5.2.1",
+    "jsqr": "^1.4.0",
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4"
+  }
+}
