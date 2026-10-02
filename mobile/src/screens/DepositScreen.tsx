@@ -96,7 +96,7 @@ export default function DepositScreen() {
             <Text style={styles.balanceValue}>₹{Math.floor(coins)}</Text>
           </LinearGradient>
 
-          <Pressable style={{ flex: 1 }} onPress={() => navigation.navigate('History')}>
+          <Pressable style={{ flex: 1 }} onPress={() => navigation.navigate('Withdraw')} accessibilityRole="button" accessibilityLabel="Withdraw">
             <LinearGradient colors={gradients.peachCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balanceCard}>
               <MaterialCommunityIcons name="chevron-right" size={22} color={CARD_TEXT_COLOR} style={styles.balanceCardArrow} />
               <Text style={styles.balanceLabel}>Withdrawable</Text>
