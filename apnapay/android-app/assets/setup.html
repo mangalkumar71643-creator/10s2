@@ -52,7 +52,7 @@
     const err = document.getElementById('err');
     const btn = document.getElementById('go');
     const saved = params.get('server') || (window.ApnaPayApp ? ApnaPayApp.getServer() : '');
-    if (saved) input.value = saved;
+    input.value = saved || 'https://apnapay.vercel.app'; // your live ApnaPay server
     if (params.get('error')) { err.textContent = params.get('error'); err.hidden = false; btn.textContent = 'Try again'; }
 
     function normalise(v) {

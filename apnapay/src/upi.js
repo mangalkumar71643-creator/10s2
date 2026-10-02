@@ -36,4 +36,19 @@ function qrSvg(text) {
   return QRCode.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#111827', light: '#ffffff' } });
 }
 
-module.exports = { parseUpiUri, buildUpiUri, qrSvg };
+// PNG so customers can save it and scan it from their gallery in any UPI app.
+function qrPng(text) {
+  return QRCode.toDataURL(text, { width: 640, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#111827', light: '#ffffff' } });
+}
+
+// Merchant QRs carry a merchant category code (mc). Personal UPI IDs don't, and UPI apps often
+// block "pay with amount" links to them, so the payment page then steers customers to scan instead.
+function isMerchant(account) {
+  try {
+    return !!JSON.parse(account.upi_params || '{}').mc;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { parseUpiUri, buildUpiUri, qrSvg, qrPng, isMerchant };

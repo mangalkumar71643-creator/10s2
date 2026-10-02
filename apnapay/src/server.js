@@ -46,7 +46,7 @@ function createApp() {
   app.use('/pay', require('./routes/pay'));
   app.use('/admin/api', require('./routes/admin'));
 
-  const pub = path.join(__dirname, '..', 'public');
+  const pub = config.publicDir;
   app.use(express.static(pub, { index: false, maxAge: '1h' }));
   app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(pub, 'admin.html')));
   app.get('/', (req, res) => res.redirect('/admin'));

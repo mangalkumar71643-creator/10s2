@@ -4,11 +4,12 @@ const path = require('node:path');
 const db = require('../db');
 const orders = require('../orders');
 const auth = require('../auth');
-const { buildUpiUri, qrSvg } = require('../upi');
+const { buildUpiUri, qrPng, isMerchant } = require('../upi');
 const { rupees } = require('../util');
 
 const router = express.Router();
-const PUBLIC = path.join(__dirname, '..', '..', 'public');
+const config = require('../config');
+const PUBLIC = config.publicDir;
 
 function returnUrlFor(order) {
   if (!order.return_url) return null;
@@ -60,7 +61,8 @@ router.get('/:id/data', async (req, res) => {
       bank: account.bank,
       upi_uri: upiUri,
       qr_mode: staticQr ? 'static' : 'dynamic',
-      qr: staticQr ? account.qr_image : 'data:image/svg+xml;base64,' + Buffer.from(await qrSvg(upiUri)).toString('base64'),
+      qr: staticQr ? account.qr_image : await qrPng(upiUri),
+      merchant: isMerchant(account),
     };
   }
   res.set('Cache-Control', 'no-store').json(out);

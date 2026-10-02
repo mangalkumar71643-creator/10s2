@@ -10,6 +10,7 @@
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
     upi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg>',
   };
 
@@ -94,11 +95,21 @@
     const isStatic = p.qr_mode === 'static';
     const qrBlock = `
       <div class="qr-frame"><img src="${esc(p.qr)}" alt="UPI QR code"></div>
+      <a class="btn btn-soft btn-sm" href="${esc(p.qr)}" download="pay-${esc(data.order.reference || data.order.id)}.png">${icon.download} Save QR to gallery</a>
       <div class="upi-line">UPI ID: <code>${esc(p.upi_id)}</code>
         <button class="icon-btn" style="width:30px;height:30px" data-copy="${esc(p.upi_id)}" data-label="UPI ID" aria-label="Copy UPI ID">${icon.copy}</button></div>`;
     const appBlock = `
       <a class="btn btn-primary btn-lg btn-block" href="${esc(p.upi_uri)}">${icon.upi} Pay ₹${fmt(data.order.amount)} with UPI app</a>
       ${appLinks(p.upi_uri)}`;
+    // Personal UPI IDs: apps often block amount links ("payment may fail"), but scanning the QR works.
+    const scanHelp = `
+      <div class="notice small" style="text-align:left;width:100%">${icon.upi}<div><b>Paying on this phone?</b> Tap <b>Save QR</b>, open your UPI app → <b>Scan</b> → choose the QR from <b>gallery</b>.
+        <span class="hi">Isi phone se pay karna hai? QR save karo, UPI app mein Scan → Gallery se QR chuno.</span></div></div>`;
+    let zone;
+    if (isStatic) zone = qrBlock;
+    else if (isMobile && p.merchant) zone = appBlock + '<div class="or">OR SCAN QR</div>' + qrBlock;
+    else if (isMobile) zone = qrBlock + scanHelp + '<div class="or">OR TRY</div>' + appBlock;
+    else zone = qrBlock + '<div class="or">ON MOBILE?</div>' + appBlock;
 
     app.innerHTML = `
       ${header()}
@@ -111,7 +122,7 @@
           ${data.order.note || data.order.reference ? `<p class="small muted" style="margin-top:10px">${esc(data.order.note || 'Order ' + data.order.reference)}</p>` : ''}
         </div>
         <div class="qr-zone">
-          ${isMobile && !isStatic ? appBlock + '<div class="or">OR SCAN QR</div>' + qrBlock : qrBlock + (isStatic ? '' : '<div class="or">ON MOBILE?</div>' + appBlock)}
+          ${zone}
         </div>
         <div class="status-bar">
           <span class="pulse"></span>

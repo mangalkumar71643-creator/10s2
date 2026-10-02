@@ -40,6 +40,8 @@ module.exports = {
   // Neon / any Postgres. Without it a local PGlite database in DATA_DIR is used.
   databaseUrl: process.env.DATABASE_URL || process.env.POSTGRES_URL || '',
   lanUrl,
+  // Static files (admin panel, payment page). Kept here so bundled builds resolve it correctly.
+  publicDir: path.join(__dirname, '..', 'public'),
   dataDir: process.env.DATA_DIR || path.join(__dirname, '..', 'data'),
   // Set TRUST_PROXY=1 when running behind Nginx/Caddy/Cloudflare so HTTPS is detected.
   trustProxy: process.env.TRUST_PROXY === '1' || !!process.env.VERCEL,

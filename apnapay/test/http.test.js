@@ -74,7 +74,7 @@ test('full payment flow', async (t) => {
   const page = await (await fetch(`${base}/pay/${order.id}/data`)).json();
   assert.equal(page.payee.upi_id, 'shop@kotak');
   assert.match(page.payee.upi_uri, new RegExp(`am=${order.amount_payable}`));
-  assert.match(page.payee.qr, /^data:image\/svg\+xml;base64,/);
+  assert.match(page.payee.qr, /^data:image\/png;base64,/);
 
   // A fake SMS from a phone number is rejected.
   const fake = await (await fetch(`${base}/ingest/sms/${dev.token}`, {

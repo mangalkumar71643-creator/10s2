@@ -42,11 +42,10 @@ test('only LIVE accounts get orders; none live -> error', async () => {
 
 test('daily limit pauses an account and moves orders to the next', async () => {
   await fresh();
-  await db.run('UPDATE accounts SET live = 1');
-  await db.run('UPDATE accounts SET daily_limit = 25000 WHERE id = 1'); // ₹250
-  await db.run('UPDATE accounts SET weight = 100 WHERE id = 1');
+  await db.run('UPDATE accounts SET daily_limit = 25000 WHERE id = 1'); // ₹250, only Kotak is live
   const a = await orders.createOrder({ basePaise: 20000 });
   assert.equal(a.account_id, 1);
+  await db.run('UPDATE accounts SET live = 1');
   const b = await orders.createOrder({ basePaise: 20000 });
   assert.equal(b.account_id, 2, 'Kotak is over its limit, so CBI takes it');
 });
