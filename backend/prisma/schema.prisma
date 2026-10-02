@@ -238,6 +238,13 @@ model Wallet {
   wageringRequired Decimal @default(0) @db.Decimal(12, 2)
   wageringProgress Decimal @default(0) @db.Decimal(12, 2)
 
+  // Deposited (or admin-credited) money not yet staked in a game. Only the
+  // rest — what came back as winnings — can be withdrawn. Kept by a database
+  // trigger on "Transaction" (see prisma/seed.ts, ensureUnplayedDepositTrigger):
+  // a completed DEPOSIT or admin credit adds to it, every GAME_STAKE /
+  // BET_STAKE takes from it, so every game is covered without its own code.
+  unplayedDeposit Decimal @default(0) @db.Decimal(12, 2)
+
   updatedAt DateTime @updatedAt
 }
 

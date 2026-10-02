@@ -140,6 +140,10 @@ export default function WithdrawScreen() {
           </LinearGradient>
         </View>
 
+        <Text style={styles.withdrawRule}>
+          Only your winnings can be withdrawn. Money you deposit has to be played in a game first; whatever comes back from your bets becomes withdrawable.
+        </Text>
+
         {!kycApproved ? (
           <View style={styles.kycBanner}>
             <MaterialCommunityIcons name="shield-alert-outline" size={18} color={colors.gold} />
@@ -333,6 +337,7 @@ const styles = {
     paddingHorizontal: spacing.lg,
     overflow: 'hidden' as const,
   },
+  withdrawRule: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: spacing.sm, marginHorizontal: spacing.xs },
   balanceCardIcon: { position: 'absolute' as const, right: -6, bottom: -6, opacity: 0.3, transform: [{ rotate: '-8deg' }] },
   balanceLabel: { color: CARD_TEXT_COLOR, fontSize: typography.sm, fontWeight: '700' as const, marginBottom: spacing.sm },
   balanceValue: { color: CARD_TEXT_COLOR, fontSize: typography.xl, fontWeight: '800' as const },

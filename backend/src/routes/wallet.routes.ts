@@ -43,7 +43,8 @@ async function buildWalletView(userId: string) {
 
   const withdrawnToday = Number(todaysWithdrawals._sum.amount ?? 0);
   const remainingWithdrawalLimit = Math.max(0, env.wallet.dailyWithdrawalLimit - withdrawnToday);
-  const withdrawable = Math.max(0, Number(wallet.balance) - Number(wallet.lockedBonus));
+  // Only winnings can leave: deposits must be played first, and a locked bonus waits for its wagering.
+  const withdrawable = Math.max(0, Number(wallet.balance) - Number(wallet.lockedBonus) - Number(wallet.unplayedDeposit));
 
   return {
     ...wallet,
@@ -188,11 +189,14 @@ router.post(
     const view = await buildWalletView(userId);
     if (amount > view.withdrawable) {
       const lockedBonus = Number(view.lockedBonus);
+      const unplayed = Number(view.unplayedDeposit);
+      const reasons = [
+        unplayed > 0 ? `₹${unplayed.toFixed(2)} deposited has not been played yet` : null,
+        lockedBonus > 0 ? `₹${lockedBonus.toFixed(2)} bonus is still locked until its wagering requirement is met` : null,
+      ].filter(Boolean);
       throw new ApiError(
         400,
-        lockedBonus > 0
-          ? `Only ₹${view.withdrawable.toFixed(2)} is withdrawable right now — ₹${lockedBonus.toFixed(2)} bonus is still locked until its wagering requirement is met.`
-          : "Insufficient balance"
+        reasons.length > 0 ? `Only ₹${view.withdrawable.toFixed(2)} (your winnings) can be withdrawn right now — ${reasons.join(", and ")}.` : "Insufficient balance"
       );
     }
     if (amount > view.remainingWithdrawalLimit) {
