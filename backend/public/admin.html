@@ -539,6 +539,35 @@
       'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON_PATHS[name] + '</svg>';
   }
 
+  // ---------- In-page dialogs ----------
+  // The admin app is a bare Android WebView with no native dialog support:
+  // window.confirm() there silently returns false and window.alert() shows nothing.
+  // These draw their own box instead, so they work in the app and a browser.
+  function openDialog(message, withCancel) {
+    return new Promise(function (resolve) {
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100;';
+      wrap.innerHTML =
+        '<div class="card" style="max-width:380px;width:100%;margin:0;">' +
+          '<div data-msg style="font-size:14px;line-height:1.5;margin-bottom:16px;white-space:pre-wrap;"></div>' +
+          '<div style="display:flex;gap:10px;justify-content:flex-end;">' +
+            (withCancel ? '<button class="btn secondary" data-ans="0">Cancel</button>' : '') +
+            '<button class="btn" data-ans="1">OK</button>' +
+          '</div>' +
+        '</div>';
+      wrap.querySelector('[data-msg]').textContent = message;
+      wrap.addEventListener('click', function (e) {
+        var ans = e.target.getAttribute && e.target.getAttribute('data-ans');
+        if (ans === null || ans === undefined) return;
+        document.body.removeChild(wrap);
+        resolve(ans === '1');
+      });
+      document.body.appendChild(wrap);
+    });
+  }
+  function askConfirm(message) { return openDialog(message, true); }
+  function showAlert(message) { openDialog(String(message), false); }
+
   // ---------- State / helpers ----------
   var API = location.origin;
   var TOKEN_KEY = 'novaplay_admin_token';
@@ -747,7 +776,7 @@
         statCardHtml('games', 'Active Players', s.activePlayers.toLocaleString('en-IN'), 'staked in last 24h') +
         statCardHtml('wallet', 'Owed to Players', fmtMoney(s.owedToPlayers),
           fmtMoney(s.playerBalanceTotal) + ' in wallets + ' + fmtMoney(s.pendingWithdrawalTotal) + ' pending withdrawal');
-    }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
 
     api('/admin/users').then(function (users) {
       allUsersCache = users;
@@ -844,7 +873,7 @@
           var select = container.querySelector('[data-kyc-select="' + id + '"]');
           api('/admin/kyc/' + id, { method: 'PATCH', body: JSON.stringify({ status: select.value }) })
             .then(function () { refreshCurrentUsersView(); })
-            .catch(function (err) { alert(err.message); });
+            .catch(function (err) { showAlert(err.message); });
         });
       });
     });
@@ -856,10 +885,12 @@
           var reason = prompt('Reason for banning this user:');
           if (!reason) return;
           api('/admin/users/' + id + '/ban', { method: 'PATCH', body: JSON.stringify({ reason: reason }) })
-            .then(refreshCurrentUsersView).catch(function (err) { alert(err.message); });
+            .then(refreshCurrentUsersView).catch(function (err) { showAlert(err.message); });
         } else if (actionName === 'unban') {
-          if (!confirm('Unban this user?')) return;
-          api('/admin/users/' + id + '/unban', { method: 'PATCH' }).then(refreshCurrentUsersView).catch(function (err) { alert(err.message); });
+          askConfirm('Unban this user?').then(function (ok) {
+            if (!ok) return;
+            api('/admin/users/' + id + '/unban', { method: 'PATCH' }).then(refreshCurrentUsersView).catch(function (err) { showAlert(err.message); });
+          });
         }
       });
     });
@@ -920,7 +951,7 @@
     api('/admin/users' + qs).then(function (users) {
       allUsersCache = users;
       renderUsersTable('usersTable', 'usersPagination', users, usersCurrentPage, 10, false);
-    }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
   }
   document.getElementById('userSearchBtn').addEventListener('click', function () { loadUsers(1); });
   document.getElementById('userSearch').addEventListener('keydown', function (e) { if (e.key === 'Enter') loadUsers(1); });
@@ -965,17 +996,21 @@
           var id = btn.getAttribute('data-id');
           var action = btn.getAttribute('data-action');
           if (action === 'approve') {
-            if (!confirm('Confirm this payout has actually been sent to the customer’s bank account?')) return;
-            btn.disabled = true;
-            api('/admin/withdrawals/' + id + '/approve', { method: 'POST' }).then(loadWithdrawals).catch(function (err) { alert(err.message); loadWithdrawals(); });
+            askConfirm('Confirm this payout has actually been sent to the customer’s bank account?').then(function (ok) {
+              if (!ok) return;
+              btn.disabled = true;
+              api('/admin/withdrawals/' + id + '/approve', { method: 'POST' }).then(loadWithdrawals).catch(function (err) { showAlert(err.message); loadWithdrawals(); });
+            });
           } else if (action === 'reject') {
-            if (!confirm('Reject this withdrawal and refund the customer’s balance?')) return;
-            btn.disabled = true;
-            api('/admin/withdrawals/' + id + '/reject', { method: 'POST' }).then(loadWithdrawals).catch(function (err) { alert(err.message); loadWithdrawals(); });
+            askConfirm('Reject this withdrawal and refund the customer’s balance?').then(function (ok) {
+              if (!ok) return;
+              btn.disabled = true;
+              api('/admin/withdrawals/' + id + '/reject', { method: 'POST' }).then(loadWithdrawals).catch(function (err) { showAlert(err.message); loadWithdrawals(); });
+            });
           }
         });
       });
-    }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
   }
   document.getElementById('withdrawalRefresh').addEventListener('click', loadWithdrawals);
   document.getElementById('withdrawalStatus').addEventListener('change', loadWithdrawals);
@@ -1176,7 +1211,7 @@
         el.addEventListener('click', function () { openThread(el.getAttribute('data-id')); });
       });
       updateBellBadge(open.length);
-    }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
   }
 
   function refreshBellBadge() {
@@ -1268,17 +1303,21 @@
     var amount = Math.round(Number(document.getElementById('creditAmount').value) * 100) / 100;
     if (!creditFound) { status.textContent = 'Find the player first.'; return; }
     if (!(amount > 0) || amount > 100000) { status.textContent = 'Enter an amount from ₹1 to ₹1,00,000.'; return; }
-    if (!confirm('Add ' + fmtMoney(amount) + ' to UID ' + creditFound.uid + '?')) return;
-    btn.disabled = true;
-    api('/admin/users/by-uid/' + creditFound.uid + '/credit', { method: 'POST', body: JSON.stringify({ amount: amount }) })
-      .then(function (r) {
-        creditFound.wallet = { balance: r.balance };
-        showCreditPlayer(creditFound);
-        document.getElementById('creditAmount').value = '';
-        status.textContent = 'Added ' + fmtMoney(r.credited) + '. New balance ' + fmtMoney(r.balance) + '.';
-      })
-      .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
-      .finally(function () { btn.disabled = !creditFound; });
+    var target = creditFound;
+    askConfirm('Add ' + fmtMoney(amount) + ' to UID ' + target.uid + '?').then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      status.textContent = 'Adding…';
+      api('/admin/users/by-uid/' + target.uid + '/credit', { method: 'POST', body: JSON.stringify({ amount: amount }) })
+        .then(function (r) {
+          target.wallet = { balance: r.balance };
+          if (creditFound === target) showCreditPlayer(target);
+          document.getElementById('creditAmount').value = '';
+          status.textContent = 'Added ' + fmtMoney(r.credited) + ' to UID ' + target.uid + '. New balance ' + fmtMoney(r.balance) + '.';
+        })
+        .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
+        .finally(function () { btn.disabled = !creditFound; });
+    });
   });
 
   // ---------- Reports ----------
@@ -1304,7 +1343,7 @@
       document.getElementById('reportsTable').innerHTML = rows
         ? '<table><thead><tr><th>Day</th><th>Bets</th><th>Players</th><th>Staked</th><th>Paid</th><th>Profit</th><th>Profit %</th></tr></thead><tbody>' + rows + '</tbody></table>'
         : '<div class="empty">No bets in this period yet.</div>';
-    }).catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
     api('/admin/settings').then(function (st) {
       var input = document.getElementById('maxPayoutInput');
       input.value = st.maxPayout;
@@ -1337,7 +1376,7 @@
 
   function loadPopups() {
     api('/admin/popups').then(function (rows) { popupsCache = rows; renderPopups(); })
-      .catch(function (err) { if (err.authError) doLogout(); else alert(err.message); });
+      .catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
   }
 
   function renderPopups() {
@@ -1373,7 +1412,7 @@
         el.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
         api('/admin/popups/reorder', { method: 'POST', body: JSON.stringify({ ids: ids }) })
           .then(function (rows) { popupsCache = rows; renderPopups(); })
-          .catch(function (err) { if (err.authError) doLogout(); else { alert(err.message); loadPopups(); } });
+          .catch(function (err) { if (err.authError) doLogout(); else { showAlert(err.message); loadPopups(); } });
       });
     });
     el.querySelectorAll('[data-popup-toggle]').forEach(function (b) {
@@ -1382,17 +1421,19 @@
         b.disabled = true;
         api('/admin/popups/' + p.id, { method: 'PATCH', body: JSON.stringify({ active: !p.active }) })
           .then(loadPopups)
-          .catch(function (err) { if (err.authError) doLogout(); else { alert(err.message); loadPopups(); } });
+          .catch(function (err) { if (err.authError) doLogout(); else { showAlert(err.message); loadPopups(); } });
       });
     });
     el.querySelectorAll('[data-popup-delete]').forEach(function (b) {
       b.addEventListener('click', function () {
         var p = popupsCache.find(function (x) { return x.id === b.getAttribute('data-id'); });
-        if (!confirm('Delete popup "' + p.title + '"? This cannot be undone.')) return;
-        b.disabled = true;
-        api('/admin/popups/' + p.id, { method: 'DELETE' })
-          .then(loadPopups)
-          .catch(function (err) { if (err.authError) doLogout(); else { alert(err.message); loadPopups(); } });
+        askConfirm('Delete popup "' + p.title + '"? This cannot be undone.').then(function (ok) {
+          if (!ok) return;
+          b.disabled = true;
+          api('/admin/popups/' + p.id, { method: 'DELETE' })
+            .then(loadPopups)
+            .catch(function (err) { if (err.authError) doLogout(); else { showAlert(err.message); loadPopups(); } });
+        });
       });
     });
   }
