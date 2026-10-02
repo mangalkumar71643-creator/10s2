@@ -134,13 +134,10 @@ export default function WithdrawScreen() {
             <Text style={styles.balanceValue}>₹{Math.floor(coins)}</Text>
           </LinearGradient>
 
-          <Pressable style={{ flex: 1 }} onPress={() => navigation.navigate('History')}>
-            <LinearGradient colors={gradients.peachCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balanceCard}>
-              <MaterialCommunityIcons name="chevron-right" size={22} color={CARD_TEXT_COLOR} style={styles.balanceCardArrow} />
-              <Text style={styles.balanceLabel}>Withdrawable</Text>
-              <Text style={styles.balanceValue}>₹{Math.floor(withdrawable)}</Text>
-            </LinearGradient>
-          </Pressable>
+          <LinearGradient colors={gradients.peachCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.balanceCard}>
+            <Text style={styles.balanceLabel}>Withdrawable</Text>
+            <Text style={styles.balanceValue}>₹{Math.floor(withdrawable)}</Text>
+          </LinearGradient>
         </View>
 
         {!kycApproved ? (
@@ -337,7 +334,6 @@ const styles = {
     overflow: 'hidden' as const,
   },
   balanceCardIcon: { position: 'absolute' as const, right: -6, bottom: -6, opacity: 0.3, transform: [{ rotate: '-8deg' }] },
-  balanceCardArrow: { position: 'absolute' as const, top: spacing.md, right: spacing.md, opacity: 0.6 },
   balanceLabel: { color: CARD_TEXT_COLOR, fontSize: typography.sm, fontWeight: '700' as const, marginBottom: spacing.sm },
   balanceValue: { color: CARD_TEXT_COLOR, fontSize: typography.xl, fontWeight: '800' as const },
   kycBanner: {
