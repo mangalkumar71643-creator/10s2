@@ -54,7 +54,9 @@ router.get('/:id/data', async (req, res) => {
   };
   if (account && order.status === 'pending') {
     const upiUri = buildUpiUri(account, order);
-    const staticQr = account.qr_mode === 'static' && account.qr_image;
+    // UPI apps block amount-filled QRs/links to personal UPI IDs, but always accept the owner's own QR.
+    // So personal accounts with an uploaded QR show that QR; the customer types the exact amount.
+    const staticQr = account.qr_image && (account.qr_mode === 'static' || !isMerchant(account));
     out.payee = {
       name: account.payee_name || account.holder_name || settings.business_name,
       upi_id: account.upi_id,

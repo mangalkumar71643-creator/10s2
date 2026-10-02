@@ -106,7 +106,7 @@
       <div class="notice small" style="text-align:left;width:100%">${icon.upi}<div><b>Paying on this phone?</b> Tap <b>Save QR</b>, open your UPI app → <b>Scan</b> → choose the QR from <b>gallery</b>.
         <span class="hi">Isi phone se pay karna hai? QR save karo, UPI app mein Scan → Gallery se QR chuno.</span></div></div>`;
     let zone;
-    if (isStatic) zone = qrBlock;
+    if (isStatic) zone = qrBlock + (isMobile ? scanHelp : '');
     else if (isMobile && p.merchant) zone = appBlock + '<div class="or">OR SCAN QR</div>' + qrBlock;
     else if (isMobile) zone = qrBlock + scanHelp + '<div class="or">OR TRY</div>' + appBlock;
     else zone = qrBlock + '<div class="or">ON MOBILE?</div>' + appBlock;
