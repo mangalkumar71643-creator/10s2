@@ -225,7 +225,7 @@
   .popup-item { display: flex; gap: 14px; align-items: flex-start; }
   .popup-thumb { width: 72px; border-radius: 8px; border: 1px solid var(--border); background: #000; flex: none; display: block; }
   .popup-pos { font-weight: 800; color: var(--green); margin-right: 6px; }
-  #popupPreview { max-width: 160px; border-radius: 8px; border: 1px solid var(--border); display: none; margin-bottom: 14px; }
+  .upload-preview { max-width: 160px; border-radius: 8px; border: 1px solid var(--border); display: none; margin-bottom: 14px; }
   .selection-row { display: flex; gap: 8px; margin-bottom: 6px; }
   .selection-row input { flex: 1; }
 
@@ -438,28 +438,39 @@
 
       <div class="panel" id="panel-popups">
         <h1 class="page-title">Popups</h1>
-        <div class="page-sub">App-open popups show one by one when the app opens (#1 first). Home slider images slide by themselves at the top of the Home screen.</div>
+        <div class="page-sub">Images players see when the app opens. #1 shows first; the next one appears when they close it.</div>
         <div class="card">
-          <div class="card-head"><h2>Add image</h2></div>
+          <div class="card-head"><h2>Add popup</h2></div>
           <div class="form-row">
-            <select id="popupKind">
-              <option value="POPUP">App-open popup</option>
-              <option value="SLIDER">Home slider</option>
-            </select>
             <input id="popupTitle" placeholder="Name (only you see this)" maxlength="80" />
             <input id="popupFile" type="file" accept="image/png,image/jpeg,image/webp" />
           </div>
-          <div class="item-meta" id="popupKindHint" style="margin-bottom:10px;"></div>
-          <img id="popupPreview" alt="" />
-          <button class="btn" id="popupAddBtn">Add</button>
+          <img id="popupPreview" class="upload-preview" alt="" />
+          <button class="btn" id="popupAddBtn">Add Popup</button>
           <div class="item-meta" id="popupAddStatus"></div>
         </div>
         <div class="card">
-          <div class="card-head"><h2>App-open popups</h2></div>
+          <div class="card-head"><h2>Order</h2></div>
           <div id="popupList"></div>
         </div>
+      </div>
+
+      <div class="panel" id="panel-slider">
+        <h1 class="page-title">Home Slider</h1>
+        <div class="page-sub">Images that slide by themselves every 4 seconds on the red stage at the top of the Home screen. #1 shows first. Add at least 2 to see them slide.</div>
         <div class="card">
-          <div class="card-head"><h2>Home slider</h2></div>
+          <div class="card-head"><h2>Add slide</h2></div>
+          <div class="form-row">
+            <input id="sliderTitle" placeholder="Name (only you see this)" maxlength="80" />
+            <input id="sliderFile" type="file" accept="image/png,image/jpeg,image/webp" />
+          </div>
+          <div class="item-meta" style="margin-bottom:10px;">Wide image, about 2:1 (for example 900 × 450). A PNG with a transparent background looks best — it stands on the red stage.</div>
+          <img id="sliderPreview" class="upload-preview" alt="" />
+          <button class="btn" id="sliderAddBtn">Add Slide</button>
+          <div class="item-meta" id="sliderAddStatus"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Order</h2></div>
           <div id="sliderList"></div>
         </div>
       </div>
@@ -530,6 +541,7 @@
     games: '<rect x="2" y="7" width="20" height="10" rx="5"/><path d="M7 10.5v3M5.5 12h3"/><circle cx="15.5" cy="11" r="0.9" fill="currentColor" stroke="none"/><circle cx="17.5" cy="13" r="0.9" fill="currentColor" stroke="none"/>',
     support: '<path d="M21 11.5a8.38 8.38 0 0 1-9 8.4A8.5 8.5 0 1 1 21 11.5z"/>',
     image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
+    slider: '<rect x="3" y="4" width="18" height="12" rx="2"/><circle cx="8" cy="20" r="1"/><circle cx="12" cy="20" r="1"/><circle cx="16" cy="20" r="1"/>',
     reports: '<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/>',
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
@@ -683,6 +695,7 @@
       ] },
     { id: 'support', label: 'Support', icon: 'support' },
     { id: 'popups', label: 'Popups', icon: 'image' },
+    { id: 'slider', label: 'Home Slider', icon: 'slider' },
     { id: 'reports', label: 'Reports', icon: 'reports' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
@@ -731,6 +744,7 @@
     'game-aviator': function () { loadAviatorPanel(); activeGamePollInterval = setInterval(loadAviatorPanel, 2000); },
     support: loadTickets,
     popups: loadPopups,
+    slider: loadPopups,
     reports: loadReports,
     settings: loadSettings,
   };
@@ -1381,7 +1395,6 @@
   // ---------- Settings ----------
   // ---------- Popups ----------
   var popupsCache = [];
-  var popupUpload = null; // { base64, mimeType, width, height } of the chosen file, already shrunk
 
   function loadPopups() {
     api('/admin/popups').then(function (rows) { popupsCache = rows; renderPopups(); })
@@ -1453,71 +1466,69 @@
     });
   }
 
-  var popupKindHints = {
-    POPUP: 'Any size. Shown in the middle of the screen with a close button.',
-    SLIDER: 'Wide image, about 2:1 (for example 900 × 450). A PNG with a transparent background looks best — it sits on the red stage.',
-  };
-  function updatePopupKindHint() {
-    document.getElementById('popupKindHint').textContent = popupKindHints[document.getElementById('popupKind').value];
+  // One add form per page: the Popups page adds app-open popups, the Home
+  // Slider page adds slides. Each shrinks the picked image to at most 900px
+  // wide and re-encodes it (WebP where the browser can, else JPEG) so uploads
+  // stay small and load fast in the app.
+  function setupImageForm(prefix, kind) {
+    var upload = null; // { base64, mimeType, width, height } of the chosen file, already shrunk
+    var titleEl = document.getElementById(prefix + 'Title');
+    var fileEl = document.getElementById(prefix + 'File');
+    var preview = document.getElementById(prefix + 'Preview');
+    var status = document.getElementById(prefix + 'AddStatus');
+
+    fileEl.addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      upload = null;
+      preview.style.display = 'none';
+      status.textContent = '';
+      if (!file) return;
+      if (!titleEl.value.trim()) titleEl.value = file.name.replace(/\.[^.]+$/, '').slice(0, 80);
+      var img = new Image();
+      img.onload = function () {
+        var w = Math.min(900, img.naturalWidth);
+        var h = Math.round(img.naturalHeight * (w / img.naturalWidth));
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        // WebP keeps a PNG's transparent background; JPEG would turn it black.
+        var dataUrl = canvas.toDataURL('image/webp', 0.86);
+        if (dataUrl.indexOf('data:image/webp') !== 0) dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        var mimeType = dataUrl.slice(5, dataUrl.indexOf(';'));
+        upload = { base64: dataUrl.slice(dataUrl.indexOf(',') + 1), mimeType: mimeType, width: w, height: h };
+        preview.src = dataUrl;
+        preview.style.display = 'block';
+        status.textContent = w + ' × ' + h + ', ' + Math.round(upload.base64.length * 0.75 / 1024) + ' KB';
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = function () { status.textContent = 'Could not read that image.'; };
+      img.src = URL.createObjectURL(file);
+    });
+
+    document.getElementById(prefix + 'AddBtn').addEventListener('click', function () {
+      var btn = this;
+      var title = titleEl.value.trim();
+      if (!upload) { status.textContent = 'Choose an image first.'; return; }
+      if (!title) { status.textContent = 'Give it a name.'; return; }
+      btn.disabled = true;
+      status.textContent = 'Uploading…';
+      api('/admin/popups', { method: 'POST', body: JSON.stringify({
+        title: title, imageBase64: upload.base64, mimeType: upload.mimeType, width: upload.width, height: upload.height, kind: kind,
+      }) })
+        .then(function () {
+          upload = null;
+          titleEl.value = '';
+          fileEl.value = '';
+          preview.style.display = 'none';
+          status.textContent = 'Added at the end of the order.';
+          loadPopups();
+        })
+        .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
+        .finally(function () { btn.disabled = false; });
+    });
   }
-  document.getElementById('popupKind').addEventListener('change', updatePopupKindHint);
-  updatePopupKindHint();
-
-  // Shrinks the picked image to at most 900px wide and re-encodes it (WebP where
-  // the browser can, else JPEG) so uploads stay small and load fast in the app.
-  document.getElementById('popupFile').addEventListener('change', function () {
-    var file = this.files && this.files[0];
-    var status = document.getElementById('popupAddStatus');
-    var preview = document.getElementById('popupPreview');
-    popupUpload = null;
-    preview.style.display = 'none';
-    status.textContent = '';
-    if (!file) return;
-    if (!document.getElementById('popupTitle').value.trim()) document.getElementById('popupTitle').value = file.name.replace(/\.[^.]+$/, '').slice(0, 80);
-    var img = new Image();
-    img.onload = function () {
-      var w = Math.min(900, img.naturalWidth);
-      var h = Math.round(img.naturalHeight * (w / img.naturalWidth));
-      var canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      // WebP keeps a PNG's transparent background; JPEG would turn it black.
-      var dataUrl = canvas.toDataURL('image/webp', 0.86);
-      if (dataUrl.indexOf('data:image/webp') !== 0) dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-      var mimeType = dataUrl.slice(5, dataUrl.indexOf(';'));
-      popupUpload = { base64: dataUrl.slice(dataUrl.indexOf(',') + 1), mimeType: mimeType, width: w, height: h };
-      preview.src = dataUrl;
-      preview.style.display = 'block';
-      status.textContent = w + ' × ' + h + ', ' + Math.round(popupUpload.base64.length * 0.75 / 1024) + ' KB';
-      URL.revokeObjectURL(img.src);
-    };
-    img.onerror = function () { status.textContent = 'Could not read that image.'; };
-    img.src = URL.createObjectURL(file);
-  });
-
-  document.getElementById('popupAddBtn').addEventListener('click', function () {
-    var btn = this;
-    var title = document.getElementById('popupTitle').value.trim();
-    var status = document.getElementById('popupAddStatus');
-    if (!popupUpload) { status.textContent = 'Choose an image first.'; return; }
-    if (!title) { status.textContent = 'Give it a name.'; return; }
-    btn.disabled = true;
-    status.textContent = 'Uploading…';
-    api('/admin/popups', { method: 'POST', body: JSON.stringify({
-      title: title, imageBase64: popupUpload.base64, mimeType: popupUpload.mimeType, width: popupUpload.width, height: popupUpload.height,
-      kind: document.getElementById('popupKind').value,
-    }) })
-      .then(function () {
-        popupUpload = null;
-        document.getElementById('popupTitle').value = '';
-        document.getElementById('popupFile').value = '';
-        document.getElementById('popupPreview').style.display = 'none';
-        status.textContent = 'Added at the end of the order.';
-        loadPopups();
-      })
-      .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
-      .finally(function () { btn.disabled = false; });
-  });
+  setupImageForm('popup', 'POPUP');
+  setupImageForm('slider', 'SLIDER');
 
   function loadSettings() {
     api('/auth/me').then(function (user) {
