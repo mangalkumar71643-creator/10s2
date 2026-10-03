@@ -3,6 +3,7 @@ import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import HomePopups from '../components/HomePopups';
+import HomeSlider from '../components/HomeSlider';
 import { GAME_CATEGORIES } from '../components/GameTile';
 import ScreenContainer from '../components/ScreenContainer';
 import { AVATARS } from '../data/avatars';
@@ -47,6 +48,10 @@ const GAME_GRID_GAP_BELOW_PANEL = 250;
 // each side, each at its own image's shape, with this gap between them.
 const BANNER_SIDE = 12;
 const BANNER_GAP = 10;
+
+// Home slider images stand on the red stage: their bottom edge rests this far
+// down the control-panel image (the middle of its red top surface).
+const SLIDER_FLOOR = 0.42;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
@@ -150,19 +155,30 @@ export default function HomeScreen() {
       {/* Everything under the top bar scrolls together: the control panel, then the banners. */}
       <ScrollView
         style={{ position: 'absolute', top: TOP_BAR_HEIGHT, left: 0, right: 0, bottom: 0 }}
-        contentContainerStyle={{ paddingHorizontal: BANNER_SIDE, paddingTop: panelTop - TOP_BAR_HEIGHT, paddingBottom: BANNER_GAP * 2, gap: BANNER_GAP }}
+        contentContainerStyle={{ paddingHorizontal: BANNER_SIDE, paddingBottom: BANNER_GAP * 2, gap: BANNER_GAP }}
         showsVerticalScrollIndicator={false}
       >
-        <Image
-          source={require('../../assets/control-panel.webp')}
+        {/* The empty space above the stage and the stage itself; the slider stands on the stage. */}
+        <View
           style={{
-            alignSelf: 'center',
-            width: panelWidth,
-            height: panelHeight,
+            width: screenWidth,
+            height: panelTop - TOP_BAR_HEIGHT + panelHeight,
+            marginHorizontal: -BANNER_SIDE,
             marginBottom: gameGridTop - panelTop - panelHeight - BANNER_GAP,
           }}
-          resizeMode="contain"
-        />
+        >
+          <Image
+            source={require('../../assets/control-panel.webp')}
+            style={{ position: 'absolute', left: (screenWidth - panelWidth) / 2, top: panelTop - TOP_BAR_HEIGHT, width: panelWidth, height: panelHeight }}
+            resizeMode="contain"
+          />
+          <HomeSlider
+            width={screenWidth}
+            height={panelTop - TOP_BAR_HEIGHT + panelHeight * SLIDER_FLOOR}
+            maxImageWidth={Math.min(screenWidth - BANNER_SIDE * 2, panelWidth)}
+            panel={{ left: (screenWidth - panelWidth) / 2, top: panelTop - TOP_BAR_HEIGHT, width: panelWidth, height: panelHeight }}
+          />
+        </View>
         {GAME_CATEGORIES.map((category) => (
           <Pressable
             key={category.id}

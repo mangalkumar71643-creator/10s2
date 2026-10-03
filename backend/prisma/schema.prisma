@@ -1452,6 +1452,8 @@ model Popup {
   height    Int
   sortOrder Int
   active    Boolean   @default(true)
+  // "POPUP" = shown once on app open; "SLIDER" = auto-sliding banner at the top of Home.
+  kind      String    @default("POPUP")
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

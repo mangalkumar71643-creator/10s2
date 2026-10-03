@@ -509,6 +509,7 @@ const createPopupSchema = z.object({
   mimeType: z.enum(popupService.POPUP_MIME_TYPES),
   width: z.number().int().min(50).max(4000),
   height: z.number().int().min(50).max(4000),
+  kind: z.enum(popupService.POPUP_KINDS).default("POPUP"),
 });
 router.post(
   "/popups",
@@ -525,11 +526,12 @@ router.patch(
   })
 );
 
-const reorderPopupsSchema = z.object({ ids: z.array(z.string().min(1)).max(200) });
+const reorderPopupsSchema = z.object({ ids: z.array(z.string().min(1)).max(200), kind: z.enum(popupService.POPUP_KINDS).default("POPUP") });
 router.post(
   "/popups/reorder",
   asyncHandler(async (req, res) => {
-    res.json(await popupService.reorderPopups(reorderPopupsSchema.parse(req.body).ids));
+    const { ids, kind } = reorderPopupsSchema.parse(req.body);
+    res.json(await popupService.reorderPopups(ids, kind));
   })
 );
 

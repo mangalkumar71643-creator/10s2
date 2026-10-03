@@ -438,20 +438,29 @@
 
       <div class="panel" id="panel-popups">
         <h1 class="page-title">Popups</h1>
-        <div class="page-sub">Images players see when the app opens. #1 shows first; the next one appears when they close it.</div>
+        <div class="page-sub">App-open popups show one by one when the app opens (#1 first). Home slider images slide by themselves at the top of the Home screen.</div>
         <div class="card">
-          <div class="card-head"><h2>Add popup</h2></div>
+          <div class="card-head"><h2>Add image</h2></div>
           <div class="form-row">
+            <select id="popupKind">
+              <option value="POPUP">App-open popup</option>
+              <option value="SLIDER">Home slider</option>
+            </select>
             <input id="popupTitle" placeholder="Name (only you see this)" maxlength="80" />
             <input id="popupFile" type="file" accept="image/png,image/jpeg,image/webp" />
           </div>
+          <div class="item-meta" id="popupKindHint" style="margin-bottom:10px;"></div>
           <img id="popupPreview" alt="" />
-          <button class="btn" id="popupAddBtn">Add Popup</button>
+          <button class="btn" id="popupAddBtn">Add</button>
           <div class="item-meta" id="popupAddStatus"></div>
         </div>
         <div class="card">
-          <div class="card-head"><h2>Order</h2></div>
+          <div class="card-head"><h2>App-open popups</h2></div>
           <div id="popupList"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Home slider</h2></div>
+          <div id="sliderList"></div>
         </div>
       </div>
 
@@ -1380,9 +1389,15 @@
   }
 
   function renderPopups() {
-    var el = document.getElementById('popupList');
-    if (!popupsCache.length) { el.innerHTML = '<div class="empty">No popups yet. Players see nothing when the app opens.</div>'; return; }
-    el.innerHTML = popupsCache.map(function (p, i) {
+    renderPopupKind('POPUP', 'popupList', 'No popups yet. Players see nothing when the app opens.');
+    renderPopupKind('SLIDER', 'sliderList', 'No slider images yet. The top of the Home screen stays empty.');
+  }
+
+  function renderPopupKind(kind, listId, emptyText) {
+    var el = document.getElementById(listId);
+    var rows = popupsCache.filter(function (p) { return (p.kind || 'POPUP') === kind; });
+    if (!rows.length) { el.innerHTML = '<div class="empty">' + emptyText + '</div>'; return; }
+    el.innerHTML = rows.map(function (p, i) {
       return (
         '<div class="item popup-item">' +
           '<img class="popup-thumb" src="' + API + p.imageUrl + '" alt="" />' +
@@ -1393,7 +1408,7 @@
             '</div>' +
             '<div class="item-actions">' +
               '<button class="btn secondary small" data-popup-move="-1" data-id="' + p.id + '"' + (i === 0 ? ' disabled' : '') + '>&uarr; Up</button>' +
-              '<button class="btn secondary small" data-popup-move="1" data-id="' + p.id + '"' + (i === popupsCache.length - 1 ? ' disabled' : '') + '>&darr; Down</button>' +
+              '<button class="btn secondary small" data-popup-move="1" data-id="' + p.id + '"' + (i === rows.length - 1 ? ' disabled' : '') + '>&darr; Down</button>' +
               '<button class="btn secondary small" data-popup-toggle data-id="' + p.id + '">' + (p.active ? 'Hide' : 'Show') + '</button>' +
               '<button class="btn danger small" data-popup-delete data-id="' + p.id + '">Delete</button>' +
             '</div>' +
@@ -1404,20 +1419,20 @@
 
     el.querySelectorAll('[data-popup-move]').forEach(function (b) {
       b.addEventListener('click', function () {
-        var ids = popupsCache.map(function (p) { return p.id; });
+        var ids = rows.map(function (p) { return p.id; });
         var from = ids.indexOf(b.getAttribute('data-id'));
         var to = from + Number(b.getAttribute('data-popup-move'));
         if (from < 0 || to < 0 || to >= ids.length) return;
         ids.splice(to, 0, ids.splice(from, 1)[0]);
         el.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
-        api('/admin/popups/reorder', { method: 'POST', body: JSON.stringify({ ids: ids }) })
-          .then(function (rows) { popupsCache = rows; renderPopups(); })
+        api('/admin/popups/reorder', { method: 'POST', body: JSON.stringify({ ids: ids, kind: kind }) })
+          .then(function (all) { popupsCache = all; renderPopups(); })
           .catch(function (err) { if (err.authError) doLogout(); else { showAlert(err.message); loadPopups(); } });
       });
     });
     el.querySelectorAll('[data-popup-toggle]').forEach(function (b) {
       b.addEventListener('click', function () {
-        var p = popupsCache.find(function (x) { return x.id === b.getAttribute('data-id'); });
+        var p = rows.find(function (x) { return x.id === b.getAttribute('data-id'); });
         b.disabled = true;
         api('/admin/popups/' + p.id, { method: 'PATCH', body: JSON.stringify({ active: !p.active }) })
           .then(loadPopups)
@@ -1426,8 +1441,8 @@
     });
     el.querySelectorAll('[data-popup-delete]').forEach(function (b) {
       b.addEventListener('click', function () {
-        var p = popupsCache.find(function (x) { return x.id === b.getAttribute('data-id'); });
-        askConfirm('Delete popup "' + p.title + '"? This cannot be undone.').then(function (ok) {
+        var p = rows.find(function (x) { return x.id === b.getAttribute('data-id'); });
+        askConfirm('Delete "' + p.title + '"? This cannot be undone.').then(function (ok) {
           if (!ok) return;
           b.disabled = true;
           api('/admin/popups/' + p.id, { method: 'DELETE' })
@@ -1437,6 +1452,16 @@
       });
     });
   }
+
+  var popupKindHints = {
+    POPUP: 'Any size. Shown in the middle of the screen with a close button.',
+    SLIDER: 'Wide image, about 2:1 (for example 900 × 450). A PNG with a transparent background looks best — it sits on the red stage.',
+  };
+  function updatePopupKindHint() {
+    document.getElementById('popupKindHint').textContent = popupKindHints[document.getElementById('popupKind').value];
+  }
+  document.getElementById('popupKind').addEventListener('change', updatePopupKindHint);
+  updatePopupKindHint();
 
   // Shrinks the picked image to at most 900px wide and re-encodes it (WebP where
   // the browser can, else JPEG) so uploads stay small and load fast in the app.
@@ -1456,6 +1481,7 @@
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // WebP keeps a PNG's transparent background; JPEG would turn it black.
       var dataUrl = canvas.toDataURL('image/webp', 0.86);
       if (dataUrl.indexOf('data:image/webp') !== 0) dataUrl = canvas.toDataURL('image/jpeg', 0.88);
       var mimeType = dataUrl.slice(5, dataUrl.indexOf(';'));
@@ -1479,6 +1505,7 @@
     status.textContent = 'Uploading…';
     api('/admin/popups', { method: 'POST', body: JSON.stringify({
       title: title, imageBase64: popupUpload.base64, mimeType: popupUpload.mimeType, width: popupUpload.width, height: popupUpload.height,
+      kind: document.getElementById('popupKind').value,
     }) })
       .then(function () {
         popupUpload = null;

@@ -5,8 +5,11 @@ export const POPUP_MIME_TYPES = ["image/webp", "image/jpeg", "image/png"] as con
 export type PopupMimeType = (typeof POPUP_MIME_TYPES)[number];
 /** Decoded image size cap; the panel shrinks uploads well under this. */
 export const MAX_POPUP_IMAGE_BYTES = 2 * 1024 * 1024;
+/** POPUP: shown on app open. SLIDER: auto-sliding banner at the top of Home. */
+export const POPUP_KINDS = ["POPUP", "SLIDER"] as const;
+export type PopupKind = (typeof POPUP_KINDS)[number];
 
-const listSelect = { id: true, title: true, mimeType: true, width: true, height: true, sortOrder: true, active: true, createdAt: true, updatedAt: true } as const;
+const listSelect = { id: true, title: true, mimeType: true, width: true, height: true, sortOrder: true, active: true, kind: true, createdAt: true, updatedAt: true } as const;
 
 type PopupRow = { id: string; updatedAt: Date };
 
@@ -23,8 +26,8 @@ function decodeImage(base64: string): Buffer {
 }
 
 /** What the app shows, in order. */
-export async function listLivePopups() {
-  const rows = await prisma.popup.findMany({ where: { deletedAt: null, active: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: listSelect });
+export async function listLivePopups(kind: PopupKind = "POPUP") {
+  const rows = await prisma.popup.findMany({ where: { deletedAt: null, active: true, kind }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: listSelect });
   return rows.map((r) => ({ id: r.id, title: r.title, width: r.width, height: r.height, imageUrl: imagePath(r) }));
 }
 
@@ -40,12 +43,12 @@ export async function listAllPopups() {
   return rows.map((r) => ({ ...r, imageUrl: imagePath(r) }));
 }
 
-/** New popups go to the end of the order. */
-export async function createPopup(input: { title: string; imageBase64: string; mimeType: PopupMimeType; width: number; height: number }) {
+/** New popups go to the end of their kind's order. */
+export async function createPopup(input: { title: string; imageBase64: string; mimeType: PopupMimeType; width: number; height: number; kind: PopupKind }) {
   const image = decodeImage(input.imageBase64);
-  const last = await prisma.popup.aggregate({ where: { deletedAt: null }, _max: { sortOrder: true } });
+  const last = await prisma.popup.aggregate({ where: { deletedAt: null, kind: input.kind }, _max: { sortOrder: true } });
   const row = await prisma.popup.create({
-    data: { title: input.title, image, mimeType: input.mimeType, width: input.width, height: input.height, sortOrder: (last._max.sortOrder ?? -1) + 1 },
+    data: { title: input.title, image, mimeType: input.mimeType, width: input.width, height: input.height, kind: input.kind, sortOrder: (last._max.sortOrder ?? -1) + 1 },
     select: listSelect,
   });
   return { ...row, imageUrl: imagePath(row) };
@@ -58,9 +61,9 @@ export async function updatePopup(id: string, input: { title?: string; active?: 
   return { ...row, imageUrl: imagePath(row) };
 }
 
-/** Sets the order to exactly the given ids, first shown first. */
-export async function reorderPopups(ids: string[]) {
-  const live = await prisma.popup.findMany({ where: { deletedAt: null }, select: { id: true } });
+/** Sets the order of one kind to exactly the given ids, first shown first. */
+export async function reorderPopups(ids: string[], kind: PopupKind) {
+  const live = await prisma.popup.findMany({ where: { deletedAt: null, kind }, select: { id: true } });
   const liveIds = new Set(live.map((r) => r.id));
   if (ids.length !== liveIds.size || new Set(ids).size !== ids.length || ids.some((id) => !liveIds.has(id))) {
     throw new ApiError(409, "The popup list changed — reload and try again.");
