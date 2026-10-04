@@ -503,6 +503,12 @@ router.get(
   })
 );
 
+// Empty text / target clears the button. The target is the app screen name
+// of a game (e.g. "Aviator"); the app ignores names it doesn't know.
+const popupButtonSchema = {
+  buttonText: z.string().trim().max(20).nullish().transform((v) => v || null),
+  buttonTarget: z.string().trim().regex(/^[A-Za-z0-9]{0,40}$/).nullish().transform((v) => v || null),
+};
 const createPopupSchema = z.object({
   title: z.string().trim().min(1).max(80),
   imageBase64: z.string().min(1),
@@ -510,6 +516,7 @@ const createPopupSchema = z.object({
   width: z.number().int().min(50).max(4000),
   height: z.number().int().min(50).max(4000),
   kind: z.enum(popupService.POPUP_KINDS).default("POPUP"),
+  ...popupButtonSchema,
 });
 router.post(
   "/popups",
@@ -518,7 +525,12 @@ router.post(
   })
 );
 
-const updatePopupSchema = z.object({ title: z.string().trim().min(1).max(80).optional(), active: z.boolean().optional() });
+const updatePopupSchema = z.object({
+  title: z.string().trim().min(1).max(80).optional(),
+  active: z.boolean().optional(),
+  buttonText: popupButtonSchema.buttonText.optional(),
+  buttonTarget: popupButtonSchema.buttonTarget.optional(),
+});
 router.patch(
   "/popups/:id",
   asyncHandler(async (req, res) => {

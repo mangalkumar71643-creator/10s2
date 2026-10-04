@@ -1,9 +1,26 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, AppState, Easing, Image, PanResponder, View } from 'react-native';
+import { Animated, AppState, Easing, Image, ImageBackground, PanResponder, Pressable, Text, View } from 'react-native';
 import { API_BASE_URL } from '../api/client';
+import { GAME_CATEGORIES } from './GameTile';
 
-type Slide = { id: string; title: string; width: number; height: number; imageUrl: string };
+type Slide = {
+  id: string;
+  title: string;
+  width: number;
+  height: number;
+  imageUrl: string;
+  /** Optional button under the picture; buttonTarget is the game screen it opens. */
+  buttonText?: string | null;
+  buttonTarget?: string | null;
+};
+
+// Only screens that are real games can be opened from a slide's button.
+const GAME_SCREENS = new Set<string>(GAME_CATEGORIES.flatMap((c) => c.games));
+
+const BUTTON_ASPECT = 420 / 147;
+const BUTTON_MAX_WIDTH = 150;
+const BUTTON_GAP = 4;
 
 const SLIDE_INTERVAL_MS = 4000;
 const SLIDE_ANIM_MS = 450;
@@ -34,6 +51,7 @@ type Props = {
  * row shows which one is up.
  */
 export default function HomeSlider({ width, height, maxImageWidth, panel }: Props) {
+  const navigation = useNavigation();
   const [slides, setSlides] = useState<Slide[]>([]);
 
   // Fetched each time Home is shown and each time the app comes back to the
@@ -143,7 +161,12 @@ export default function HomeSlider({ width, height, maxImageWidth, panel }: Prop
         <Animated.View style={{ flexDirection: 'row', width: width * pages.length, height, transform: [{ translateX: offset }] }}>
           {pages.map((s, i) => {
             const aspect = s.width / s.height;
-            const h = Math.min(height, maxImageWidth / aspect);
+            const buttonWidth = Math.min(BUTTON_MAX_WIDTH, width * 0.42);
+            const buttonHeight = buttonWidth / BUTTON_ASPECT;
+            // With a button the picture stands on the button, the button on the stage.
+            const imageRoom = s.buttonText ? height - buttonHeight - BUTTON_GAP : height;
+            const h = Math.min(imageRoom, maxImageWidth / aspect);
+            const target = s.buttonTarget && GAME_SCREENS.has(s.buttonTarget) ? s.buttonTarget : null;
             return (
               <View key={`${s.id}-${i}`} style={{ width, height, alignItems: 'center', justifyContent: 'flex-end' }}>
                 <Image
@@ -152,6 +175,38 @@ export default function HomeSlider({ width, height, maxImageWidth, panel }: Prop
                   resizeMode="contain"
                   accessibilityLabel={s.title}
                 />
+                {!!s.buttonText && (
+                  <Pressable
+                    onPress={target ? () => (navigation as any).navigate(target) : undefined}
+                    disabled={!target}
+                    style={({ pressed }) => ({ marginTop: BUTTON_GAP, transform: [{ scale: pressed ? 0.95 : 1 }] })}
+                    accessibilityRole="button"
+                    accessibilityLabel={s.buttonText}
+                  >
+                    <ImageBackground
+                      source={require('../../assets/slider-button.webp')}
+                      style={{ width: buttonWidth, height: buttonHeight, alignItems: 'center', justifyContent: 'center' }}
+                      resizeMode="contain"
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: '#FFFFFF',
+                          fontSize: buttonHeight * 0.4,
+                          fontWeight: '900',
+                          letterSpacing: 0.5,
+                          marginTop: -buttonHeight * 0.06,
+                          paddingHorizontal: buttonWidth * 0.1,
+                          textShadowColor: 'rgba(60,0,0,0.7)',
+                          textShadowOffset: { width: 0, height: 1.5 },
+                          textShadowRadius: 3,
+                        }}
+                      >
+                        {s.buttonText}
+                      </Text>
+                    </ImageBackground>
+                  </Pressable>
+                )}
               </View>
             );
           })}

@@ -9,7 +9,7 @@ export const MAX_POPUP_IMAGE_BYTES = 2 * 1024 * 1024;
 export const POPUP_KINDS = ["POPUP", "SLIDER"] as const;
 export type PopupKind = (typeof POPUP_KINDS)[number];
 
-const listSelect = { id: true, title: true, mimeType: true, width: true, height: true, sortOrder: true, active: true, kind: true, createdAt: true, updatedAt: true } as const;
+const listSelect = { id: true, title: true, mimeType: true, width: true, height: true, sortOrder: true, active: true, kind: true, buttonText: true, buttonTarget: true, createdAt: true, updatedAt: true } as const;
 
 type PopupRow = { id: string; updatedAt: Date };
 
@@ -28,7 +28,7 @@ function decodeImage(base64: string): Buffer {
 /** What the app shows, in order. */
 export async function listLivePopups(kind: PopupKind = "POPUP") {
   const rows = await prisma.popup.findMany({ where: { deletedAt: null, active: true, kind }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: listSelect });
-  return rows.map((r) => ({ id: r.id, title: r.title, width: r.width, height: r.height, imageUrl: imagePath(r) }));
+  return rows.map((r) => ({ id: r.id, title: r.title, width: r.width, height: r.height, imageUrl: imagePath(r), buttonText: r.buttonText, buttonTarget: r.buttonTarget }));
 }
 
 export async function getPopupImage(id: string) {
@@ -44,17 +44,29 @@ export async function listAllPopups() {
 }
 
 /** New popups go to the end of their kind's order. */
-export async function createPopup(input: { title: string; imageBase64: string; mimeType: PopupMimeType; width: number; height: number; kind: PopupKind }) {
+type PopupButton = { buttonText?: string | null; buttonTarget?: string | null };
+
+export async function createPopup(input: { title: string; imageBase64: string; mimeType: PopupMimeType; width: number; height: number; kind: PopupKind } & PopupButton) {
   const image = decodeImage(input.imageBase64);
   const last = await prisma.popup.aggregate({ where: { deletedAt: null, kind: input.kind }, _max: { sortOrder: true } });
   const row = await prisma.popup.create({
-    data: { title: input.title, image, mimeType: input.mimeType, width: input.width, height: input.height, kind: input.kind, sortOrder: (last._max.sortOrder ?? -1) + 1 },
+    data: {
+      title: input.title,
+      image,
+      mimeType: input.mimeType,
+      width: input.width,
+      height: input.height,
+      kind: input.kind,
+      buttonText: input.buttonText || null,
+      buttonTarget: input.buttonTarget || null,
+      sortOrder: (last._max.sortOrder ?? -1) + 1,
+    },
     select: listSelect,
   });
   return { ...row, imageUrl: imagePath(row) };
 }
 
-export async function updatePopup(id: string, input: { title?: string; active?: boolean }) {
+export async function updatePopup(id: string, input: { title?: string; active?: boolean } & PopupButton) {
   const found = await prisma.popup.findFirst({ where: { id, deletedAt: null }, select: { id: true } });
   if (!found) throw new ApiError(404, "Popup not found");
   const row = await prisma.popup.update({ where: { id }, data: input, select: listSelect });

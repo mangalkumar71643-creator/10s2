@@ -1454,6 +1454,9 @@ model Popup {
   active    Boolean   @default(true)
   // "POPUP" = shown once on app open; "SLIDER" = auto-sliding banner at the top of Home.
   kind      String    @default("POPUP")
+  // Home slider only: optional button under the picture, and the game it opens.
+  buttonText   String?
+  buttonTarget String?
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

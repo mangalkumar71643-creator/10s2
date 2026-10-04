@@ -470,6 +470,11 @@
           </label>
           <div class="item-meta" style="margin-bottom:10px;">The preview below shows it on the red stage colour. Wide pictures look biggest on the stage.</div>
           <img id="sliderPreview" class="upload-preview" alt="" style="background:#6b0d14;" />
+          <div class="item-meta" style="margin-bottom:6px;">Button (optional) — shown between the picture and the red stage. Leave the text empty for no button.</div>
+          <div class="form-row">
+            <input id="sliderButtonText" placeholder="Button text, e.g. Play" maxlength="20" />
+            <select id="sliderButtonTarget" data-game-select></select>
+          </div>
           <button class="btn" id="sliderAddBtn">Add Slide</button>
           <div class="item-meta" id="sliderAddStatus"></div>
         </div>
@@ -1410,6 +1415,27 @@
     renderPopupKind('SLIDER', 'sliderList', 'No slider images yet. The top of the Home screen stays empty.');
   }
 
+  // Games a slider button can open: app screen name → name shown here.
+  var SLIDER_BUTTON_GAMES = [
+    ['Aviator', 'Aviator'], ['CricketX', 'Cricket X'], ['Vortex', 'Vortex'], ['Rocket', 'Rocket'],
+    ['Slot', 'Slot'], ['Aces', 'Aces'], ['CandyBlast', 'Candy Blast'], ['Neon777', 'Neon 777'], ['MoneyComing', 'Money Coming'],
+    ['AndarBahar', 'Andar Bahar'], ['TeenPatti', 'Teen Patti'], ['DragonTiger', 'Dragon Tiger'], ['Baccarat', 'Baccarat'], ['Blackjack', 'Blackjack'],
+    ['Roulette', 'Roulette'], ['Hilo', 'Hi-Lo'], ['VideoPoker', 'Video Poker'], ['CasinoHoldem', "Casino Hold'em"], ['ThreeCardPoker', 'Three Card Poker'],
+    ['Dice', 'Dice'], ['Limbo', 'Limbo'], ['Plinko', 'Plinko'], ['SevenUpDown', '7 Up Down'], ['Diamonds', 'Diamonds'], ['Keno', 'Keno'],
+    ['WinGo', 'Win Go'], ['K3Lottery', 'K3 Lottery'], ['FiveDLottery', '5D Lottery'], ['TrxWin', 'Trx Win'], ['JhandiMunda', 'Jhandi Munda'],
+    ['Mines', 'Mines'], ['ChickenRoad', 'Chicken Road'], ['DragonTower', 'Dragon Tower'], ['Pump', 'Pump'], ['CoinFlip', 'Coin Flip'],
+  ];
+  function gameOptionsHtml(selected) {
+    return '<option value="">Opens: nothing</option>' + SLIDER_BUTTON_GAMES.map(function (g) {
+      return '<option value="' + g[0] + '"' + (g[0] === selected ? ' selected' : '') + '>Opens: ' + escapeHtml(g[1]) + '</option>';
+    }).join('');
+  }
+  function gameName(id) {
+    var g = SLIDER_BUTTON_GAMES.find(function (x) { return x[0] === id; });
+    return g ? g[1] : id;
+  }
+  document.querySelectorAll('[data-game-select]').forEach(function (sel) { sel.innerHTML = gameOptionsHtml(''); });
+
   function renderPopupKind(kind, listId, emptyText) {
     var el = document.getElementById(listId);
     var rows = popupsCache.filter(function (p) { return (p.kind || 'POPUP') === kind; });
@@ -1423,10 +1449,21 @@
               '<div class="item-title"><span class="popup-pos">#' + (i + 1) + '</span>' + escapeHtml(p.title) + '</div>' +
               '<span class="pill ' + (p.active ? 'active' : 'banned') + '">' + (p.active ? 'Showing' : 'Hidden') + '</span>' +
             '</div>' +
+            (kind === 'SLIDER'
+              ? '<div class="item-meta">' + (p.buttonText
+                  ? 'Button: "' + escapeHtml(p.buttonText) + '"' + (p.buttonTarget ? ' → opens ' + escapeHtml(gameName(p.buttonTarget)) : ' (opens nothing)')
+                  : 'No button') + '</div>' +
+                '<div class="form-row" data-button-editor="' + p.id + '" style="display:none;margin-top:8px;">' +
+                  '<input data-button-text maxlength="20" placeholder="Button text, e.g. Play" value="' + escapeHtml(p.buttonText || '') + '" />' +
+                  '<select data-button-target>' + gameOptionsHtml(p.buttonTarget || '') + '</select>' +
+                  '<button class="btn small" data-button-save data-id="' + p.id + '" style="flex:none;min-width:0;">Save</button>' +
+                '</div>'
+              : '') +
             '<div class="item-actions">' +
               '<button class="btn secondary small" data-popup-move="-1" data-id="' + p.id + '"' + (i === 0 ? ' disabled' : '') + '>&uarr; Up</button>' +
               '<button class="btn secondary small" data-popup-move="1" data-id="' + p.id + '"' + (i === rows.length - 1 ? ' disabled' : '') + '>&darr; Down</button>' +
               '<button class="btn secondary small" data-popup-toggle data-id="' + p.id + '">' + (p.active ? 'Hide' : 'Show') + '</button>' +
+              (kind === 'SLIDER' ? '<button class="btn secondary small" data-button-edit data-id="' + p.id + '">Button</button>' : '') +
               '<button class="btn danger small" data-popup-delete data-id="' + p.id + '">Delete</button>' +
             '</div>' +
           '</div>' +
@@ -1452,6 +1489,24 @@
         var p = rows.find(function (x) { return x.id === b.getAttribute('data-id'); });
         b.disabled = true;
         api('/admin/popups/' + p.id, { method: 'PATCH', body: JSON.stringify({ active: !p.active }) })
+          .then(loadPopups)
+          .catch(function (err) { if (err.authError) doLogout(); else { showAlert(err.message); loadPopups(); } });
+      });
+    });
+    el.querySelectorAll('[data-button-edit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var row = el.querySelector('[data-button-editor="' + b.getAttribute('data-id') + '"]');
+        row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+      });
+    });
+    el.querySelectorAll('[data-button-save]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var row = b.parentNode;
+        b.disabled = true;
+        api('/admin/popups/' + b.getAttribute('data-id'), { method: 'PATCH', body: JSON.stringify({
+          buttonText: row.querySelector('[data-button-text]').value.trim(),
+          buttonTarget: row.querySelector('[data-button-target]').value,
+        }) })
           .then(loadPopups)
           .catch(function (err) { if (err.authError) doLogout(); else { showAlert(err.message); loadPopups(); } });
       });
@@ -1565,6 +1620,8 @@
     var fileEl = document.getElementById(prefix + 'File');
     var preview = document.getElementById(prefix + 'Preview');
     var status = document.getElementById(prefix + 'AddStatus');
+    var buttonTextEl = document.getElementById(prefix + 'ButtonText');
+    var buttonTargetEl = document.getElementById(prefix + 'ButtonTarget');
 
     var cleanBox = document.getElementById(prefix + 'Clean');
     if (cleanBox) cleanBox.addEventListener('change', function () { fileEl.dispatchEvent(new Event('change')); });
@@ -1609,10 +1666,13 @@
       status.textContent = 'Uploading…';
       api('/admin/popups', { method: 'POST', body: JSON.stringify({
         title: title, imageBase64: upload.base64, mimeType: upload.mimeType, width: upload.width, height: upload.height, kind: kind,
+        buttonText: buttonTextEl ? buttonTextEl.value.trim() : '',
+        buttonTarget: buttonTargetEl ? buttonTargetEl.value : '',
       }) })
         .then(function () {
           upload = null;
           titleEl.value = '';
+          if (buttonTextEl) { buttonTextEl.value = ''; buttonTargetEl.value = ''; }
           fileEl.value = '';
           preview.style.display = 'none';
           status.textContent = 'Added at the end of the order.';
