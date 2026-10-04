@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { asyncHandler, ApiError } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
@@ -260,6 +261,68 @@ router.get(
       count: completed._count,
       pending: Number(pending._sum.amount ?? 0),
       items: items.map((t) => ({ ...t, amount: Number(t.amount) })),
+    });
+  })
+);
+
+// Every balance change, newest first, with the balance right after it.
+// Only completed deposits and credits moved the balance; a withdrawal took
+// the money when it was requested (a rejected one is paid back by its own
+// WITHDRAWAL_REVERSAL row). balanceAfter is worked back from the current
+// balance through the newer rows, so the filter never changes it. A game's
+// stake and payout are written in one database transaction and share a
+// timestamp, so within a timestamp money going out sorts before money in.
+const recordsSchema = z.object({
+  filter: z.enum(["all", "income", "expense"]).default("all"),
+  before: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+router.get(
+  "/records",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { filter, before, limit } = recordsSchema.parse(req.query);
+    const userId = req.user!.userId;
+    const wallet = await prisma.wallet.findUnique({ where: { userId }, select: { balance: true } });
+    const balance = wallet?.balance ?? new Prisma.Decimal(0);
+    const filterSql =
+      filter === "income" ? Prisma.sql`AND delta > 0` : filter === "expense" ? Prisma.sql`AND delta < 0` : Prisma.empty;
+    const cursorSql = before
+      ? Prisma.sql`AND ("createdAt", rnk, id) < (SELECT "createdAt", rnk, id FROM tx WHERE id = ${before})`
+      : Prisma.empty;
+    const rows = await prisma.$queryRaw<
+      { id: string; type: string; status: string; provider: string | null; amount: Prisma.Decimal; delta: Prisma.Decimal; createdAt: Date; balanceAfter: Prisma.Decimal }[]
+    >`
+      WITH tx AS (
+        SELECT id, type::text AS type, status::text AS status, provider, amount, "createdAt",
+          CASE
+            WHEN type IN ('DEPOSIT', 'BET_PAYOUT', 'GAME_PAYOUT', 'BONUS', 'BET_REFUND', 'DEPOSIT_BONUS', 'WITHDRAWAL_REVERSAL')
+              THEN CASE WHEN status = 'COMPLETED' THEN amount ELSE 0 END
+            ELSE -amount
+          END AS delta,
+          CASE WHEN type IN ('GAME_STAKE', 'BET_STAKE', 'WITHDRAWAL') THEN 0 ELSE 1 END AS rnk
+        FROM "Transaction" WHERE "userId" = ${userId}
+      ), ordered AS (
+        SELECT *, COALESCE(SUM(delta) OVER (ORDER BY "createdAt" DESC, rnk DESC, id DESC ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0) AS later
+        FROM tx
+      )
+      SELECT id, type, status, provider, amount, delta, "createdAt", ${balance}::numeric - later AS "balanceAfter"
+      FROM ordered
+      WHERE TRUE ${filterSql} ${cursorSql}
+      ORDER BY "createdAt" DESC, rnk DESC, id DESC
+      LIMIT ${limit}`;
+    res.json({
+      items: rows.map((r) => ({
+        id: r.id,
+        type: r.type,
+        status: r.status,
+        provider: r.provider,
+        amount: Number(r.amount),
+        change: Number(r.delta),
+        balanceAfter: Number(r.balanceAfter),
+        createdAt: r.createdAt,
+      })),
+      hasMore: rows.length === limit,
     });
   })
 );

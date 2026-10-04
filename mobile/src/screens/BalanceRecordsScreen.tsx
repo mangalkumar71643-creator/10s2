@@ -1,17 +1,88 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { BalanceRecord, BalanceRecordFilter, fetchBalanceRecords } from '../api/backend';
 import ScreenContainer from '../components/ScreenContainer';
 import { RootStackParamList } from '../navigation/types';
 import { colors, spacing, typography } from '../theme';
 
-type Tab = 'all' | 'income' | 'expense';
+function recordLabel(r: BalanceRecord): string {
+  switch (r.type) {
+    case 'GAME_STAKE':
+    case 'BET_STAKE':
+      return 'Bet';
+    case 'GAME_PAYOUT':
+    case 'BET_PAYOUT':
+      return 'Game win';
+    case 'BET_REFUND':
+      return 'Bet refund';
+    case 'DEPOSIT':
+      return r.status === 'COMPLETED' ? 'Deposit' : r.status === 'PENDING' ? 'Deposit (pending)' : 'Deposit (failed)';
+    case 'WITHDRAWAL':
+      return r.status === 'PENDING' ? 'Withdrawal (pending)' : r.status === 'FAILED' ? 'Withdrawal (rejected)' : 'Withdrawal';
+    case 'WITHDRAWAL_REVERSAL':
+      return 'Withdrawal refunded';
+    case 'DEPOSIT_BONUS':
+      return 'Deposit bonus';
+    case 'BONUS':
+      return r.provider === 'gift-code' ? 'Gift code' : r.provider === 'admin-credit' ? 'Balance added' : 'Bonus';
+    default:
+      return r.type;
+  }
+}
 
+function pad(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function formatMoney(n: number) {
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+/** Every change to the balance — each bet, win, bonus, deposit and withdrawal — with the balance after it. */
 export default function BalanceRecordsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<BalanceRecordFilter>('all');
+  const [records, setRecords] = useState<BalanceRecord[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  // Ignores replies from a tab the player has already left.
+  const requestId = useRef(0);
+
+  const load = useCallback(async (filter: BalanceRecordFilter, before?: string) => {
+    const id = ++requestId.current;
+    setLoading(true);
+    setFailed(false);
+    try {
+      const page = await fetchBalanceRecords(filter, before);
+      if (id !== requestId.current) return;
+      setRecords((prev) => (before ? [...prev, ...page.items] : page.items));
+      setHasMore(page.hasMore);
+    } catch {
+      if (id === requestId.current) setFailed(true);
+    } finally {
+      if (id === requestId.current) setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setRecords([]);
+      load(tab);
+    }, [tab, load])
+  );
+
+  const loadMore = () => {
+    if (!loading && hasMore && records.length) load(tab, records[records.length - 1].id);
+  };
 
   return (
     <ScreenContainer scroll={false}>
@@ -24,15 +95,13 @@ export default function BalanceRecordsScreen() {
       </View>
 
       <View style={styles.tabRow}>
-        <Pressable style={styles.tab} onPress={() => setTab('all')}>
-          <Text style={[styles.tabLabel, tab === 'all' && styles.tabLabelActive]}>All</Text>
-        </Pressable>
-        <Pressable style={styles.tab} onPress={() => setTab('income')}>
-          <Text style={[styles.tabLabel, tab === 'income' && styles.tabLabelActive]}>Income</Text>
-        </Pressable>
-        <Pressable style={styles.tab} onPress={() => setTab('expense')}>
-          <Text style={[styles.tabLabel, tab === 'expense' && styles.tabLabelActive]}>Expense</Text>
-        </Pressable>
+        {(['all', 'income', 'expense'] as const).map((t) => (
+          <Pressable key={t} style={styles.tab} onPress={() => setTab(t)}>
+            <Text style={[styles.tabLabel, tab === t && styles.tabLabelActive]}>
+              {t === 'all' ? 'All' : t === 'income' ? 'Income' : 'Expense'}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       <View style={styles.tableHeader}>
@@ -41,10 +110,46 @@ export default function BalanceRecordsScreen() {
         <Text style={[styles.tableHeaderCell, styles.tableHeaderMuted]}>Balance</Text>
       </View>
 
-      <View style={styles.body}>
-        <MaterialCommunityIcons name="text-box-multiple-outline" size={64} color={colors.crimsonLight} style={{ opacity: 0.35 }} />
-        <Text style={styles.emptyText}>No record</Text>
-      </View>
+      {records.length === 0 ? (
+        <View style={styles.body}>
+          {loading ? (
+            <ActivityIndicator color={colors.gold} />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="text-box-multiple-outline" size={64} color={colors.crimsonLight} style={{ opacity: 0.35 }} />
+              <Text style={styles.emptyText}>{failed ? 'Could not load. Please try again.' : 'No record'}</Text>
+            </>
+          )}
+        </View>
+      ) : (
+        <FlatList
+          data={records}
+          keyExtractor={(r) => r.id}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          contentContainerStyle={{ paddingBottom: 120 }}
+          ListFooterComponent={loading ? <ActivityIndicator color={colors.gold} style={{ marginVertical: spacing.lg }} /> : null}
+          renderItem={({ item }) => (
+            <View style={styles.row}>
+              <View style={styles.cellType}>
+                <Text style={styles.rowType} numberOfLines={1}>
+                  {recordLabel(item)}
+                </Text>
+                <Text style={styles.rowDate}>{formatDate(item.createdAt)}</Text>
+              </View>
+              <Text
+                style={[styles.cellChange, item.change > 0 ? styles.changeUp : item.change < 0 ? styles.changeDown : styles.changeNone]}
+                numberOfLines={1}
+              >
+                {item.change > 0 ? '+' : item.change < 0 ? '-' : ''}₹{formatMoney(Math.abs(item.change || item.amount))}
+              </Text>
+              <Text style={styles.cellBalance} numberOfLines={1}>
+                {formatMoney(item.balanceAfter)}
+              </Text>
+            </View>
+          )}
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -79,9 +184,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   tableHeaderCell: { flex: 1, fontSize: typography.md, fontWeight: '700' },
-  tableHeaderType: { color: colors.gold },
+  tableHeaderType: { color: colors.gold, flex: 1.3 },
   tableHeaderMuted: { color: colors.crimsonLight, textAlign: 'center' },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xxl },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  cellType: { flex: 1.3 },
+  rowType: { color: colors.textPrimary, fontSize: typography.md, fontWeight: '600' },
+  rowDate: { color: colors.textSecondary, fontSize: typography.xs, marginTop: 3 },
+  cellChange: { flex: 1, textAlign: 'center', fontSize: typography.md, fontWeight: '700' },
+  changeUp: { color: colors.positive },
+  changeDown: { color: colors.negative },
+  changeNone: { color: colors.textMuted },
+  cellBalance: { flex: 1, textAlign: 'center', color: colors.goldLight, fontSize: typography.md, fontWeight: '600' },
   emptyText: {
     color: colors.crimsonLight,
     opacity: 0.8,

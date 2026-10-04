@@ -261,6 +261,8 @@ model Transaction {
   betId               String?
   bet                 Bet?              @relation(fields: [betId], references: [id])
   createdAt           DateTime          @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // Retired: the sportsbook (Sport / Event / Market / Selection / Bet) had no

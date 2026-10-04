@@ -2460,3 +2460,25 @@ export type WalletHistory = {
 export function fetchWalletHistory(kind: WalletHistoryKind) {
   return apiFetch<WalletHistory>(`/wallet/history?kind=${kind}`);
 }
+
+// --- Balance records (every balance change) ---
+
+export type BalanceRecordFilter = 'all' | 'income' | 'expense';
+
+export type BalanceRecord = {
+  id: string;
+  type: BackendTransaction['type'];
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  provider: string | null;
+  amount: number;
+  /** Signed change to the balance (0 for a deposit that never completed). */
+  change: number;
+  /** Balance right after this record. */
+  balanceAfter: number;
+  createdAt: string;
+};
+
+export function fetchBalanceRecords(filter: BalanceRecordFilter, before?: string) {
+  const params = `filter=${filter}&limit=50${before ? `&before=${before}` : ''}`;
+  return apiFetch<{ items: BalanceRecord[]; hasMore: boolean }>(`/wallet/records?${params}`);
+}
