@@ -2442,3 +2442,21 @@ export type GiftCodeRedeemed = { amount: number; balance: number };
 export function redeemGiftCode(code: string) {
   return apiFetch<GiftCodeRedeemed>('/gift-codes/redeem', { method: 'POST', body: JSON.stringify({ code }) });
 }
+
+// --- Deposit / withdrawal history ---
+
+export type WalletHistoryKind = 'deposit' | 'withdraw';
+
+export type WalletHistory = {
+  kind: WalletHistoryKind;
+  /** All-time total of completed ones. */
+  total: number;
+  count: number;
+  /** Withdrawals still waiting for approval. */
+  pending: number;
+  items: { id: string; amount: number; status: 'PENDING' | 'COMPLETED' | 'FAILED'; createdAt: string }[];
+};
+
+export function fetchWalletHistory(kind: WalletHistoryKind) {
+  return apiFetch<WalletHistory>(`/wallet/history?kind=${kind}`);
+}

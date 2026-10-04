@@ -32,7 +32,7 @@ export default function WalletScreen() {
           <Pressable onPress={() => rootNavigation.navigate('Help')} style={styles.headerButton}>
             <MaterialCommunityIcons name="headset" size={24} color={colors.gold} />
           </Pressable>
-          <Pressable onPress={() => rootNavigation.navigate('History')} style={styles.headerButton}>
+          <Pressable onPress={() => rootNavigation.navigate('History')} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="History">
             <MaterialCommunityIcons name="clock-time-four-outline" size={24} color={colors.gold} />
           </Pressable>
         </View>

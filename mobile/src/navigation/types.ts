@@ -20,7 +20,8 @@ export type RootStackParamList = {
   Help: undefined;
   Notifications: undefined;
   BalanceRecords: undefined;
-  History: undefined;
+  /** Deposit or withdraw history; without a kind (from Wallet) the screen lets you switch. */
+  History: { kind?: 'deposit' | 'withdraw' } | undefined;
   Deposit: undefined;
   Withdraw: undefined;
   Aviator: undefined;

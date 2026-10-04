@@ -234,4 +234,34 @@ router.get(
   })
 );
 
+// Deposit or withdrawal history on its own (the general list above can be
+// crowded out by game rows), with all-time totals for the screen's header.
+const historySchema = z.object({ kind: z.enum(["deposit", "withdraw"]) });
+router.get(
+  "/history",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { kind } = historySchema.parse(req.query);
+    const userId = req.user!.userId;
+    const type = kind === "deposit" ? "DEPOSIT" : "WITHDRAWAL";
+    const [items, completed, pending] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { userId, type },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: { id: true, amount: true, status: true, createdAt: true },
+      }),
+      prisma.transaction.aggregate({ where: { userId, type, status: "COMPLETED" }, _sum: { amount: true }, _count: true }),
+      prisma.transaction.aggregate({ where: { userId, type, status: "PENDING" }, _sum: { amount: true } }),
+    ]);
+    res.json({
+      kind,
+      total: Number(completed._sum.amount ?? 0),
+      count: completed._count,
+      pending: Number(pending._sum.amount ?? 0),
+      items: items.map((t) => ({ ...t, amount: Number(t.amount) })),
+    });
+  })
+);
+
 export default router;

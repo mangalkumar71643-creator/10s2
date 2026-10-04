@@ -115,7 +115,7 @@ export default function WithdrawScreen() {
           <Pressable onPress={() => navigation.navigate('Help')} style={styles.headerButton}>
             <MaterialCommunityIcons name="headset" size={24} color={colors.gold} />
           </Pressable>
-          <Pressable onPress={() => navigation.navigate('History')} style={styles.headerButton}>
+          <Pressable onPress={() => navigation.navigate('History', { kind: 'withdraw' })} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="History">
             <MaterialCommunityIcons name="clock-time-four-outline" size={24} color={colors.gold} />
           </Pressable>
         </View>
