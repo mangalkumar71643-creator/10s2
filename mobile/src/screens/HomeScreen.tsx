@@ -52,6 +52,10 @@ const BANNER_GAP = 10;
 // Home slider images stand on the red stage: their bottom edge rests this far
 // down the control-panel image (the middle of its red top surface).
 const SLIDER_FLOOR = 0.42;
+// The stage graphic's visible bottom edge, as a share of the control-panel
+// image's height (361 of 483 px); slide buttons go in the gap below it.
+const PANEL_VISIBLE_BOTTOM = 361 / 483;
+const MIN_BUTTON_AREA = 44;
 
 // All content and navigation elements were intentionally stripped from this
 // screen — new custom buttons/UI go here next.
@@ -65,6 +69,12 @@ export default function HomeScreen() {
   const panelTop = screenHeight * (PANEL_TOP / REFERENCE_HEIGHT);
   const gameGridTop = panelTop + panelHeight + screenHeight * (GAME_GRID_GAP_BELOW_PANEL / REFERENCE_HEIGHT) - 50;
   const bannerWidth = screenWidth - BANNER_SIDE * 2;
+  // Stage + slider area, laid out from the top of the scroll content. Its
+  // bottom is where the category banners start; it grows a little on short
+  // screens so a slide's button always fits under the stage.
+  const stageTop = panelTop - TOP_BAR_HEIGHT;
+  const stageBottom = stageTop + panelHeight * PANEL_VISIBLE_BOTTOM;
+  const stageAreaHeight = Math.max(gameGridTop - TOP_BAR_HEIGHT - BANNER_GAP, stageBottom + MIN_BUTTON_AREA);
   const walletButtonWidth = WALLET_BUTTON_HEIGHT * WALLET_BUTTON_ASPECT;
   const walletButtonLeft = (screenWidth - walletButtonWidth) / 2 - 25;
 
@@ -162,21 +172,21 @@ export default function HomeScreen() {
         <View
           style={{
             width: screenWidth,
-            height: panelTop - TOP_BAR_HEIGHT + panelHeight,
+            height: stageAreaHeight,
             marginHorizontal: -BANNER_SIDE,
-            marginBottom: gameGridTop - panelTop - panelHeight - BANNER_GAP,
           }}
         >
           <Image
             source={require('../../assets/control-panel.webp')}
-            style={{ position: 'absolute', left: (screenWidth - panelWidth) / 2, top: panelTop - TOP_BAR_HEIGHT, width: panelWidth, height: panelHeight }}
+            style={{ position: 'absolute', left: (screenWidth - panelWidth) / 2, top: stageTop, width: panelWidth, height: panelHeight }}
             resizeMode="contain"
           />
           <HomeSlider
             width={screenWidth}
-            height={panelTop - TOP_BAR_HEIGHT + panelHeight * SLIDER_FLOOR}
+            height={stageTop + panelHeight * SLIDER_FLOOR}
             maxImageWidth={Math.min(screenWidth - BANNER_SIDE * 2, panelWidth)}
-            panel={{ left: (screenWidth - panelWidth) / 2, top: panelTop - TOP_BAR_HEIGHT, width: panelWidth, height: panelHeight }}
+            panel={{ left: (screenWidth - panelWidth) / 2, top: stageTop, width: panelWidth, height: panelHeight }}
+            buttonArea={{ top: stageBottom, height: stageAreaHeight - stageBottom }}
           />
         </View>
         {GAME_CATEGORIES.map((category) => (
