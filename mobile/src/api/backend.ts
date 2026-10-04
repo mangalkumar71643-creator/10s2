@@ -2482,3 +2482,35 @@ export function fetchBalanceRecords(filter: BalanceRecordFilter, before?: string
   const params = `filter=${filter}&limit=50${before ? `&before=${before}` : ''}`;
   return apiFetch<{ items: BalanceRecord[]; hasMore: boolean }>(`/wallet/records?${params}`);
 }
+
+// --- VIP and ranking (real data) ---
+
+export type VipStatus = {
+  /** Total staked in games; ₹1 = 1 XP. */
+  xp: number;
+  level: number;
+  levels: { level: number; xpRequired: number; weeklyBonus?: number; upgradeBonus?: number }[];
+  claimedUpgrades: number[];
+  /** Levels whose weekly bonus was already taken this week. */
+  weeklyClaimedLevels: number[];
+  history: { kind: 'upgrade' | 'weekly'; level: number; amount: number; createdAt: string }[];
+};
+
+export function fetchVipStatus() {
+  return apiFetch<VipStatus>('/players/vip');
+}
+
+export function claimVipBonus(kind: 'upgrade' | 'weekly', level: number) {
+  return apiFetch<{ amount: number; balance: number }>('/players/vip/claim', { method: 'POST', body: JSON.stringify({ kind, level }) });
+}
+
+export type Ranking = {
+  periodDays: number;
+  top: { rank: number; name: string; won: number; isMe: boolean }[];
+  me: { rank: number | null; won: number };
+  players: number;
+};
+
+export function fetchRanking() {
+  return apiFetch<Ranking>('/players/ranking');
+}

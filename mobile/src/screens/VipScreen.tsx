@@ -1,8 +1,8 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -11,30 +11,23 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
 } from 'react-native';
+import { claimVipBonus, fetchVipStatus, VipStatus } from '../api/backend';
+import { ApiClientError } from '../api/client';
 import LoadingState from '../components/LoadingState';
 import ScreenContainer from '../components/ScreenContainer';
 import { AVATARS } from '../data/avatars';
 import { IconName, VipLevelDef } from '../data/models';
 import { BottomTabParamList } from '../navigation/types';
-import { fetchVipLevels } from '../services/vipService';
+import { vipLevels as VIP_LOOKS } from '../data/mockData';
 import { useAuth } from '../state/AuthContext';
 import { useGameState } from '../state/GameStateContext';
 import { colors, gradients, radius, spacing, typography } from '../theme';
-
-function comingSoon(label: string) {
-  if (Platform.OS === 'web') {
-    window.alert(`${label} — coming soon.`);
-    return;
-  }
-  Alert.alert(label, 'Coming soon.');
-}
 
 const ITEM_WIDTH = 210;
 const DIAMOND_SIZE = 104;
@@ -42,8 +35,8 @@ const DESCRIPTION_IMAGE_ASPECT = 784 / 1168;
 
 function buildPrivileges(level: VipLevelDef): { icon: IconName; label: string; value: string }[] {
   const items: { icon: IconName; label: string; value: string }[] = [];
-  if (level.weeklyBonus) items.push({ icon: 'calendar-week', label: 'Weekly Bonus', value: `${level.weeklyBonus} Coins` });
-  if (level.upgradeBonus) items.push({ icon: 'trending-up', label: 'Upgrade Bonus', value: `${level.upgradeBonus} Coins` });
+  if (level.weeklyBonus) items.push({ icon: 'calendar-week', label: 'Weekly Bonus', value: `₹${level.weeklyBonus.toLocaleString('en-IN')}` });
+  if (level.upgradeBonus) items.push({ icon: 'trending-up', label: 'Upgrade Bonus', value: `₹${level.upgradeBonus.toLocaleString('en-IN')}` });
   return items;
 }
 
@@ -54,6 +47,7 @@ function BenefitRow({
   level,
   reached,
   claimed,
+  lockedText,
   onClaim,
 }: {
   icon: IconName;
@@ -62,9 +56,11 @@ function BenefitRow({
   level: number;
   reached: boolean;
   claimed: boolean;
+  /** Shown instead of "Reach VIP n" when the bonus can't be taken for another reason. */
+  lockedText?: string;
   onClaim: () => void;
 }) {
-  const statusText = !reached ? `Reach VIP ${level}` : claimed ? 'Claimed' : 'Tap to claim';
+  const statusText = !reached ? lockedText ?? `Reach VIP ${level}` : claimed ? 'Claimed' : 'Tap to claim';
   return (
     <Pressable style={styles.benefitRow} onPress={reached && !claimed ? onClaim : undefined}>
       <View style={styles.benefitIconWrap}>
@@ -72,7 +68,7 @@ function BenefitRow({
       </View>
       <View style={styles.benefitMiddle}>
         <Text style={styles.benefitTitle}>{title}</Text>
-        <Text style={styles.benefitAmount}>{amount.toLocaleString('en-US')} Coins</Text>
+        <Text style={styles.benefitAmount}>₹{amount.toLocaleString('en-IN')}</Text>
       </View>
       <Text style={[styles.benefitStatus, reached && !claimed && styles.benefitStatusActive]}>{statusText}</Text>
     </Pressable>
@@ -134,9 +130,9 @@ export default function VipScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<BottomTabParamList>>();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const { avatarId, backendUser } = useAuth();
-  const { user, vipBonusHistory, isVipBonusClaimed, claimVipBonus } = useGameState();
-  const [levels, setLevels] = useState<VipLevelDef[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { refreshWallet } = useGameState();
+  const [vip, setVip] = useState<VipStatus | null>(null);
+  const [claiming, setClaiming] = useState(false);
   const [focusedLevel, setFocusedLevel] = useState(1);
   const [descriptionVisible, setDescriptionVisible] = useState(false);
   const [bonusHistoryVisible, setBonusHistoryVisible] = useState(false);
@@ -144,18 +140,35 @@ export default function VipScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const focusedLevelRef = useRef(1);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchVipLevels().then((data) => {
-      if (!cancelled) {
-        setLevels(data);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+  // Level, XP and claims come from the server: XP is what the player has
+  // staked in games, and bonuses are paid into the real balance.
+  const loadVip = useCallback(() => {
+    fetchVipStatus()
+      .then(setVip)
+      .catch(() => {});
   }, []);
+  useFocusEffect(loadVip);
+
+  // Server numbers, dressed in each level's icon and colours.
+  const levels: VipLevelDef[] = (vip?.levels ?? []).map((l) => {
+    const look = VIP_LOOKS.find((v) => v.level === l.level) ?? VIP_LOOKS[VIP_LOOKS.length - 1];
+    return { ...look, ...l };
+  });
+
+  const claim = async (kind: 'upgrade' | 'weekly', level: number) => {
+    if (claiming) return;
+    setClaiming(true);
+    try {
+      const { amount } = await claimVipBonus(kind, level);
+      Alert.alert('Bonus added', `₹${amount.toLocaleString('en-IN')} has been added to your balance. It has to be played once before it can be withdrawn.`);
+      refreshWallet().catch(() => {});
+    } catch (err) {
+      Alert.alert('Could not claim', err instanceof ApiClientError ? err.message : 'Please try again.');
+    } finally {
+      setClaiming(false);
+      loadVip();
+    }
+  };
 
   useEffect(() => {
     const scrollLevels = levels.filter((l) => l.level >= 1);
@@ -169,9 +182,9 @@ export default function VipScreen() {
       }
     });
     return () => scrollX.removeListener(id);
-  }, [levels, scrollX]);
+  }, [vip, scrollX]);
 
-  if (loading || !user) {
+  if (!vip || levels.length === 0) {
     return (
       <ScreenContainer scroll={false}>
         <LoadingState />
@@ -184,7 +197,7 @@ export default function VipScreen() {
   const current = levels.find((l) => l.level === focusedLevel) ?? scrollLevels[0];
   const prev = levels.find((l) => l.level === focusedLevel - 1) ?? levels[0];
   const progressTarget = Math.max(1, current.xpRequired - prev.xpRequired);
-  const progressValue = Math.max(0, Math.min(progressTarget, user.xp - prev.xpRequired));
+  const progressValue = Math.max(0, Math.min(progressTarget, vip.xp - prev.xpRequired));
   const progress = progressValue / progressTarget;
   const privileges = buildPrivileges(current);
   const hasBenefits = Boolean(current.weeklyBonus || current.upgradeBonus);
@@ -201,6 +214,12 @@ export default function VipScreen() {
 
   const bonusCardWidth = Math.min(400, screenWidth - spacing.lg * 4);
   const bonusTopHeight = bonusCardWidth * (114 / 640);
+  const vipBonusHistory = vip.history.map((h) => ({
+    id: `${h.kind}-${h.level}-${h.createdAt}`,
+    title: `VIP ${h.level} ${h.kind === 'upgrade' ? 'Upgrade' : 'Weekly'} Bonus`,
+    amount: h.amount,
+    timestampISO: h.createdAt,
+  }));
   const totalVipRewards = vipBonusHistory.reduce((sum, b) => sum + b.amount, 0);
   const now = new Date();
   const filteredBonusHistory =
@@ -224,7 +243,7 @@ export default function VipScreen() {
           </Text>
           <LinearGradient colors={gradients.goldButton} style={styles.vipBadge}>
             <MaterialCommunityIcons name="crown" size={12} color={colors.background} />
-            <Text style={styles.vipBadgeText}>VIP {user.vipLevel}</Text>
+            <Text style={styles.vipBadgeText}>VIP {vip.level}</Text>
           </LinearGradient>
         </View>
         <View style={styles.backButton} />
@@ -272,6 +291,7 @@ export default function VipScreen() {
         <Text style={styles.progressCount}>
           {progressValue.toLocaleString('en-US')}/{progressTarget.toLocaleString('en-US')}
         </Text>
+        <Text style={styles.progressHint}>Your XP: {vip.xp.toLocaleString('en-IN')} · every ₹1 you bet = 1 XP</Text>
       </View>
 
       <View style={styles.sectionHeaderRow}>
@@ -314,9 +334,9 @@ export default function VipScreen() {
                 title="Upgrade Bonus"
                 amount={current.upgradeBonus}
                 level={current.level}
-                reached={user.vipLevel >= current.level}
-                claimed={isVipBonusClaimed(current.level, 'upgrade')}
-                onClaim={() => claimVipBonus(current.level, 'upgrade', 'Upgrade Bonus', current.upgradeBonus!)}
+                reached={vip.level >= current.level}
+                claimed={vip.claimedUpgrades.includes(current.level)}
+                onClaim={() => claim('upgrade', current.level)}
               />
             ) : null}
             {current.weeklyBonus ? (
@@ -325,16 +345,17 @@ export default function VipScreen() {
                 title="Weekly Bonus"
                 amount={current.weeklyBonus}
                 level={current.level}
-                reached={user.vipLevel >= current.level}
-                claimed={isVipBonusClaimed(current.level, 'weekly')}
-                onClaim={() => claimVipBonus(current.level, 'weekly', 'Weekly Bonus', current.weeklyBonus!)}
+                reached={vip.level === current.level}
+                claimed={vip.weeklyClaimedLevels.includes(current.level)}
+                lockedText={vip.level > current.level ? 'Your level is higher' : undefined}
+                onClaim={() => claim('weekly', current.level)}
               />
             ) : null}
           </View>
         </>
       ) : null}
 
-      <Pressable style={styles.levelUpButtonWrap} onPress={() => comingSoon('Level up')}>
+      <Pressable style={styles.levelUpButtonWrap} onPress={() => navigation.navigate('Home')}>
         <LinearGradient colors={gradients.crimsonButton} style={styles.levelUpButton}>
           <Text style={styles.levelUpLabel}>Level up now</Text>
         </LinearGradient>
@@ -380,7 +401,7 @@ export default function VipScreen() {
                 </Text>
                 <View style={styles.bonusVipBadge}>
                   <MaterialCommunityIcons name="crown" size={11} color={colors.gold} />
-                  <Text style={styles.bonusVipBadgeText}>VIP {user.vipLevel}</Text>
+                  <Text style={styles.bonusVipBadgeText}>VIP {vip.level}</Text>
                 </View>
               </View>
               <View style={styles.bonusHeaderRight}>
@@ -399,7 +420,7 @@ export default function VipScreen() {
             />
             <LinearGradient colors={gradients.goldButton} style={styles.bonusRewardsBox}>
               <Text style={styles.bonusRewardsLabel}>Total Rewards</Text>
-              <Text style={styles.bonusRewardsValue}>{totalVipRewards}</Text>
+              <Text style={styles.bonusRewardsValue}>₹{totalVipRewards.toLocaleString('en-IN')}</Text>
             </LinearGradient>
 
             <View style={styles.bonusTabRow}>
@@ -432,7 +453,7 @@ export default function VipScreen() {
                           {new Date(record.timestampISO).toLocaleDateString()}
                         </Text>
                       </View>
-                      <Text style={styles.bonusHistoryAmount}>+{record.amount.toLocaleString('en-US')} Coins</Text>
+                      <Text style={styles.bonusHistoryAmount}>+₹{record.amount.toLocaleString('en-IN')}</Text>
                     </View>
                   ))}
                 </View>
@@ -446,6 +467,7 @@ export default function VipScreen() {
 }
 
 const styles = StyleSheet.create({
+  progressHint: { color: colors.textMuted, fontSize: typography.xs, textAlign: 'center', marginTop: spacing.xs },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

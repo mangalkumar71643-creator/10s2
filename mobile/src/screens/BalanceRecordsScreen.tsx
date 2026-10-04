@@ -27,7 +27,11 @@ function recordLabel(r: BalanceRecord): string {
     case 'DEPOSIT_BONUS':
       return 'Deposit bonus';
     case 'BONUS':
-      return r.provider === 'gift-code' ? 'Gift code' : r.provider === 'admin-credit' ? 'Balance added' : 'Bonus';
+      if (r.provider === 'gift-code') return 'Gift code';
+      if (r.provider === 'admin-credit') return 'Balance added';
+      if (r.provider === 'vip-upgrade') return 'VIP upgrade bonus';
+      if (r.provider === 'vip-weekly') return 'VIP weekly bonus';
+      return 'Bonus';
     default:
       return r.type;
   }

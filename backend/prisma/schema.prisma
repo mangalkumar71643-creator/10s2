@@ -209,6 +209,7 @@ model User {
   Neon777Spin        Neon777Spin[]
   MoneyComingSpin    MoneyComingSpin[]
   GiftCodeRedemption GiftCodeRedemption[]
+  VipBonusClaim      VipBonusClaim[]
 }
 
 model KycVerification {
@@ -1553,4 +1554,17 @@ model GiftCodeRedemption {
 
   @@unique([giftCodeId, userId])
   @@index([userId])
+}
+
+// One row per VIP bonus a player has taken: "upgrade-<level>" once ever,
+// "weekly-<level>-<week>" once per week. The unique key stops double claims.
+model VipBonusClaim {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  claimKey  String
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, claimKey])
 }
