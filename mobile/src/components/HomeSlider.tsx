@@ -1,5 +1,6 @@
+import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, PanResponder, View } from 'react-native';
+import { Animated, AppState, Easing, Image, PanResponder, View } from 'react-native';
 import { API_BASE_URL } from '../api/client';
 
 type Slide = { id: string; title: string; width: number; height: number; imageUrl: string };
@@ -35,22 +36,32 @@ type Props = {
 export default function HomeSlider({ width, height, maxImageWidth, panel }: Props) {
   const [slides, setSlides] = useState<Slide[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/popups?kind=SLIDER`);
-        if (!res.ok) return;
-        const rows: Slide[] = await res.json();
-        if (!cancelled) setSlides(rows);
-      } catch {
-        // No slider if the server can't be reached.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  // Fetched each time Home is shown and each time the app comes back to the
+  // front, so slides added in the admin panel appear without a full restart.
+  const loadSlides = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/popups?kind=SLIDER`);
+      if (!res.ok) return;
+      const rows: Slide[] = await res.json();
+      // Same list (image URLs carry a version) → keep the slider where it is.
+      setSlides((prev) => (JSON.stringify(prev) === JSON.stringify(rows) ? prev : rows));
+    } catch {
+      // Keep whatever was showing if the server can't be reached.
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSlides();
+    }, [loadSlides])
+  );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadSlides();
+    });
+    return () => sub.remove();
+  }, [loadSlides]);
 
   const n = slides.length;
   // Pages are [last, ...slides, first] so sliding past either end wraps
