@@ -464,8 +464,12 @@
             <input id="sliderTitle" placeholder="Name (only you see this)" maxlength="80" />
             <input id="sliderFile" type="file" accept="image/png,image/jpeg,image/webp" />
           </div>
-          <div class="item-meta" style="margin-bottom:10px;">Wide image, about 2:1 (for example 900 × 450). A PNG with a transparent background looks best — it stands on the red stage.</div>
-          <img id="sliderPreview" class="upload-preview" alt="" />
+          <label class="item-meta" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;cursor:pointer;">
+            <input type="checkbox" id="sliderClean" checked style="width:auto;" />
+            Remove background and empty edges (white, grey-checkered or one-colour backgrounds)
+          </label>
+          <div class="item-meta" style="margin-bottom:10px;">The preview below shows it on the red stage colour. Wide pictures look biggest on the stage.</div>
+          <img id="sliderPreview" class="upload-preview" alt="" style="background:#6b0d14;" />
           <button class="btn" id="sliderAddBtn">Add Slide</button>
           <div class="item-meta" id="sliderAddStatus"></div>
         </div>
@@ -1466,6 +1470,91 @@
     });
   }
 
+  // Slider pictures should stand on the red stage with nothing around them.
+  // Many "transparent PNGs" from the internet have the grey-white checkers
+  // painted in, or a plain white/one-colour background. This clears any such
+  // background that touches the picture's edges (so white inside the picture
+  // stays), softens the cut edge, then crops away the empty margins.
+  function cleanSlideImage(img) {
+    var scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    var w = Math.max(1, Math.round(img.naturalWidth * scale)), h = Math.max(1, Math.round(img.naturalHeight * scale));
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    var data = ctx.getImageData(0, 0, w, h), px = data.data;
+
+    // One-colour background: most edge pixels close to their average colour.
+    var sum = [0, 0, 0], edge = [], i, x, y;
+    for (x = 0; x < w; x++) { edge.push(x, (h - 1) * w + x); }
+    for (y = 0; y < h; y++) { edge.push(y * w, y * w + w - 1); }
+    edge.forEach(function (p) { sum[0] += px[p * 4]; sum[1] += px[p * 4 + 1]; sum[2] += px[p * 4 + 2]; });
+    var mean = sum.map(function (v) { return v / edge.length; });
+    function dist(p, c) { var dr = px[p * 4] - c[0], dg = px[p * 4 + 1] - c[1], db = px[p * 4 + 2] - c[2]; return Math.sqrt(dr * dr + dg * dg + db * db); }
+    var plain = edge.filter(function (p) { return dist(p, mean) < 48; }).length >= edge.length * 0.7 ? mean : null;
+
+    function isBackground(p) {
+      var r = px[p * 4], g = px[p * 4 + 1], b = px[p * 4 + 2], a = px[p * 4 + 3];
+      if (a < 20) return true;
+      var hi = Math.max(r, g, b), lo = Math.min(r, g, b);
+      if (lo >= 185 && hi - lo <= 22) return true; // white / light-grey checkers
+      return plain !== null && dist(p, plain) < 48;
+    }
+
+    var bg = new Uint8Array(w * h), stack = [];
+    edge.forEach(function (p) { if (!bg[p] && isBackground(p)) { bg[p] = 1; stack.push(p); } });
+    while (stack.length) {
+      var p = stack.pop(), px0 = p % w;
+      var next = [px0 > 0 ? p - 1 : -1, px0 < w - 1 ? p + 1 : -1, p - w, p + w];
+      for (i = 0; i < 4; i++) {
+        var q = next[i];
+        if (q >= 0 && q < w * h && !bg[q] && isBackground(q)) { bg[q] = 1; stack.push(q); }
+      }
+    }
+
+    for (y = 0; y < h; y++) {
+      for (x = 0; x < w; x++) {
+        var k = y * w + x;
+        if (bg[k]) { px[k * 4 + 3] = 0; continue; }
+        // Half-fade the picture's outermost pixels so the cut isn't jagged.
+        if ((x > 0 && bg[k - 1]) || (x < w - 1 && bg[k + 1]) || (y > 0 && bg[k - w]) || (y < h - 1 && bg[k + w])) px[k * 4 + 3] = Math.round(px[k * 4 + 3] * 0.55);
+      }
+    }
+
+    // Crop to what's left, ignoring tiny specks far out (a watermark in a
+    // corner, stray dots) so they don't keep the empty margins.
+    var seen = new Uint8Array(w * h), parts = [], total = 0;
+    for (var start = 0; start < w * h; start++) {
+      if (seen[start] || px[start * 4 + 3] <= 16) continue;
+      var part = { area: 0, minX: w, minY: h, maxX: 0, maxY: 0 };
+      seen[start] = 1; stack.push(start);
+      while (stack.length) {
+        var c = stack.pop(), cx = c % w, cy = (c - cx) / w;
+        part.area++;
+        if (cx < part.minX) part.minX = cx; if (cx > part.maxX) part.maxX = cx;
+        if (cy < part.minY) part.minY = cy; if (cy > part.maxY) part.maxY = cy;
+        var around = [cx > 0 ? c - 1 : -1, cx < w - 1 ? c + 1 : -1, c - w, c + w];
+        for (i = 0; i < 4; i++) {
+          var d = around[i];
+          if (d >= 0 && d < w * h && !seen[d] && px[d * 4 + 3] > 16) { seen[d] = 1; stack.push(d); }
+        }
+      }
+      parts.push(part); total += part.area;
+    }
+    var minX = w, minY = h, maxX = -1, maxY = -1;
+    parts.forEach(function (pt) {
+      if (pt.area < total * 0.003) return;
+      minX = Math.min(minX, pt.minX); minY = Math.min(minY, pt.minY);
+      maxX = Math.max(maxX, pt.maxX); maxY = Math.max(maxY, pt.maxY);
+    });
+    if (maxX < 0) return img; // nothing left — keep the original rather than upload a blank
+    ctx.putImageData(data, 0, 0);
+    var out = document.createElement('canvas');
+    out.width = maxX - minX + 1; out.height = maxY - minY + 1;
+    out.getContext('2d').drawImage(canvas, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+    return out;
+  }
+
   // One add form per page: the Popups page adds app-open popups, the Home
   // Slider page adds slides. Each shrinks the picked image to at most 900px
   // wide and re-encodes it (WebP where the browser can, else JPEG) so uploads
@@ -1477,6 +1566,9 @@
     var preview = document.getElementById(prefix + 'Preview');
     var status = document.getElementById(prefix + 'AddStatus');
 
+    var cleanBox = document.getElementById(prefix + 'Clean');
+    if (cleanBox) cleanBox.addEventListener('change', function () { fileEl.dispatchEvent(new Event('change')); });
+
     fileEl.addEventListener('change', function () {
       var file = this.files && this.files[0];
       upload = null;
@@ -1486,11 +1578,14 @@
       if (!titleEl.value.trim()) titleEl.value = file.name.replace(/\.[^.]+$/, '').slice(0, 80);
       var img = new Image();
       img.onload = function () {
-        var w = Math.min(900, img.naturalWidth);
-        var h = Math.round(img.naturalHeight * (w / img.naturalWidth));
+        var cleanBox = document.getElementById(prefix + 'Clean');
+        var src = cleanBox && cleanBox.checked ? cleanSlideImage(img) : img;
+        var srcW = src.naturalWidth || src.width, srcH = src.naturalHeight || src.height;
+        var w = Math.min(900, srcW);
+        var h = Math.round(srcH * (w / srcW));
         var canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.getContext('2d').drawImage(src, 0, 0, w, h);
         // WebP keeps a PNG's transparent background; JPEG would turn it black.
         var dataUrl = canvas.toDataURL('image/webp', 0.86);
         if (dataUrl.indexOf('data:image/webp') !== 0) dataUrl = canvas.toDataURL('image/jpeg', 0.88);
