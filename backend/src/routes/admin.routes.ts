@@ -11,7 +11,7 @@ import { getChickenRoadConfig } from "../services/chickenRoadService";
 import { getMinesConfig } from "../services/minesService";
 import * as popupService from "../services/popupService";
 import * as giftCodeService from "../services/giftCodeService";
-import { getGameSettings, MAX_MAX_PAYOUT, MIN_MAX_PAYOUT, setMaxPayout } from "../services/settingsService";
+import { getAppDownloadUrl, getGameSettings, MAX_MAX_PAYOUT, MIN_MAX_PAYOUT, setAppDownloadUrl, setMaxPayout } from "../services/settingsService";
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -236,6 +236,25 @@ router.post(
       return updated;
     });
     res.json({ user, credited: rounded, balance: wallet.balance });
+  })
+);
+
+// --- App download link (Home slider "Download app" buttons) ---
+
+router.get(
+  "/app-download",
+  asyncHandler(async (_req, res) => {
+    res.json({ url: await getAppDownloadUrl() });
+  })
+);
+
+const appDownloadSchema = z.object({
+  url: z.union([z.literal(""), z.string().trim().url().max(500).refine((u) => /^https?:\/\//i.test(u), "Link must start with http:// or https://")]),
+});
+router.put(
+  "/app-download",
+  asyncHandler(async (req, res) => {
+    res.json(await setAppDownloadUrl(appDownloadSchema.parse(req.body).url));
   })
 );
 

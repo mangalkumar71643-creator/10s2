@@ -1,5 +1,6 @@
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
+import { getAppDownloadUrl } from "./settingsService";
 
 export const POPUP_MIME_TYPES = ["image/webp", "image/jpeg", "image/png"] as const;
 export type PopupMimeType = (typeof POPUP_MIME_TYPES)[number];
@@ -8,6 +9,8 @@ export const MAX_POPUP_IMAGE_BYTES = 2 * 1024 * 1024;
 /** POPUP: shown on app open. SLIDER: auto-sliding banner at the top of Home. */
 export const POPUP_KINDS = ["POPUP", "SLIDER"] as const;
 export type PopupKind = (typeof POPUP_KINDS)[number];
+/** A slider button target that downloads the app instead of opening a game. */
+export const DOWNLOAD_TARGET = "DOWNLOAD";
 
 const listSelect = { id: true, title: true, mimeType: true, width: true, height: true, sortOrder: true, active: true, kind: true, buttonText: true, buttonTarget: true, createdAt: true, updatedAt: true } as const;
 
@@ -25,10 +28,20 @@ function decodeImage(base64: string): Buffer {
   return image;
 }
 
-/** What the app shows, in order. */
+/** What the app shows, in order. "Download app" buttons carry the download link. */
 export async function listLivePopups(kind: PopupKind = "POPUP") {
   const rows = await prisma.popup.findMany({ where: { deletedAt: null, active: true, kind }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: listSelect });
-  return rows.map((r) => ({ id: r.id, title: r.title, width: r.width, height: r.height, imageUrl: imagePath(r), buttonText: r.buttonText, buttonTarget: r.buttonTarget }));
+  const downloadUrl = rows.some((r) => r.buttonTarget === DOWNLOAD_TARGET) ? await getAppDownloadUrl() : null;
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    width: r.width,
+    height: r.height,
+    imageUrl: imagePath(r),
+    buttonText: r.buttonText,
+    buttonTarget: r.buttonTarget,
+    buttonUrl: r.buttonTarget === DOWNLOAD_TARGET ? downloadUrl : null,
+  }));
 }
 
 export async function getPopupImage(id: string) {

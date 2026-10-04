@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, AppState, Easing, Image, ImageBackground, PanResponder, Pressable, Text, View } from 'react-native';
+import { Animated, AppState, Easing, Image, ImageBackground, Linking, PanResponder, Platform, Pressable, Text, View } from 'react-native';
 import { API_BASE_URL } from '../api/client';
 import { GAME_CATEGORIES } from './GameTile';
 
@@ -10,10 +10,17 @@ type Slide = {
   width: number;
   height: number;
   imageUrl: string;
-  /** Optional button under the picture; buttonTarget is the game screen it opens. */
+  /** Optional button under the picture; buttonTarget is the game screen it opens, or DOWNLOAD_TARGET. */
   buttonText?: string | null;
   buttonTarget?: string | null;
+  /** For a "Download app" button: the link it opens. */
+  buttonUrl?: string | null;
 };
+
+// "Download app" slides are for people playing on the website; anyone in the
+// installed app already has it, so those slides are left out there.
+const DOWNLOAD_TARGET = 'DOWNLOAD';
+const SHOW_DOWNLOAD_SLIDES = Platform.OS === 'web';
 
 // Only screens that are real games can be opened from a slide's button.
 const GAME_SCREENS = new Set<string>(GAME_CATEGORIES.flatMap((c) => c.games));
@@ -61,7 +68,7 @@ export default function HomeSlider({ width, height, maxImageWidth, panel, button
     try {
       const res = await fetch(`${API_BASE_URL}/popups?kind=SLIDER`);
       if (!res.ok) return;
-      const rows: Slide[] = await res.json();
+      const rows: Slide[] = (await res.json()).filter((r: Slide) => SHOW_DOWNLOAD_SLIDES || r.buttonTarget !== DOWNLOAD_TARGET);
       // Same list (image URLs carry a version) → keep the slider where it is.
       setSlides((prev) => (JSON.stringify(prev) === JSON.stringify(rows) ? prev : rows));
     } catch {
@@ -159,6 +166,12 @@ export default function HomeSlider({ width, height, maxImageWidth, panel, button
   // The showing slide's button, under the stage (it changes with the slide).
   const current = slides[(pos - 1 + n) % n] ?? slides[0];
   const buttonTarget = current.buttonTarget && GAME_SCREENS.has(current.buttonTarget) ? current.buttonTarget : null;
+  const downloadUrl = current.buttonTarget === DOWNLOAD_TARGET ? current.buttonUrl : null;
+  const onButtonPress = buttonTarget
+    ? () => (navigation as any).navigate(buttonTarget)
+    : downloadUrl
+      ? () => Linking.openURL(downloadUrl).catch(() => {})
+      : undefined;
   const buttonHeight = Math.min(BUTTON_MAX_HEIGHT, buttonArea.height - 4);
   const buttonWidth = buttonHeight * BUTTON_ASPECT;
 
@@ -213,8 +226,8 @@ export default function HomeSlider({ width, height, maxImageWidth, panel, button
       {!!current.buttonText && (
         <Pressable
           key={current.id}
-          onPress={buttonTarget ? () => (navigation as any).navigate(buttonTarget) : undefined}
-          disabled={!buttonTarget}
+          onPress={onButtonPress}
+          disabled={!onButtonPress}
           style={({ pressed }) => ({
             position: 'absolute',
             left: (width - buttonWidth) / 2,

@@ -479,6 +479,15 @@
           <div class="item-meta" id="sliderAddStatus"></div>
         </div>
         <div class="card">
+          <div class="card-head"><h2>App download link</h2></div>
+          <div class="item-meta" style="margin-bottom:10px;">Slides whose button is set to "Download app" show only to people playing on the website, and their button opens this link. Players who already have the app installed never see those slides.</div>
+          <div class="form-row">
+            <input id="appDownloadUrl" placeholder="https://… (link to the app / APK)" maxlength="500" />
+            <button class="btn" id="appDownloadSave" style="flex:0 0 auto;min-width:0;">Save</button>
+          </div>
+          <div class="item-meta" id="appDownloadStatus"></div>
+        </div>
+        <div class="card">
           <div class="card-head"><h2>Order</h2></div>
           <div id="sliderList"></div>
         </div>
@@ -774,7 +783,7 @@
     'game-aviator': function () { loadAviatorPanel(); activeGamePollInterval = setInterval(loadAviatorPanel, 2000); },
     support: loadTickets,
     popups: loadPopups,
-    slider: loadPopups,
+    slider: function () { loadPopups(); loadAppDownloadUrl(); },
     giftcodes: loadGiftCodes,
     reports: loadReports,
     settings: loadSettings,
@@ -1448,11 +1457,14 @@
     ['Mines', 'Mines'], ['ChickenRoad', 'Chicken Road'], ['DragonTower', 'Dragon Tower'], ['Pump', 'Pump'], ['CoinFlip', 'Coin Flip'],
   ];
   function gameOptionsHtml(selected) {
-    return '<option value="">Opens: nothing</option>' + SLIDER_BUTTON_GAMES.map(function (g) {
+    return '<option value="">Opens: nothing</option>' +
+      '<option value="DOWNLOAD"' + (selected === 'DOWNLOAD' ? ' selected' : '') + '>Download app (website only)</option>' +
+      SLIDER_BUTTON_GAMES.map(function (g) {
       return '<option value="' + g[0] + '"' + (g[0] === selected ? ' selected' : '') + '>Opens: ' + escapeHtml(g[1]) + '</option>';
     }).join('');
   }
   function gameName(id) {
+    if (id === 'DOWNLOAD') return 'the app download (website only)';
     var g = SLIDER_BUTTON_GAMES.find(function (x) { return x[0] === id; });
     return g ? g[1] : id;
   }
@@ -1706,6 +1718,23 @@
   }
   setupImageForm('popup', 'POPUP');
   setupImageForm('slider', 'SLIDER');
+
+  // ---------- App download link (Home slider) ----------
+  function loadAppDownloadUrl() {
+    api('/admin/app-download').then(function (r) { document.getElementById('appDownloadUrl').value = r.url || ''; })
+      .catch(function (err) { if (err.authError) doLogout(); });
+  }
+  document.getElementById('appDownloadSave').addEventListener('click', function () {
+    var btn = this;
+    var status = document.getElementById('appDownloadStatus');
+    var url = document.getElementById('appDownloadUrl').value.trim();
+    if (url && !/^https?:\/\/\S+$/i.test(url)) { status.textContent = 'The link must start with http:// or https://'; return; }
+    btn.disabled = true;
+    api('/admin/app-download', { method: 'PUT', body: JSON.stringify({ url: url }) })
+      .then(function (r) { status.textContent = r.url ? 'Saved. Download buttons open this link.' : 'Cleared. Download buttons do nothing until a link is set.'; })
+      .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
+      .finally(function () { btn.disabled = false; });
+  });
 
   // ---------- Gift codes ----------
   function loadGiftCodes() {

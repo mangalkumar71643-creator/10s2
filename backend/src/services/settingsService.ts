@@ -36,3 +36,18 @@ export async function setMaxPayout(value: number) {
   await load();
   return getGameSettings();
 }
+
+// Where the Home slider's "Download app" buttons send people playing on the website.
+const APP_DOWNLOAD_URL_KEY = "appDownloadUrl";
+
+export async function getAppDownloadUrl(): Promise<string | null> {
+  const row = await prisma.setting.findUnique({ where: { key: APP_DOWNLOAD_URL_KEY } });
+  return row?.value || null;
+}
+
+/** An empty value clears it. */
+export async function setAppDownloadUrl(url: string) {
+  if (!url) await prisma.setting.deleteMany({ where: { key: APP_DOWNLOAD_URL_KEY } });
+  else await prisma.setting.upsert({ where: { key: APP_DOWNLOAD_URL_KEY }, update: { value: url }, create: { key: APP_DOWNLOAD_URL_KEY, value: url } });
+  return { url: url || null };
+}
