@@ -10,6 +10,7 @@ import * as aviatorService from "../services/aviatorService";
 import { getChickenRoadConfig } from "../services/chickenRoadService";
 import { getMinesConfig } from "../services/minesService";
 import * as popupService from "../services/popupService";
+import * as giftCodeService from "../services/giftCodeService";
 import { getGameSettings, MAX_MAX_PAYOUT, MIN_MAX_PAYOUT, setMaxPayout } from "../services/settingsService";
 
 const router = Router();
@@ -235,6 +236,49 @@ router.post(
       return updated;
     });
     res.json({ user, credited: rounded, balance: wallet.balance });
+  })
+);
+
+// --- Gift codes (redeemed from the app's gift box) ---
+
+router.get(
+  "/gift-codes",
+  asyncHandler(async (_req, res) => {
+    res.json(await giftCodeService.listGiftCodes());
+  })
+);
+
+const createGiftCodeSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9]{0,20}$/, "Code can only have letters and numbers (up to 20).")
+    .optional()
+    .transform((v) => v || undefined)
+    .refine((v) => v === undefined || v.length >= 4, "Code must be at least 4 characters."),
+  amount: z.number().positive().max(100000),
+  maxUses: z.number().int().min(1).max(100000),
+});
+router.post(
+  "/gift-codes",
+  asyncHandler(async (req, res) => {
+    res.status(201).json(await giftCodeService.createGiftCode(createGiftCodeSchema.parse(req.body)));
+  })
+);
+
+router.patch(
+  "/gift-codes/:id",
+  asyncHandler(async (req, res) => {
+    const { active } = z.object({ active: z.boolean() }).parse(req.body);
+    res.json(await giftCodeService.setGiftCodeActive(req.params.id, active));
+  })
+);
+
+router.delete(
+  "/gift-codes/:id",
+  asyncHandler(async (req, res) => {
+    await giftCodeService.deleteGiftCode(req.params.id);
+    res.status(204).end();
   })
 );
 

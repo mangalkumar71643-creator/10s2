@@ -134,7 +134,9 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => navigation.navigate('Rewards')}
+          onPress={() => (navigation as any).navigate('GiftCode')}
+          accessibilityRole="button"
+          accessibilityLabel="Gift code"
           style={{
             position: 'absolute',
             left: walletButtonLeft + walletButtonWidth + TOP_BAR_ICON_GAP,

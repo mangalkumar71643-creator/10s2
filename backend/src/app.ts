@@ -43,6 +43,7 @@ import threeCardPokerRoutes from "./routes/threeCardPoker.routes";
 import candyBlastRoutes from "./routes/candyBlast.routes";
 import neon777Routes from "./routes/neon777.routes";
 import popupsRoutes from "./routes/popups.routes";
+import giftCodesRoutes from "./routes/giftCodes.routes";
 import rocketRoutes from "./routes/rocket.routes";
 import moneyComingRoutes from "./routes/moneyComing.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
@@ -102,6 +103,7 @@ app.use("/three-card-poker", threeCardPokerRoutes);
 app.use("/candy-blast", candyBlastRoutes);
 app.use("/neon-777", neon777Routes);
 app.use("/popups", popupsRoutes);
+app.use("/gift-codes", giftCodesRoutes);
 app.use("/rocket", rocketRoutes);
 app.use("/money-coming", moneyComingRoutes);
 

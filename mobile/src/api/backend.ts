@@ -2434,3 +2434,11 @@ export function spinMoneyComing(stake: number) {
 export function fetchMoneyComingHistory(limit = 30) {
   return apiFetch<MoneyComingSpinRow[]>(`/money-coming/my-history?limit=${limit}`);
 }
+
+// --- Gift codes (the Home gift box) ---
+
+export type GiftCodeRedeemed = { amount: number; balance: number };
+
+export function redeemGiftCode(code: string) {
+  return apiFetch<GiftCodeRedeemed>('/gift-codes/redeem', { method: 'POST', body: JSON.stringify({ code }) });
+}

@@ -69,8 +69,8 @@ async function main() {
 
 /**
  * Keeps Wallet."unplayedDeposit" in step with the money flowing in and out,
- * inside the same database transaction as each write: deposits and admin
- * credits add to it when they complete, stakes use it up first. Recreated on
+ * inside the same database transaction as each write: deposits, admin
+ * credits and gift codes add to it when they complete, stakes use it up first. Recreated on
  * every deploy, so changes here take effect with the next build.
  */
 async function ensureUnplayedDepositTrigger() {
@@ -78,7 +78,7 @@ async function ensureUnplayedDepositTrigger() {
     CREATE OR REPLACE FUNCTION novaplay_track_unplayed_deposit() RETURNS trigger AS $$
     BEGIN
       IF NEW.status = 'COMPLETED'
-         AND (NEW.type = 'DEPOSIT' OR (NEW.type = 'BONUS' AND NEW.provider = 'admin-credit'))
+         AND (NEW.type = 'DEPOSIT' OR (NEW.type = 'BONUS' AND NEW.provider IN ('admin-credit', 'gift-code')))
          AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'COMPLETED') THEN
         UPDATE "Wallet" SET "unplayedDeposit" = "unplayedDeposit" + NEW.amount WHERE "userId" = NEW."userId";
       ELSIF TG_OP = 'INSERT' AND NEW.type IN ('GAME_STAKE', 'BET_STAKE') THEN
