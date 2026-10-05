@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#5b4cf0">
+  <title>ApnaPay UK Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    body { min-height: 100dvh; background: radial-gradient(1200px 520px at 50% -200px, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%), var(--bg); }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 40px 16px 56px; }
+    .hero { text-align: center; margin-bottom: 34px; }
+    .hero h1 { font-size: clamp(30px, 6vw, 46px); letter-spacing: -.03em; line-height: 1.08; margin: 14px 0 10px; }
+    .hero p { color: var(--muted); max-width: 560px; margin: 0 auto; font-size: 16px; }
+    .mark { width: 54px; height: 54px; border-radius: 16px; display: inline-grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-2)); box-shadow: 0 12px 26px -10px var(--brand); }
+    .mark svg { width: 28px; height: 28px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+    .tile { display: flex; flex-direction: column; gap: 8px; padding: 22px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); color: inherit; text-decoration: none !important; transition: transform .15s; }
+    .tile:hover { transform: translateY(-2px); }
+    .tile .e { font-size: 30px; }
+    .tile b { font-size: 17px; }
+    .tile span { color: var(--muted); font-size: 14px; }
+    .flow { margin-top: 30px; padding: 22px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border); }
+    .flow ol { margin: 10px 0 0; padding-left: 20px; color: var(--muted); display: grid; gap: 6px; font-size: 14.5px; }
+    .flow b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="demo-ribbon">DEMO · no real money · all payments are simulated</div>
+  <main class="wrap">
+    <div class="hero">
+      <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span>
+      <h1>ApnaPay UK — demo payment desk</h1>
+      <p>Customers pay by UK bank transfer with a unique reference. Payments are matched automatically, your website gets a signed webhook, and you control everything from one admin panel.</p>
+    </div>
+    <div class="tiles">
+      <a class="tile" href="/admin"><span class="e">🛠️</span><b>Admin panel</b><span>Bank accounts with LIVE/OFF switches, orders, payment links, bank notifications, API keys.</span></a>
+      <a class="tile" href="/shop"><span class="e">🛍️</span><b>Demo shop</b><span>A product website using the API. Buy something, simulate the transfer, watch it turn SOLD.</span></a>
+      <a class="tile" href="/admin#/sites"><span class="e">🔌</span><b>API & webhooks</b><span>REST API with Bearer keys and HMAC-signed webhooks — the same flow your own website would use.</span></a>
+    </div>
+    <div class="flow">
+      <b>How a payment flows</b>
+      <ol>
+        <li>Your website calls <b>POST /api/v1/orders</b> and sends the customer to the <b>payment page</b>.</li>
+        <li>The customer sends a bank transfer to your sort code + account number with reference like <b>AP7KQ2XM</b>.</li>
+        <li>The "money in" notification is matched by reference → order <b>Paid</b>.</li>
+        <li>Your website gets <b>order.paid</b> (signed) and marks the product <b>SOLD</b>.</li>
+      </ol>
+      <p class="small muted" style="margin:12px 0 0">This demo has no bank connection: step 3 is simulated with a button.</p>
+    </div>
+  </main>
+</body>
+</html>

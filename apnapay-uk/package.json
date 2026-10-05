@@ -1,0 +1,22 @@
+{
+  "name": "apnapay-uk-demo",
+  "version": "1.0.0",
+  "description": "DEMO ONLY (no real money): UK bank-transfer payment desk with admin panel, merchant API and signed webhooks",
+  "main": "src/server.js",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/server.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@vercel/functions": "^3.9.9",
+    "express": "^5.2.1",
+    "pg": "^8.23.1",
+    "qrcode": "^1.5.4"
+  }
+}
