@@ -24,7 +24,7 @@ function statusPayload(order) {
     status: order.status,
     seconds_left: Math.max(0, Math.round((order.expires_at - Date.now()) / 1000)),
     paid_at: order.paid_at ? new Date(order.paid_at).toISOString() : null,
-    payment_id: order.status === 'paid' ? order.utr : null,
+    payment_id: order.status === 'paid' ? order.payment_id : null,
     return_url: returnUrlFor(order),
   };
 }

@@ -340,7 +340,7 @@ router.get('/orders', h(async (req) => {
   }
   const q = str(req.query.q, 60);
   if (q) {
-    where.push('(id ILIKE ? OR reference ILIKE ? OR pay_ref ILIKE ? OR customer_name ILIKE ? OR customer_email ILIKE ? OR utr ILIKE ? OR CAST(amount AS TEXT) LIKE ?)');
+    where.push('(id ILIKE ? OR reference ILIKE ? OR pay_ref ILIKE ? OR customer_name ILIKE ? OR customer_email ILIKE ? OR payment_id ILIKE ? OR CAST(amount AS TEXT) LIKE ?)');
     const like = `%${q}%`;
     const amt = toPence(q);
     params.push(like, like, like.replace(/[\s-]/g, ''), like, like, like, amt ? String(amt) : like);
@@ -378,9 +378,9 @@ router.post('/orders', h(async (req) => {
 }));
 
 router.post('/orders/:id/mark-paid', h(async (req) => {
-  const utr = str(req.body.payment_id, 40) || null;
-  if (utr && !/^[A-Za-z0-9-]{4,40}$/.test(utr)) throw bad('Bank payment ID: letters and numbers only');
-  const o = await orders.manualPay(req.params.id, { utr, transactionId: req.body.transaction_id ? Number(req.body.transaction_id) : null });
+  const payment_id = str(req.body.payment_id, 40) || null;
+  if (payment_id && !/^[A-Za-z0-9-]{4,40}$/.test(payment_id)) throw bad('Bank payment ID: letters and numbers only');
+  const o = await orders.manualPay(req.params.id, { payment_id, transactionId: req.body.transaction_id ? Number(req.body.transaction_id) : null });
   return orderRow(o);
 }));
 

@@ -6,8 +6,8 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
-  const inr = (v) => '£' + Number(v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const inrShort = (v) => '£' + Number(v || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 });
+  const money = (v) => '£' + Number(v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const moneyShort = (v) => '£' + Number(v || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 });
   const when = (t) => {
     if (!t) return '—';
     const d = new Date(t);
@@ -39,7 +39,7 @@
     info: I('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.5"/>'),
     check: I('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
     qr: I('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 17h3v3"/>'),
-    rupee: I('<path d="M17 6.5A4 4 0 0 0 10 9v11M7 13h7M6 20h12"/>'),
+    pound: I('<path d="M17 6.5A4 4 0 0 0 10 9v11M7 13h7M6 20h12"/>'),
     shop: I('<path d="M4 8h16l-1.5 12h-13z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>'),
     clock: I('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     shield: I('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>'),
@@ -344,7 +344,7 @@
             <a class="btn btn-primary" href="#/accounts">${icon.plus} Add bank account</a></div>` : ''}
         ${d.accounts.length && !live.length ? `<div class="notice bad">${icon.alert}<div><b>No bank account is LIVE.</b> Customers cannot pay right now. Turn one on below.</div></div>` : ''}
         <div class="grid cols-4">
-          <div class="card stat hero"><div class="k">${icon.rupee} Received today</div><div class="v">${inr(d.today.amount)}</div></div>
+          <div class="card stat hero"><div class="k">${icon.pound} Received today</div><div class="v">${money(d.today.amount)}</div></div>
           <div class="card stat"><div class="k">${icon.check} Paid orders today</div><div class="v">${d.today.count}</div></div>
           <div class="card stat"><div class="k">${icon.clock} Waiting for payment</div><div class="v">${d.pending}</div></div>
           <a class="card stat" href="#/messages" style="text-decoration:none;color:inherit"><div class="k">${icon.msg} Unmatched money</div><div class="v" style="color:${d.unmatched ? 'var(--warn)' : 'inherit'}">${d.unmatched}</div></a>
@@ -357,7 +357,7 @@
                 ${bankLogo(a.bank, 38)}
                 <div class="grow">
                   <div class="bold ellipsis">${esc(a.label)}</div>
-                  <div class="tiny muted">${inr(a.today_paid)} today${a.daily_limit ? ` · limit ${inrShort(a.daily_limit)}` : ''}</div>
+                  <div class="tiny muted">${money(a.today_paid)} today${a.daily_limit ? ` · limit ${moneyShort(a.daily_limit)}` : ''}</div>
                   ${a.limit_used_pct !== null ? `<div class="meter ${a.limit_used_pct > 90 ? 'bad' : a.limit_used_pct > 70 ? 'warn' : ''}" style="margin-top:6px"><span style="width:${a.limit_used_pct}%"></span></div>` : ''}
                 </div>
                 <span class="live-label ${a.live ? 'on' : 'off'}" data-live-label="${a.id}">${a.live ? 'LIVE' : 'OFF'}</span>
@@ -367,8 +367,8 @@
           <div class="card">
             <div class="card-head"><div><h2>Last 7 days</h2><div class="sub">${d.week_count} payments received</div></div></div>
             <div class="bars">${d.chart.map((c) => `
-              <div class="bar ${Number(c.amount) ? '' : 'zero'}" title="${inr(c.amount)}">
-                <span class="tiny">${Number(c.amount) ? inrShort(c.amount) : ''}</span>
+              <div class="bar ${Number(c.amount) ? '' : 'zero'}" title="${money(c.amount)}">
+                <span class="tiny">${Number(c.amount) ? moneyShort(c.amount) : ''}</span>
                 <i style="height:${Math.max(3, (Number(c.amount) / max) * 100)}%"></i>
                 <span>${new Date(c.date).toLocaleDateString('en-GB', { weekday: 'short' })}</span>
               </div>`).join('')}</div>
@@ -430,7 +430,7 @@
         <div class="tiny muted ellipsis">${esc(o.site)}${o.reference ? ' · ' + esc(o.reference) : ''} · ${when(o.created_at)}</div>
       </div>
       <div style="text-align:right">
-        <div class="amount">${inr(o.amount_paid || o.amount_payable)}</div>
+        <div class="amount">${money(o.amount_paid || o.amount_payable)}</div>
         <div style="margin-top:2px">${statusBadge(o.status)}</div>
       </div></div>`;
   }
@@ -460,7 +460,7 @@
               <td><div class="bold">${esc(o.customer.name || '—')}</div><div class="tiny muted mono">${esc(o.payment_reference)}${o.reference ? ' · ' + esc(o.reference) : ''}</div></td>
               <td class="small">${esc(o.site)}</td>
               <td class="small">${esc(o.account || '—')}</td>
-              <td class="amount">${inr(o.amount_paid || o.amount_payable)}</td>
+              <td class="amount">${money(o.amount_paid || o.amount_payable)}</td>
               <td>${statusBadge(o.status)}</td>
               <td class="small muted nowrap">${when(o.created_at)}</td>
             </tr>`).join('')}</tbody></table>
@@ -499,7 +499,7 @@
       body: `
         <div class="stack lg">
           <div class="row between wrap">
-            <div><div class="muted small">Amount ${o.amount !== o.amount_payable ? `(price ${inr(o.amount)})` : ''}</div><div style="font-size:30px;font-weight:800">${inr(o.amount_paid || o.amount_payable)}</div></div>
+            <div><div class="muted small">Amount ${o.amount !== o.amount_payable ? `(price ${money(o.amount)})` : ''}</div><div style="font-size:30px;font-weight:800">${money(o.amount_paid || o.amount_payable)}</div></div>
             ${o.status === 'pending' ? `<a class="btn btn-ghost btn-sm" href="${esc(o.payment_url)}" target="_blank" rel="noopener">${icon.link} Open payment page</a>` : ''}
           </div>
           ${o.status === 'pending' ? copyField(o.payment_url, 'Payment link') : ''}
@@ -586,7 +586,7 @@
         $('.modal-body', m.el).innerHTML = `
           <div class="stack lg center">
             <div style="font-size:44px">🔗</div>
-            <div><div class="muted small">Customer will pay</div><div style="font-size:32px;font-weight:800">${inr(o.amount_payable)}</div>
+            <div><div class="muted small">Customer will pay</div><div style="font-size:32px;font-weight:800">${money(o.amount_payable)}</div>
             <div class="tiny muted">Bank reference <b class="mono">${esc(o.payment_reference)}</b> identifies this payment</div></div>
             ${copyField(o.payment_url, 'Link')}
             <div class="row" style="justify-content:center;flex-wrap:wrap">
@@ -623,9 +623,9 @@
             <div><div class="k">Account no.</div><div class="v mono small">${esc(a.account_number)}</div></div>
           </div>
           <div class="kv">
-            <div><div class="k">Today</div><div class="v" title="${inr(a.today_paid)}">${inrShort(a.today_paid)}</div></div>
+            <div><div class="k">Today</div><div class="v" title="${money(a.today_paid)}">${moneyShort(a.today_paid)}</div></div>
             <div><div class="k">Share</div><div class="v">${a.live && totalWeight ? Math.round((a.weight / totalWeight) * 100) + '%' : '—'}</div></div>
-            <div><div class="k">Daily limit</div><div class="v">${a.daily_limit ? inrShort(a.daily_limit) : 'None'}</div></div>
+            <div><div class="k">Daily limit</div><div class="v">${a.daily_limit ? moneyShort(a.daily_limit) : 'None'}</div></div>
           </div>
           ${a.limit_used_pct !== null ? `<div><div class="row between tiny muted" style="margin-bottom:4px"><span>Limit used (incl. waiting)</span><span>${a.limit_used_pct}%</span></div><div class="meter ${a.limit_used_pct > 90 ? 'bad' : a.limit_used_pct > 70 ? 'warn' : ''}"><span style="width:${a.limit_used_pct}%"></span></div></div>` : ''}
           <div class="row">
@@ -724,7 +724,7 @@
             ${list.length ? list.map((t) => `
               <div class="list-item" style="align-items:flex-start;flex-direction:column;gap:8px">
                 <div class="row" style="width:100%">
-                  <div class="grow"><span class="amount" style="font-size:17px">${t.amount ? inr(t.amount) : '—'}</span>
+                  <div class="grow"><span class="amount" style="font-size:17px">${t.amount ? money(t.amount) : '—'}</span>
                     <span class="tiny muted"> · ${esc(sourceLabel[t.source] || t.source)}${t.account ? ' · ' + esc(t.account) : ''} · ${when(t.received_at)}</span></div>
                   ${statusBadge(t.status)}
                 </div>
@@ -738,7 +738,7 @@
           <div><h2>🧪 Payment simulator</h2><p class="small muted" style="margin-top:4px">Pretend a customer's bank sent money to one of your accounts.</p></div>
           <form id="sf2" class="stack">
             <div class="field"><label>Open order (fills the fields)</label><select class="input" id="simOrder"><option value="">— choose, or type below —</option>
-              ${open.orders.map((o) => `<option value="${esc(o.id)}" data-amt="${esc(o.amount_payable)}" data-ref="${esc(o.payment_reference)}" data-name="${esc(o.customer.name)}">${esc(o.payment_reference)} · ${inr(o.amount_payable)}${o.customer.name ? ' · ' + esc(o.customer.name) : ''}</option>`).join('')}</select></div>
+              ${open.orders.map((o) => `<option value="${esc(o.id)}" data-amt="${esc(o.amount_payable)}" data-ref="${esc(o.payment_reference)}" data-name="${esc(o.customer.name)}">${esc(o.payment_reference)} · ${money(o.amount_payable)}${o.customer.name ? ' · ' + esc(o.customer.name) : ''}</option>`).join('')}</select></div>
             <div class="form-grid">
               <div class="field"><label>Amount (£)</label><input class="input" name="amount" inputmode="decimal" placeholder="24.99" required></div>
               <div class="field"><label>Reference</label><input class="input mono" name="reference" placeholder="AP… (empty = forgot it)"></div>
@@ -806,7 +806,7 @@
           const p = r.parsed;
           out.innerHTML = `<div class="notice ${p.type === 'credit' ? 'ok' : 'warn'}" style="margin-top:10px">${p.type === 'credit' ? icon.check : icon.alert}<div class="stack" style="gap:4px">
             <div><b>${p.type === 'credit' ? 'Money in ✓' : p.type === 'debit' ? 'Money out (ignored)' : 'Ignored'}</b>${p.reason ? ' — ' + esc(p.reason) : ''}</div>
-            <div class="small">Amount: <b>${p.amount ? inr(p.amount) : '—'}</b> · Ref: <b class="mono">${esc(p.reference || '—')}</b> · Payment ID: <b class="mono">${esc(p.utr || '—')}</b></div>
+            <div class="small">Amount: <b>${p.amount ? money(p.amount) : '—'}</b> · Ref: <b class="mono">${esc(p.reference || '—')}</b> · Payment ID: <b class="mono">${esc(p.payment_id || '—')}</b></div>
             <div class="small">Bank account: <b>${esc(r.account || 'not sure')}</b>${p.payer ? ' · Payer: ' + esc(p.payer) : ''}</div>
             <div class="small">${r.candidates.length ? `Would confirm: <b>${r.candidates.map((c) => esc(c.payment_reference)).join(', ')}</b>` : 'No open order matches.'}</div></div></div>`;
         } else {
@@ -821,12 +821,12 @@
     const options = [...pending.orders, ...expired.orders];
     options.sort((x, y) => Math.abs(Number(x.amount_payable) - Number(amount)) - Math.abs(Number(y.amount_payable) - Number(amount)));
     const m = modal({
-      title: `Link ${inr(amount)} to an order`,
+      title: `Link ${money(amount)} to an order`,
       body: options.length
         ? `<p class="small muted" style="margin-bottom:10px">Closest amounts first. Choose the order this money belongs to.</p>
            <div class="card flush">${options.slice(0, 20).map((o) => `<div class="list-item click" data-pick="${esc(o.id)}">
              <div class="grow"><div class="bold">${esc(o.customer.name || o.reference || o.id)}</div><div class="tiny muted">${esc(o.site)} · ${when(o.created_at)}</div></div>
-             <div style="text-align:right"><div class="amount">${inr(o.amount_payable)}</div>${statusBadge(o.status)}</div></div>`).join('')}</div>`
+             <div style="text-align:right"><div class="amount">${money(o.amount_payable)}</div>${statusBadge(o.status)}</div></div>`).join('')}</div>`
         : '<div class="empty">No open or expired orders to link.</div>',
     });
     $$('[data-pick]', m.el).forEach((el) => el.addEventListener('click', async () => {

@@ -2,7 +2,3 @@ node_modules/
 data/
 .env
 *.log
-android-app/build/
-*.apk
-*.keystore
-*.idsig

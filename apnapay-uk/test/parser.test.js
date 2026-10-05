@@ -4,7 +4,7 @@ const { parseBankMessage, findOurRef } = require('../src/parser');
 
 test('reads UK money-in notifications', () => {
   const a = parseBankMessage('You received £25.00 from John Smith. Reference: AP7KQ2XM. Payment ID: FP4A9C2E71');
-  assert.deepEqual([a.type, a.amount, a.reference, a.payer, a.utr], ['credit', 2500, 'AP7KQ2XM', 'John Smith', 'FP4A9C2E71']);
+  assert.deepEqual([a.type, a.amount, a.reference, a.payer, a.payment_id], ['credit', 2500, 'AP7KQ2XM', 'John Smith', 'FP4A9C2E71']);
 
   const b = parseBankMessage('John Smith sent you £1,250.50 – ap 7kq 2xm');
   assert.deepEqual([b.type, b.amount, b.reference, b.payer], ['credit', 125050, 'AP7KQ2XM', 'John Smith']);

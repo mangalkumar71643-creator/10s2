@@ -15,7 +15,7 @@ function publicOrder(o) {
     amount_paid: o.paid_amount != null ? pounds(o.paid_amount) : null,
     currency: 'GBP',
     payment_reference: o.pay_ref,
-    bank_payment_id: o.utr || null,
+    bank_payment_id: o.payment_id || null,
     matched_by: o.matched_by || null,
     customer: { name: o.customer_name, phone: o.customer_phone, email: o.customer_email },
     note: o.note,

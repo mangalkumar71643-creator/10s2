@@ -37,7 +37,7 @@ function parseBankMessage(raw) {
   const out = {
     type: 'ignored',
     amount,
-    utr: (PAYMENT_ID.exec(text) || [])[1] || null,
+    payment_id: (PAYMENT_ID.exec(text) || [])[1] || null,
     reference: findOurRef(text) || ((REFERENCE.exec(text) || [])[1] || '').trim() || '',
     payer: ((PAYER_SENT.exec(text) || PAYER_FROM.exec(text) || [])[1] || '').trim(),
     last4: (LAST4.exec(text) || [])[1] || null,

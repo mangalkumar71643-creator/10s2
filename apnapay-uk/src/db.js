@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   expires_at BIGINT NOT NULL
 );
 
--- Failed login / UTR attempts, for brute-force protection across serverless instances.
+-- Failed logins and demo payment attempts, for brute-force protection across serverless instances.
 CREATE TABLE IF NOT EXISTS attempts (
   key        TEXT NOT NULL,
   created_at BIGINT NOT NULL
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_email TEXT NOT NULL DEFAULT '',
   note           TEXT NOT NULL DEFAULT '',
   return_url     TEXT NOT NULL DEFAULT '',
-  utr            TEXT,              -- bank payment id of the credit
+  payment_id            TEXT,              -- bank payment id of the credit
   matched_by     TEXT,
   transaction_id BIGINT,
   paid_amount    BIGINT,
@@ -93,14 +93,17 @@ CREATE TABLE IF NOT EXISTS transactions (
   sender      TEXT NOT NULL DEFAULT '',
   raw_text    TEXT NOT NULL,
   amount      BIGINT,
-  utr         TEXT,                   -- bank payment id
+  payment_id         TEXT,                   -- bank payment id
   reference   TEXT NOT NULL DEFAULT '',
   payer       TEXT NOT NULL DEFAULT '',
   status      TEXT NOT NULL,          -- matched | unmatched | duplicate | ignored
   order_id    TEXT,
   received_at BIGINT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_tx_utr ON transactions(utr);
+-- Databases created by an earlier demo build used another column name.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_id TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS payment_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_tx_payment_id ON transactions(payment_id);
 CREATE INDEX IF NOT EXISTS idx_tx_received ON transactions(received_at);
 
 CREATE TABLE IF NOT EXISTS webhook_deliveries (
@@ -163,7 +166,7 @@ function toPg(sql) {
 
 async function makePg(url) {
   const pg = require('pg');
-  pg.types.setTypeParser(20, Number); // bigint (timestamps, paise) -> JS number
+  pg.types.setTypeParser(20, Number); // bigint (timestamps, pence) -> JS number
   pg.types.setTypeParser(1700, Number); // numeric (SUM results)
   const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
   const pool = new pg.Pool({

@@ -127,12 +127,12 @@ async function getOrder(id) {
 }
 
 // Must be called inside db.tx. Returns the updated order.
-async function markPaid(order, { utr = null, matchedBy, transactionId = null, paidAmount = null }, now = Date.now()) {
+async function markPaid(order, { payment_id = null, matchedBy, transactionId = null, paidAmount = null }, now = Date.now()) {
   const late = order.status === 'expired';
   await db.run(
-    `UPDATE orders SET status = 'paid', utr = COALESCE(?, utr), matched_by = ?, transaction_id = ?,
+    `UPDATE orders SET status = 'paid', payment_id = COALESCE(?, payment_id), matched_by = ?, transaction_id = ?,
        paid_amount = ?, paid_at = ? WHERE id = ? AND status IN ('pending', 'expired')`,
-    utr, matchedBy, transactionId, paidAmount ?? order.amount, now, order.id,
+    payment_id, matchedBy, transactionId, paidAmount ?? order.amount, now, order.id,
   );
   if (transactionId) await db.run("UPDATE transactions SET status = 'matched', order_id = ? WHERE id = ?", order.id, transactionId);
   const updated = await getById(order.id);
@@ -177,7 +177,7 @@ async function matchTransaction(txn, now = Date.now()) {
     );
     if (order) {
       if (txn.amount >= order.base_amount) {
-        return markPaid(order, { utr: txn.utr, matchedBy: 'reference', transactionId: txn.id, paidAmount: txn.amount }, now);
+        return markPaid(order, { payment_id: txn.payment_id, matchedBy: 'reference', transactionId: txn.id, paidAmount: txn.amount }, now);
       }
       await alert('alert', `Underpaid: order ${order.reference || order.pay_ref} needs ${formatGBP(order.amount)} but ${formatGBP(txn.amount)} arrived`);
       return null;
@@ -192,7 +192,7 @@ async function matchTransaction(txn, now = Date.now()) {
       txn.received_at + 120000,
     );
     const pick = pickCandidate(same, txn.account_id);
-    if (pick) return markPaid(pick, { utr: txn.utr, matchedBy: 'amount', transactionId: txn.id, paidAmount: txn.amount }, now);
+    if (pick) return markPaid(pick, { payment_id: txn.payment_id, matchedBy: 'amount', transactionId: txn.id, paidAmount: txn.amount }, now);
     if (same.length > 1) await alert('alert', `Payment of ${formatGBP(txn.amount)} without our reference matches ${same.length} orders — please link it manually`);
   }
   return null;
@@ -226,15 +226,15 @@ async function ingestMessage({ source, text, accountId = null, receivedAt = Date
     const account = await identifyAccount({ accountId, last4: parsed.last4 });
 
     // The same notification can arrive twice. Keep only the first (by bank payment id).
-    const dup = parsed.utr
-      ? await db.get("SELECT id FROM transactions WHERE utr = ? AND status IN ('matched', 'unmatched')", parsed.utr)
+    const dup = parsed.payment_id
+      ? await db.get("SELECT id FROM transactions WHERE payment_id = ? AND status IN ('matched', 'unmatched')", parsed.payment_id)
       : null;
 
     const [inserted] = await db.all(
-      `INSERT INTO transactions (source, account_id, sender, raw_text, amount, utr, reference, payer, status, received_at)
+      `INSERT INTO transactions (source, account_id, sender, raw_text, amount, payment_id, reference, payer, status, received_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       source, account ? account.id : null, account ? account.bank : '', String(text).slice(0, 2000),
-      parsed.amount, parsed.utr, String(parsed.reference || '').slice(0, 40), parsed.payer || '', dup ? 'duplicate' : 'unmatched', receivedAt,
+      parsed.amount, parsed.payment_id, String(parsed.reference || '').slice(0, 40), parsed.payer || '', dup ? 'duplicate' : 'unmatched', receivedAt,
     );
     if (dup) return { parsed, transaction: inserted, order: null, duplicate: true };
 
@@ -248,7 +248,7 @@ async function ingestMessage({ source, text, accountId = null, receivedAt = Date
 }
 
 // Admin: confirm by hand (e.g. you checked the bank app yourself).
-async function manualPay(orderId, { utr = null, transactionId = null } = {}, now = Date.now()) {
+async function manualPay(orderId, { payment_id = null, transactionId = null } = {}, now = Date.now()) {
   return db.tx(async () => {
     const order = await getById(orderId);
     if (!order) throw new OrderError('order not found', 404, 'not_found');
@@ -258,10 +258,10 @@ async function manualPay(orderId, { utr = null, transactionId = null } = {}, now
       const txn = await db.get('SELECT * FROM transactions WHERE id = ?', transactionId);
       if (!txn) throw new OrderError('transaction not found', 404, 'not_found');
       if (txn.status === 'matched') throw new OrderError('transaction is already linked to an order', 409, 'conflict');
-      utr = utr || txn.utr;
+      payment_id = payment_id || txn.payment_id;
       paidAmount = txn.amount;
     }
-    return markPaid(order, { utr, matchedBy: 'manual', transactionId, paidAmount }, now);
+    return markPaid(order, { payment_id, matchedBy: 'manual', transactionId, paidAmount }, now);
   });
 }
 
