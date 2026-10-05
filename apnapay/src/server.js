@@ -44,6 +44,7 @@ function createApp() {
   app.use('/api/v1', require('./routes/api'));
   app.use('/ingest', require('./routes/ingest'));
   app.use('/pay', require('./routes/pay'));
+  app.use(['/topup', '/add-money'], require('./routes/topup'));
   app.use('/admin/api', require('./routes/admin'));
 
   const pub = config.publicDir;

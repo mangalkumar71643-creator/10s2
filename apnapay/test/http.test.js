@@ -143,3 +143,36 @@ test('full payment flow', async (t) => {
   const dash = (await admin('/dashboard')).data;
   assert.equal(dash.today.count, 2);
 });
+
+test('add money page: ready amounts open a bill', async (t) => {
+  const db = require('../src/db');
+  const server = http.createServer(createApp());
+  const base = await listen(server);
+  t.after(() => server.close());
+  await db.run('UPDATE accounts SET live = 1');
+  const cfg = await (await fetch(base + '/add-money/config')).json();
+  assert.equal(cfg.enabled, true);
+  assert.ok(cfg.amounts.includes(200));
+  const create = (body) => fetch(base + '/add-money/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  assert.equal((await create({ amount: 200 })).status, 400); // no user
+  const r1 = await (await create({ amount: 200, user: '9876543210' })).json();
+  assert.match(r1.payment_url, /^\/pay\/ord_/);
+  assert.ok(Number(r1.amount) > 200 && Number(r1.amount) < 201);
+  // Tapping the same amount again reuses the open bill.
+  const r2 = await (await create({ amount: 200, user: '9876543210' })).json();
+  assert.equal(r2.payment_url, r1.payment_url);
+  const o = await db.get('SELECT * FROM orders WHERE id = ?', r1.payment_url.split('/').pop());
+  assert.equal(o.note, 'Add money');
+  assert.equal(o.customer_phone, '9876543210');
+
+  // Custom amounts only when allowed.
+  await db.setSetting('topup_custom', '0');
+  assert.equal((await create({ amount: 333, user: '9876543210' })).status, 400);
+  await db.setSetting('topup_custom', '1');
+  assert.equal((await create({ amount: 333, user: '9876543210' })).status, 200);
+  // Turned off -> refused.
+  await db.setSetting('topup_enabled', '0');
+  assert.equal((await create({ amount: 200, user: '1111111' })).status, 403);
+  await db.setSetting('topup_enabled', '1');
+});

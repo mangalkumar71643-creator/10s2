@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#5b4cf0">
+  <title>Add money</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    body { min-height: 100dvh; background: radial-gradient(1200px 500px at 50% -180px, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%), var(--bg); }
+    .wrap { max-width: 460px; margin: 0 auto; padding: 24px 16px 40px; }
+    .brand { display: flex; align-items: center; gap: 12px; margin: 4px 4px 18px; }
+    .avatar { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 18px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); }
+    .card2 { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--shadow); padding: 20px; display: grid; gap: 16px; }
+    .amts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .amt { height: 64px; border-radius: 16px; border: 2px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 22px; font-weight: 800; cursor: pointer; font-variant-numeric: tabular-nums; }
+    .amt:active { transform: scale(.98); }
+    .amt:hover { border-color: var(--brand); }
+    .amt[disabled] { opacity: .6; }
+    .or { display: flex; align-items: center; gap: 10px; color: var(--faint); font-size: 12px; font-weight: 600; }
+    .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+    .lbl { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: block; }
+    .foot { text-align: center; margin-top: 18px; font-size: 12px; color: var(--faint); }
+  </style>
+</head>
+<body>
+  <main class="wrap" id="app"><div class="card2"><div class="skeleton" style="height:180px"></div></div></main>
+  <div class="toasts" id="toasts"></div>
+  <script>
+  (() => {
+    const app = document.getElementById('app');
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const toast = (m, k = '') => { const t = document.createElement('div'); t.className = 'toast ' + k; t.textContent = m; document.getElementById('toasts').appendChild(t); setTimeout(() => t.remove(), 3200); };
+    const q = new URLSearchParams(location.search);
+    const fixedUser = q.get('user') || q.get('phone') || q.get('id') || '';
+    let saved = '';
+    try { saved = localStorage.getItem('topupUser') || ''; } catch {}
+    const fmt = (n) => '₹' + Number(n).toLocaleString('en-IN');
+
+    async function start(amount, btn) {
+      const userInput = document.getElementById('user');
+      const user = (fixedUser || userInput.value).trim();
+      if (user.length < 3) { toast('Pehle apna mobile number / User ID daalo', 'bad'); userInput && userInput.focus(); return; }
+      try { if (!fixedUser) localStorage.setItem('topupUser', user); } catch {}
+      document.querySelectorAll('button').forEach((b) => (b.disabled = true));
+      const html = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner"></span>';
+      try {
+        const r = await fetch('/add-money/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amount, user, name: q.get('name') || '' }) });
+        const out = await r.json();
+        if (!r.ok) throw new Error(out.error || 'Bill nahi bana');
+        location.href = out.payment_url;
+      } catch (err) {
+        toast(err.message, 'bad');
+        document.querySelectorAll('button').forEach((b) => (b.disabled = false));
+        btn.innerHTML = html;
+      }
+    }
+
+    fetch('/add-money/config', { cache: 'no-store' }).then((r) => r.json()).then((c) => {
+      document.title = `${c.title} · ${c.business}`;
+      if (!c.enabled) { app.innerHTML = '<div class="card2"><h2>Abhi band hai</h2><p class="muted">Add money abhi available nahi hai. Thodi der baad try karein.</p></div>'; return; }
+      app.innerHTML = `
+        <div class="brand"><div class="avatar">${esc((c.business || 'S').trim()[0]).toUpperCase()}</div>
+          <div><div class="bold" style="font-size:17px">${esc(c.business)}</div><div class="small muted">${esc(c.title)} · UPI</div></div></div>
+        <div class="card2">
+          ${fixedUser
+            ? `<div class="small muted">Account: <b style="color:var(--text)">${esc(fixedUser)}</b></div>`
+            : `<div><label class="lbl" for="user">Mobile number / User ID</label><input class="input" id="user" inputmode="tel" maxlength="60" placeholder="98xxxxxxxx" value="${esc(saved)}"></div>`}
+          <div><div class="lbl">Amount chuno</div>
+            <div class="amts">${c.amounts.map((a) => `<button class="amt" data-amt="${a}">${fmt(a)}</button>`).join('')}</div></div>
+          ${c.custom ? `<div class="or">YA APNA AMOUNT</div>
+            <form id="cf" class="row"><div class="input-group grow"><span class="prefix">₹</span><input class="input" id="camt" inputmode="numeric" placeholder="${c.min} – ${c.max}"></div>
+            <button class="btn btn-primary" type="submit">Pay</button></form>` : ''}
+          <p class="tiny muted" style="margin:0">Amount chunte hi UPI payment page khulega. Payment apne aap confirm ho jayega.</p>
+        </div>
+        <div class="foot">🔒 Secure UPI payment · 0 extra fee</div>`;
+      app.querySelectorAll('[data-amt]').forEach((b) => b.addEventListener('click', () => start(b.dataset.amt, b)));
+      const cf = document.getElementById('cf');
+      if (cf) cf.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const v = Number(document.getElementById('camt').value);
+        if (!Number.isInteger(v) || v < c.min || v > c.max) return toast(`Amount ₹${c.min} se ₹${c.max} ke beech daalo`, 'bad');
+        start(v, cf.querySelector('button'));
+      });
+    }).catch(() => { app.innerHTML = '<div class="card2">Internet check karke page refresh karein.</div>'; });
+  })();
+  </script>
+</body>
+</html>

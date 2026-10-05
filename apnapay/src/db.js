@@ -300,6 +300,14 @@ const DEFAULT_SETTINGS = {
   email_token: '',
   // 1 = only accept emails whose headers show DKIM/DMARC pass (protects against fake bank emails).
   email_require_auth: '1',
+  // Public "Add money" page with ready amounts (₹).
+  topup_enabled: '1',
+  topup_title: 'Add money',
+  topup_amounts: '100, 200, 400, 1000',
+  topup_custom: '1',
+  topup_max: '10000',
+  topup_site_id: '',
+  topup_return_url: '',
 };
 
 async function getSettings() {

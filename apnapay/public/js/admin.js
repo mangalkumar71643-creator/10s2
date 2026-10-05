@@ -1199,6 +1199,27 @@ Authorization: Bearer ak_live_…
             <div><button class="btn btn-primary">Save</button></div>
           </form>
 
+          <form class="card stack" id="topupForm">
+            <div class="row between"><div><h2>💰 Add Money page</h2><p class="small muted" style="margin-top:4px">Customer ready amount (₹100, ₹200…) tap kare, turant bill ban kar UPI payment khul jaye.</p></div>
+              <label class="switch"><input type="checkbox" name="topup_enabled" ${st.topup_enabled === '1' ? 'checked' : ''}><span class="track"></span></label></div>
+            <div class="field"><label>Page link (app / WhatsApp mein lagao)</label>${copyField(s.topup_url, 'Add money link')}
+              <span class="hint">Customer pehchanne ke liye link ke end mein uska number jodo: <code>${esc(s.topup_url)}?user=9876543210</code></span></div>
+            <div class="field"><label>Ready amounts (₹)</label><input class="input mono" name="topup_amounts" value="${esc(st.topup_amounts)}" placeholder="100, 200, 400, 1000">
+              <span class="hint">Comma lagakar likho. Minimum order (₹${esc(st.min_order_amount)}) se kam wale nahi dikhenge.</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Page title</label><input class="input" name="topup_title" value="${esc(st.topup_title)}"></div>
+              <div class="field"><label>Apna amount max (₹)</label><input class="input" type="number" min="1" max="99999" name="topup_max" value="${esc(st.topup_max)}"></div>
+            </div>
+            <label class="row" style="gap:12px"><label class="switch"><input type="checkbox" name="topup_custom" ${st.topup_custom === '1' ? 'checked' : ''}><span class="track"></span></label>
+              <span class="small"><b>Customer apna amount bhi daal sake</b></span></label>
+            <div class="form-grid">
+              <div class="field"><label>Webhook kis website ko jaye (optional)</label><select class="input" name="topup_site_id"><option value="">— Koi nahi —</option>
+                ${s.sites.map((x) => `<option value="${x.id}" ${String(st.topup_site_id) === String(x.id) ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+              <div class="field"><label>Payment ke baad kahan bheje (optional)</label><input class="input mono" name="topup_return_url" value="${esc(st.topup_return_url)}" placeholder="https://myshop.in/thanks"></div>
+            </div>
+            <div class="row"><button class="btn btn-primary">Save</button><a class="btn btn-ghost" href="${esc(s.topup_url)}" target="_blank" rel="noopener">${icon.link} Page kholo</a></div>
+          </form>
+
           <form class="card stack" id="tgForm">
             <div><h2>Telegram alerts</h2><p class="small muted" style="margin-top:4px">Free instant alerts on your phone for every payment, login and security change.</p></div>
             <ol class="steps-list small"><li><div>Open Telegram, message <b>@BotFather</b> → <code>/newbot</code> → copy the token.</div></li>
@@ -1254,6 +1275,7 @@ Authorization: Bearer ak_live_…
     });
     saveForm('#bizForm', (b, f) => ({ ...b, accept_base_amount: f.accept_base_amount.checked }));
     saveForm('#tgForm');
+    saveForm('#topupForm', (b, f) => ({ ...b, topup_enabled: f.topup_enabled.checked, topup_custom: f.topup_custom.checked }));
     saveForm('#emailForm');
     $('#tgTest', page).addEventListener('click', (e) => busy(e.currentTarget, async () => {
       await api('/settings', { method: 'PUT', body: formData($('#tgForm', page)) });

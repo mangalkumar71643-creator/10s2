@@ -563,7 +563,8 @@ router.post('/activity/seen', h(async () => await db.run('UPDATE activity SET se
 
 // ---------- Settings & security ------------------------------------------------------------------
 
-const SETTING_KEYS = ['business_name', 'min_order_amount', 'order_expiry_minutes', 'late_match_hours', 'accept_base_amount', 'telegram_bot_token', 'telegram_chat_id', 'support_phone', 'email_allowed_domains'];
+const SETTING_KEYS = ['business_name', 'min_order_amount', 'order_expiry_minutes', 'late_match_hours', 'accept_base_amount', 'telegram_bot_token', 'telegram_chat_id', 'support_phone', 'email_allowed_domains',
+  'topup_enabled', 'topup_title', 'topup_amounts', 'topup_custom', 'topup_max', 'topup_site_id', 'topup_return_url'];
 
 router.get('/settings', h(async () => {
   const s = (await db.getSettings());
@@ -573,6 +574,8 @@ router.get('/settings', h(async () => {
     username: a.username,
     totp_enabled: !!a.totp_enabled,
     base_url: config.baseUrl,
+    topup_url: `${config.baseUrl}/add-money`,
+    sites: await db.all('SELECT id, name FROM sites WHERE active = 1 ORDER BY id'),
     email_url: `${config.baseUrl}/ingest/email/${s.email_token}`,
   };
 }));
@@ -585,6 +588,15 @@ router.put('/settings', h(async (req) => {
     if (key === 'min_order_amount') value = String(Math.min(99999, Math.max(1, Math.round(Number(value)) || 100)));
     if (key === 'order_expiry_minutes') value = String(Math.min(120, Math.max(2, parseInt(value, 10) || 15)));
     if (key === 'late_match_hours') value = String(Math.min(168, Math.max(1, parseInt(value, 10) || 24)));
+    if (key === 'topup_enabled' || key === 'topup_custom') value = body[key] === true || value === '1' ? '1' : '0';
+    if (key === 'topup_amounts') {
+      const list = [...new Set(value.split(/[\s,]+/).map(Number).filter((n) => Number.isInteger(n) && n > 0 && n <= 99999))].sort((a, b) => a - b);
+      if (!list.length) throw bad('Kam se kam ek amount daalo, jaise 100, 200, 500');
+      value = list.join(', ');
+    }
+    if (key === 'topup_max') value = String(Math.min(99999, Math.max(1, parseInt(value, 10) || 10000)));
+    if (key === 'topup_site_id') value = value && await db.get('SELECT id FROM sites WHERE id = ?', Number(value)) ? String(Number(value)) : '';
+    if (key === 'topup_return_url' && value && !isHttpUrl(value)) throw bad('Return URL https:// se shuru hona chahiye');
     if (key === 'accept_base_amount') value = body[key] === true || value === '1' ? '1' : '0';
     await db.setSetting(key, value);
   }
