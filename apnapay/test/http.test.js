@@ -176,3 +176,19 @@ test('add money page: ready amounts open a bill', async (t) => {
   assert.equal((await create({ amount: 200, user: '1111111' })).status, 403);
   await db.setSetting('topup_enabled', '1');
 });
+
+test('add money direct link goes straight to the payment page', async (t) => {
+  const db = require('../src/db');
+  const server = http.createServer(createApp());
+  const base = await listen(server);
+  t.after(() => server.close());
+  await db.run('UPDATE accounts SET live = 1');
+  const r = await fetch(`${base}/add-money/go?amount=400&user=9000000001`, { redirect: 'manual' });
+  assert.equal(r.status, 302);
+  assert.match(r.headers.get('location'), /^\/pay\/ord_/);
+  const again = await fetch(`${base}/add-money/go?amount=400&user=9000000001`, { redirect: 'manual' });
+  assert.equal(again.headers.get('location'), r.headers.get('location'));
+  const bad = await fetch(`${base}/add-money/go?amount=400`, { redirect: 'manual' });
+  assert.equal(bad.status, 400);
+  assert.match(await bad.text(), /mobile number/);
+});

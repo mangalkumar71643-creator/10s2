@@ -1204,6 +1204,8 @@ Authorization: Bearer ak_live_…
               <label class="switch"><input type="checkbox" name="topup_enabled" ${st.topup_enabled === '1' ? 'checked' : ''}><span class="track"></span></label></div>
             <div class="field"><label>Page link (app / WhatsApp mein lagao)</label>${copyField(s.topup_url, 'Add money link')}
               <span class="hint">Customer pehchanne ke liye link ke end mein uska number jodo: <code>${esc(s.topup_url)}?user=9876543210</code></span></div>
+            <div class="field"><label>Direct button link (seedha QR wala payment page)</label>${copyField(s.topup_url + '/go?amount=200&user=9876543210', 'Direct link')}
+              <span class="hint">Shop ke ₹200 button mein ye lagao (amount aur user badal do). Amount upar "Ready amounts" mein hona chahiye, ya "apna amount" ON ho.</span></div>
             <div class="field"><label>Ready amounts (₹)</label><input class="input mono" name="topup_amounts" value="${esc(st.topup_amounts)}" placeholder="100, 200, 400, 1000">
               <span class="hint">Comma lagakar likho. Minimum order (₹${esc(st.min_order_amount)}) se kam wale nahi dikhenge.</span></div>
             <div class="form-grid">
