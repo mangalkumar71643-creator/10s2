@@ -127,3 +127,17 @@ test('full payment flow', async (t) => {
   const dash = (await admin('/dashboard')).data;
   assert.equal(dash.today.count, 3);
 });
+
+test('built-in demo shop gets its webhook in-process', async () => {
+  const config = require('../src/config');
+  await db.run('UPDATE shop_products SET sold = 0');
+  await db.run("UPDATE sites SET webhook_url = ?, active = 1 WHERE name = 'Demo Shop (built-in)'", `${config.baseUrl}/shop/webhook`);
+  await db.run('UPDATE accounts SET live = 1');
+  const orders = require('../src/orders');
+  const site = await db.get("SELECT * FROM sites WHERE name = 'Demo Shop (built-in)'");
+  const o = await orders.createOrder({ siteId: site.id, basePence: 1400, reference: 'SHOP-umbrella-T1' });
+  await orders.ingestMessage({ source: 'demo', text: `You received £14.00 from A B. Reference: ${o.pay_ref}. Payment ID: FPINPROC1` });
+  await webhooks.processDue();
+  const p = await db.get("SELECT sold FROM shop_products WHERE id = 'umbrella'");
+  assert.equal(p.sold, 1);
+});

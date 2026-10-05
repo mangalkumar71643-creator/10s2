@@ -35,17 +35,24 @@ async function deliver(delivery) {
     error = 'website removed or has no webhook URL';
   } else {
     const timestamp = Math.floor(now / 1000).toString();
-    try {
+    const headers = {
+      'content-type': 'application/json',
+      'user-agent': 'ApnaPay-UK-Demo-Webhook/1.0',
+      'x-apnapay-event': delivery.event,
+      'x-apnapay-delivery': String(delivery.id),
+      'x-apnapay-timestamp': timestamp,
+      'x-apnapay-signature': sign(site.webhook_secret, timestamp, delivery.payload),
+    };
+    // The built-in demo shop lives on this same server: hand it the signed webhook directly.
+    // Over HTTP it could land on another serverless instance that has its own throwaway database.
+    if (site.webhook_url === `${require('./config').baseUrl}/shop/webhook`) {
+      const out = await require('./routes/shop').receiveWebhook({ headers, rawBody: delivery.payload, body: JSON.parse(delivery.payload) });
+      status = out.status;
+      if (status !== 200) error = `HTTP ${status}`;
+    } else try {
       const res = await fetch(site.webhook_url, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'user-agent': 'ApnaPay-UK-Demo-Webhook/1.0',
-          'x-apnapay-event': delivery.event,
-          'x-apnapay-delivery': String(delivery.id),
-          'x-apnapay-timestamp': timestamp,
-          'x-apnapay-signature': sign(site.webhook_secret, timestamp, delivery.payload),
-        },
+        headers,
         body: delivery.payload,
         redirect: 'manual',
         signal: AbortSignal.timeout(10000),

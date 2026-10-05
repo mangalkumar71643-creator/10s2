@@ -57,19 +57,19 @@ router.post('/restock', async (req, res) => {
 });
 
 // The webhook receiver — exactly what your own website would run.
-router.post('/webhook', async (req, res) => {
+// Returns { status, body } so it can also be called in-process (see webhooks.deliver).
+async function receiveWebhook({ headers, rawBody, body }) {
   const site = await demoShopSite();
-  const ts = req.headers['x-apnapay-timestamp'];
-  const sig = req.headers['x-apnapay-signature'];
-  const raw = req.rawBody || '';
+  const ts = headers['x-apnapay-timestamp'];
+  const sig = headers['x-apnapay-signature'];
   const fresh = ts && Math.abs(Date.now() / 1000 - Number(ts)) <= 300;
-  const expected = site && 'sha256=' + crypto.createHmac('sha256', site.webhook_secret).update(`${ts}.${raw}`).digest('hex');
+  const expected = site && 'sha256=' + crypto.createHmac('sha256', site.webhook_secret).update(`${ts}.${rawBody || ''}`).digest('hex');
   const verified = !!(site && fresh && sig && timingSafeEqual(expected, sig));
-  const body = req.body || {};
+  body = body || {};
   const order = body.order || {};
   if (!verified) {
     await db.run("INSERT INTO shop_events (event, verified, summary, created_at) VALUES (?, 0, 'Rejected: bad or missing signature', ?)", String(body.event || 'unknown').slice(0, 40), Date.now());
-    return res.status(401).json({ error: 'bad signature' });
+    return { status: 401, body: { error: 'bad signature' } };
   }
   let summary = 'Signature OK';
   if (body.event === 'order.paid' && /^SHOP-/.test(order.reference || '')) {
@@ -82,7 +82,13 @@ router.post('/webhook', async (req, res) => {
     summary = rows.length ? `✅ ${rows[0].name} marked SOLD — £${order.amount_paid} received (ref ${order.payment_reference})` : 'Already sold — nothing to do';
   }
   await db.run('INSERT INTO shop_events (event, verified, order_id, summary, created_at) VALUES (?, 1, ?, ?, ?)', String(body.event).slice(0, 40), order.id || null, summary, Date.now());
-  res.json({ ok: true });
+  return { status: 200, body: { ok: true } };
+}
+
+router.post('/webhook', async (req, res) => {
+  const out = await receiveWebhook({ headers: req.headers, rawBody: req.rawBody, body: req.body });
+  res.status(out.status).json(out.body);
 });
 
+router.receiveWebhook = receiveWebhook;
 module.exports = router;
