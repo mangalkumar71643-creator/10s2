@@ -949,6 +949,38 @@ export function fetchRocketMyBets() {
   return apiFetch<AviatorMyBet[]>('/rocket/my-bets');
 }
 
+// ---- Goal Rush (same crash engine and shapes as Aviator) -------------------
+
+export function fetchGoalRushConfig() {
+  return apiFetch<AviatorConfig>('/goal-rush/config');
+}
+
+export function fetchGoalRushCurrentRound() {
+  return apiFetch<AviatorRoundView>('/goal-rush/current');
+}
+
+export function fetchGoalRushHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/goal-rush/history?limit=${limit}`);
+}
+
+export function placeGoalRushBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<AviatorBetResult>('/goal-rush/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+export function cashOutGoalRushBet(betId: string) {
+  return apiFetch<{ multiplier: number; payout: number }>('/goal-rush/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+export function fetchGoalRushMyBets() {
+  return apiFetch<AviatorMyBet[]>('/goal-rush/my-bets');
+}
+
 // ---- Jhandi Munda ------------------------------------------------------------
 
 export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';

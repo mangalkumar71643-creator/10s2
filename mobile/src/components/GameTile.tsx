@@ -22,6 +22,7 @@ import { ThreeCardPokerTileArt } from '../screens/ThreeCardPokerScreen';
 import { CandyBlastTileArt } from '../screens/CandyBlastScreen';
 import { Neon777TileArt } from '../screens/Neon777Screen';
 import { RocketTileArt } from '../screens/RocketScreen';
+import { GoalRushTileArt } from '../screens/GoalRushScreen';
 import { MoneyComingTileArt } from '../screens/MoneyComingScreen';
 import { useNavigation } from '@react-navigation/native';
 import React from 'react';
@@ -65,6 +66,7 @@ export type GameId =
   | 'CandyBlast'
   | 'Neon777'
   | 'Rocket'
+  | 'GoalRush'
   | 'MoneyComing';
 
 export type GameCategory = {
@@ -82,7 +84,7 @@ export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
   { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
   { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777', 'MoneyComing'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
-  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
+  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket', 'GoalRush'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
 ];
 
 /** Games drawn with a supplied icon image instead of their built-in tile art. */
@@ -803,6 +805,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <RocketTileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFFFFF', fontSize: 19, fontWeight: '900', fontStyle: 'italic', letterSpacing: 3, textShadowColor: '#FF3DA6', textShadowRadius: 8 }}>ROCKET</Text>
+        </Pressable>
+      );
+    case 'GoalRush':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('GoalRush')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#2FE07A',
+            backgroundColor: '#02101C',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 10,
+          }}
+        >
+          <GoalRushTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2, textAlign: 'center', lineHeight: 19, textShadowColor: '#2FE07A', textShadowRadius: 8 }}>{'GOAL\nRUSH'}</Text>
         </Pressable>
       );
     case 'MoneyComing':

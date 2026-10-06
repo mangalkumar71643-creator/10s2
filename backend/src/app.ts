@@ -46,6 +46,7 @@ import popupsRoutes from "./routes/popups.routes";
 import giftCodesRoutes from "./routes/giftCodes.routes";
 import vipRoutes from "./routes/vip.routes";
 import rocketRoutes from "./routes/rocket.routes";
+import goalRushRoutes from "./routes/goalRush.routes";
 import moneyComingRoutes from "./routes/moneyComing.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 import { refreshSettingsIfStale } from "./services/settingsService";
@@ -107,6 +108,7 @@ app.use("/popups", popupsRoutes);
 app.use("/gift-codes", giftCodesRoutes);
 app.use("/players", vipRoutes);
 app.use("/rocket", rocketRoutes);
+app.use("/goal-rush", goalRushRoutes);
 app.use("/money-coming", moneyComingRoutes);
 
 app.use(errorHandler);
