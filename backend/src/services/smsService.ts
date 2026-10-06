@@ -20,46 +20,18 @@ class MockSmsProvider implements SmsProvider {
 }
 
 /**
- * Sends a real SMS via Fast2SMS's OTP route
- * (https://www.fast2sms.com/dev/bulkV2?route=otp) — an Indian SMS
- * gateway that accepts UPI, unlike Firebase's Blaze plan which requires
- * an international card. Requires FAST2SMS_API_KEY.
+ * Placeholder for SMS_PROVIDER_MODE=live: no live SMS gateway is wired in
+ * yet. Plug a UK provider in here (e.g. Twilio or Vonage) before switching
+ * to live mode — until then every OTP request fails with a clear error
+ * rather than silently not sending.
  */
-class Fast2SmsProvider implements SmsProvider {
-  readonly name = "fast2sms";
+class UnconfiguredSmsProvider implements SmsProvider {
+  readonly name = "unconfigured";
 
-  async sendOtp(phone: string, code: string): Promise<void> {
-    const apiKey = process.env.FAST2SMS_API_KEY;
-    if (!apiKey) {
-      throw new Error("FAST2SMS_API_KEY is not set — required when SMS_PROVIDER_MODE=live.");
-    }
-
-    // Fast2SMS expects a bare 10-digit Indian number, not E.164.
-    const bareNumber = phone.replace(/^\+91/, "");
-
-    const res = await fetch("https://www.fast2sms.com/dev/bulkV2", {
-      method: "POST",
-      headers: {
-        authorization: apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        route: "otp",
-        variables_values: code,
-        numbers: bareNumber,
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Fast2SMS request failed (${res.status}): ${body}`);
-    }
-    const data = (await res.json().catch(() => null)) as { return?: boolean; message?: string[] } | null;
-    if (!data?.return) {
-      throw new Error(`Fast2SMS did not confirm delivery: ${JSON.stringify(data)}`);
-    }
+  async sendOtp(): Promise<void> {
+    throw new Error("No live SMS provider is configured — add one in smsService.ts before setting SMS_PROVIDER_MODE=live.");
   }
 }
 
 export const smsProvider: SmsProvider =
-  env.smsProviderMode === "live" ? new Fast2SmsProvider() : new MockSmsProvider();
+  env.smsProviderMode === "live" ? new UnconfiguredSmsProvider() : new MockSmsProvider();

@@ -45,8 +45,7 @@ machine's LAN IP for a physical device or Android emulator, not `localhost`).
 `src/state/AuthContext.tsx` calls the backend directly — no Firebase SDK, no ID tokens. The
 backend generates the 6-digit code, hashes and stores it, and sends it via
 `backend/src/services/smsService.ts` (mock in dev — shows the code on-screen since no real SMS is
-sent; **Fast2SMS** in live mode, chosen over Firebase because it accepts UPI instead of requiring
-an international card for Firebase's Blaze plan). The backend is what actually creates the
+sent; no live SMS gateway is wired in yet — a UK provider must be added before live mode). The backend is what actually creates the
 account, issues the session JWT, and is the only thing that can create a wallet.
 
 ## Project structure

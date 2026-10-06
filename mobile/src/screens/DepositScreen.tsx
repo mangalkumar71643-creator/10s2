@@ -188,7 +188,7 @@ export default function DepositScreen() {
         <View style={styles.tipsBlock}>
           <Text style={styles.tipsTitle}>Important notes:</Text>
           <Text style={styles.tipsText}>
-            Please do not modify the payment amount. Avoid reusing saved QR codes or UPI accounts for
+            Please do not modify the payment amount. Avoid reusing saved payment details for
             multiple payments.
           </Text>
         </View>

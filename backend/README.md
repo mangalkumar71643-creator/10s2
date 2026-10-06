@@ -43,10 +43,9 @@ Firebase, no ID tokens. Three steps:
    its hash (5 min expiry), and sends it via `src/services/smsService.ts`.
    In `SMS_PROVIDER_MODE=mock` (default) no real SMS is sent; the response
    includes `{ devCode }` so the mobile app can display it for testing —
-   never ship that mode to real users. `SMS_PROVIDER_MODE=live` sends a
-   real SMS via **Fast2SMS** (`FAST2SMS_API_KEY` — an Indian gateway that
-   accepts UPI, unlike Firebase's Blaze plan which needs an international
-   card).
+   never ship that mode to real users. No live SMS gateway is wired in
+   yet: `SMS_PROVIDER_MODE=live` makes every OTP request fail until a UK
+   provider is added to `smsService.ts`.
 2. `POST /auth/otp/verify { phone, code }` — checks the code (max 5
    attempts, then a new code is required). An existing phone number logs
    straight in. A brand-new one gets `428 {"error":"profile_required"}`
@@ -113,7 +112,7 @@ implementation used by default
 real money, real identity data, or real SMS ever moves through these.
 Before accepting real users, implement `LiveKycProvider` /
 `LivePaymentProvider` against a licensed KYC vendor and a
-gambling-licensed payment processor, get a `FAST2SMS_API_KEY`, then flip
+gambling-licensed payment processor, add a UK SMS provider, then flip
 the mode env vars to `live`. See the root `README.md` for the full
 compliance checklist, including the RNG certification requirement for
 `/games/:gameKey/play`.

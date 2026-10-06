@@ -41,8 +41,8 @@ real customer you are responsible for:
   can use it.
 - **Phone auth**: `backend/src/services/smsService.ts` doesn't send real
   SMS in "mock" mode (the OTP is just returned in the API response) until
-  you get a `FAST2SMS_API_KEY` and set `SMS_PROVIDER_MODE=live` — mock
-  mode must never be used with real users.
+  you wire a UK SMS provider into it and set `SMS_PROVIDER_MODE=live` —
+  mock mode must never be used with real users.
 
 ## Architecture
 

@@ -105,7 +105,7 @@ Admin app: `cd admin-app && ./gradlew assembleRelease`.
 ## 7. Things that are placeholders today
 
 - **KYC** — `services/kycService.ts` uses a mock provider.
-- **SMS/OTP** — `services/smsService.ts` in mock mode returns the OTP in the API response; never use mock mode with real users.
+- **SMS/OTP** — `services/smsService.ts` in mock mode returns the OTP in the API response; no live SMS gateway is wired in (Fast2SMS was removed) — a UK provider must be added before live mode. Never use mock mode with real users.
 - **Payments** — `services/paymentService.ts` has only a mock provider, and deposits are switched off (`DEPOSITS_ENABLED`).
 - **Game RNG** — honest and server-side, but not certified by a testing lab.
 - **Geo-restriction** — not implemented.

@@ -345,19 +345,43 @@ router.get(
   })
 );
 
+// A pending withdrawal is claimed before anything is paid or refunded, by a
+// single conditional update that only one request can win: a double click,
+// a retried request or an approve racing a reject finds it already claimed
+// and stops. While the payment provider is paying it out, the claim is held
+// by provider = "processing".
+const PROCESSING = "processing";
+const unclaimedPendingWithdrawal = (id: string) =>
+  ({ id, type: "WITHDRAWAL", status: "PENDING", provider: null }) as const;
+
 router.post(
   "/withdrawals/:transactionId/approve",
   asyncHandler(async (req, res) => {
     const transaction = await prisma.transaction.findUniqueOrThrow({ where: { id: req.params.transactionId } });
-    if (transaction.type !== "WITHDRAWAL" || transaction.status !== "PENDING") {
-      throw new ApiError(400, "This withdrawal is not pending.");
+    const claimed = await prisma.transaction.updateMany({
+      where: unclaimedPendingWithdrawal(transaction.id),
+      data: { provider: PROCESSING },
+    });
+    if (claimed.count === 0) {
+      throw new ApiError(400, "This withdrawal is not pending, or is already being processed.");
     }
     const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: transaction.userId } });
-    const result = await paymentProvider.withdraw({
-      userId: transaction.userId,
-      amount: Number(transaction.amount),
-      currency: wallet.currency,
-    });
+    let result: Awaited<ReturnType<typeof paymentProvider.withdraw>> | null = null;
+    try {
+      result = await paymentProvider.withdraw({
+        userId: transaction.userId,
+        amount: Number(transaction.amount),
+        currency: wallet.currency,
+      });
+    } finally {
+      if (result?.status !== "COMPLETED") {
+        // Nothing was paid: release the claim so it can be approved again or rejected.
+        await prisma.transaction.updateMany({
+          where: { id: transaction.id, status: "PENDING", provider: PROCESSING },
+          data: { provider: null },
+        });
+      }
+    }
     if (result.status !== "COMPLETED") {
       throw new ApiError(502, "Withdrawal could not be completed by the payment provider.");
     }
@@ -373,23 +397,28 @@ router.post(
   "/withdrawals/:transactionId/reject",
   asyncHandler(async (req, res) => {
     const transaction = await prisma.transaction.findUniqueOrThrow({ where: { id: req.params.transactionId } });
-    if (transaction.type !== "WITHDRAWAL" || transaction.status !== "PENDING") {
-      throw new ApiError(400, "This withdrawal is not pending.");
-    }
     // Refund the earmarked amount (it was deducted the moment the
     // withdrawal was requested — see wallet.routes.ts) and record the
     // reversal as its own transaction so the customer's history stays
     // accurate rather than showing a debit for money that never left.
-    const [updated] = await prisma.$transaction([
-      prisma.transaction.update({ where: { id: transaction.id }, data: { status: "FAILED" } }),
-      prisma.wallet.update({
+    // The claim and the refund commit together, so it is refunded once.
+    const updated = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.transaction.updateMany({
+        where: unclaimedPendingWithdrawal(transaction.id),
+        data: { status: "FAILED" },
+      });
+      if (claimed.count === 0) {
+        throw new ApiError(400, "This withdrawal is not pending, or is already being processed.");
+      }
+      await tx.wallet.update({
         where: { userId: transaction.userId },
         data: { balance: { increment: transaction.amount } },
-      }),
-      prisma.transaction.create({
+      });
+      await tx.transaction.create({
         data: { userId: transaction.userId, type: "WITHDRAWAL_REVERSAL", amount: transaction.amount, status: "COMPLETED" },
-      }),
-    ]);
+      });
+      return tx.transaction.findUniqueOrThrow({ where: { id: transaction.id } });
+    });
     res.json(updated);
   })
 );

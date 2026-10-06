@@ -20,10 +20,10 @@ function startOfDay(): Date {
  * sees the same fields: raw wallet columns plus the derived numbers it
  * actually needs (how much is really free to withdraw right now, and how
  * much of today's withdrawal limit is left). */
-async function buildWalletView(userId: string) {
+async function buildWalletView(userId: string, db: Prisma.TransactionClient = prisma) {
   const [wallet, user, todaysWithdrawals] = await Promise.all([
-    prisma.wallet.findUniqueOrThrow({ where: { userId } }),
-    prisma.user.findUniqueOrThrow({
+    db.wallet.findUniqueOrThrow({ where: { userId } }),
+    db.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
         payoutAccountHolderName: true,
@@ -32,7 +32,7 @@ async function buildWalletView(userId: string) {
         firstDepositBonusClaimed: true,
       },
     }),
-    prisma.transaction.aggregate({
+    db.transaction.aggregate({
       // PENDING counts too so a still-unapproved withdrawal already
       // earmarked against the daily limit — otherwise a user could
       // submit several pending requests to bypass it before any are
@@ -187,36 +187,43 @@ router.post(
       throw new ApiError(400, "Add your bank account before withdrawing.");
     }
 
-    const view = await buildWalletView(userId);
-    if (amount > view.withdrawable) {
-      const lockedBonus = Number(view.lockedBonus);
-      const unplayed = Number(view.unplayedDeposit);
-      const reasons = [
-        unplayed > 0 ? `₹${unplayed.toFixed(2)} deposited has not been played yet` : null,
-        lockedBonus > 0 ? `₹${lockedBonus.toFixed(2)} bonus is still locked until its wagering requirement is met` : null,
-      ].filter(Boolean);
-      throw new ApiError(
-        400,
-        reasons.length > 0 ? `Only ₹${view.withdrawable.toFixed(2)} (your winnings) can be withdrawn right now — ${reasons.join(", and ")}.` : "Insufficient balance"
-      );
-    }
-    if (amount > view.remainingWithdrawalLimit) {
-      throw new ApiError(400, `This would exceed today's withdrawal limit. Remaining today: ₹${view.remainingWithdrawalLimit.toFixed(2)}.`);
-    }
+    // The checks and the debit run under a lock on the player's wallet row,
+    // so parallel requests are handled one at a time: each one sees the
+    // balance and daily total left by the one before, and none can withdraw
+    // money (or limit) another has already taken.
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+      const view = await buildWalletView(userId, tx);
+      if (amount > view.withdrawable) {
+        const lockedBonus = Number(view.lockedBonus);
+        const unplayed = Number(view.unplayedDeposit);
+        const reasons = [
+          unplayed > 0 ? `₹${unplayed.toFixed(2)} deposited has not been played yet` : null,
+          lockedBonus > 0 ? `₹${lockedBonus.toFixed(2)} bonus is still locked until its wagering requirement is met` : null,
+        ].filter(Boolean);
+        throw new ApiError(
+          400,
+          reasons.length > 0 ? `Only ₹${view.withdrawable.toFixed(2)} (your winnings) can be withdrawn right now — ${reasons.join(", and ")}.` : "Insufficient balance"
+        );
+      }
+      if (amount > view.remainingWithdrawalLimit) {
+        throw new ApiError(400, `This would exceed today's withdrawal limit. Remaining today: ₹${view.remainingWithdrawalLimit.toFixed(2)}.`);
+      }
 
-    // Withdrawals now require manual admin approval (see admin.routes.ts
-    // PATCH /admin/withdrawals/:id/approve|reject) rather than completing
-    // instantly — the amount is deducted right away so the funds are
-    // earmarked and can't be double-spent while the request is pending.
-    await prisma.$transaction([
-      prisma.transaction.create({
-        data: { userId, type: "WITHDRAWAL", amount, status: "PENDING" },
-      }),
-      prisma.wallet.update({
-        where: { userId },
+      // Withdrawals now require manual admin approval (see admin.routes.ts
+      // PATCH /admin/withdrawals/:id/approve|reject) rather than completing
+      // instantly — the amount is deducted right away so the funds are
+      // earmarked and can't be double-spent while the request is pending.
+      // Conditional debit as a last guard: the balance can never go negative.
+      const debited = await tx.wallet.updateMany({
+        where: { userId, balance: { gte: amount } },
         data: { balance: { decrement: amount } },
-      }),
-    ]);
+      });
+      if (debited.count === 0) throw new ApiError(400, "Insufficient balance");
+      await tx.transaction.create({
+        data: { userId, type: "WITHDRAWAL", amount, status: "PENDING" },
+      });
+    });
 
     res.json(await buildWalletView(userId));
   })
