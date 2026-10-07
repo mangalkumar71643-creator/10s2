@@ -1076,6 +1076,63 @@ export function fetchCosmonautMyBets() {
   return apiFetch<CosmonautMyBet[]>('/cosmonaut/my-bets');
 }
 
+// ---- Sky Jet (the crash engine with a progressive jackpot) -------------------
+
+export interface SkyJetConfig extends AviatorConfig {
+  crashEdgePercent: number;
+  jackpotSharePercent: number;
+  /** A bet of this stake would always hit; the chance is stake / this. */
+  jackpotOddsStake: number;
+}
+
+export interface SkyJetRoundView extends AviatorRoundView {
+  jackpot: number;
+}
+
+export interface SkyJetMyBet extends AviatorMyBet {
+  jackpotChecked: boolean;
+  jackpotPayout: string;
+}
+
+export interface SkyJetJackpotInfo {
+  amount: number;
+  wins: { amount: string; periodNumber: string; createdAt: string; player: string }[];
+}
+
+export function fetchSkyJetConfig() {
+  return apiFetch<SkyJetConfig>('/sky-jet/config');
+}
+
+export function fetchSkyJetCurrentRound() {
+  return apiFetch<SkyJetRoundView>('/sky-jet/current');
+}
+
+export function fetchSkyJetHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/sky-jet/history?limit=${limit}`);
+}
+
+export function fetchSkyJetJackpot() {
+  return apiFetch<SkyJetJackpotInfo>('/sky-jet/jackpot');
+}
+
+export function placeSkyJetBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<AviatorBetResult>('/sky-jet/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+export function cashOutSkyJetBet(betId: string) {
+  return apiFetch<{ multiplier: number; payout: number }>('/sky-jet/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+export function fetchSkyJetMyBets() {
+  return apiFetch<SkyJetMyBet[]>('/sky-jet/my-bets');
+}
+
 // ---- Jhandi Munda ------------------------------------------------------------
 
 export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';

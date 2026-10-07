@@ -187,6 +187,8 @@ model User {
   GoalRushBet        GoalRushBet[]
   BigCatchBet        BigCatchBet[]
   CosmonautBet       CosmonautBet[]
+  SkyJetBet          SkyJetBet[]
+  SkyJetJackpotWin   SkyJetJackpotWin[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1681,6 +1683,62 @@ model CosmonautBet {
 
   @@index([userId])
   @@index([roundId])
+}
+
+model SkyJetRound {
+  id               String      @id @default(uuid())
+  periodNumber     String      @unique
+  bettingStartTime DateTime
+  flyStartTime     DateTime
+  crashTime        DateTime
+  endTime          DateTime
+  crashMultiplier  Decimal     @db.Decimal(10, 2)
+  serverSeed       String
+  serverSeedHash   String
+  settled          Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  bets             SkyJetBet[]
+
+  @@index([bettingStartTime])
+}
+
+model SkyJetBet {
+  id                String      @id @default(uuid())
+  roundId           String
+  round             SkyJetRound @relation(fields: [roundId], references: [id])
+  userId            String
+  user              User        @relation(fields: [userId], references: [id])
+  amount            Decimal     @db.Decimal(12, 2)
+  autoCashoutAt     Decimal?    @db.Decimal(10, 2)
+  cashoutMultiplier Decimal?    @db.Decimal(10, 2)
+  status            BetStatus   @default(PENDING)
+  payout            Decimal     @default(0) @db.Decimal(12, 2)
+  // The bet's jackpot draw has been made (once, after the round), and what it won.
+  jackpotChecked    Boolean     @default(false)
+  jackpotPayout     Decimal     @default(0) @db.Decimal(12, 2)
+  createdAt         DateTime    @default(now())
+
+  @@index([userId])
+  @@index([roundId, jackpotChecked])
+}
+
+// The Sky Jet jackpot pool: a single row, 1% of every stake.
+model SkyJetJackpot {
+  id        String   @id
+  amount    Decimal  @default(0) @db.Decimal(14, 2)
+  updatedAt DateTime @updatedAt
+}
+
+model SkyJetJackpotWin {
+  id           String   @id @default(uuid())
+  betId        String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  periodNumber String
+  amount       Decimal  @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // Admin-changeable settings, one row per key (e.g. "maxPayout").

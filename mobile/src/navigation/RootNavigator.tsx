@@ -18,6 +18,7 @@ import RocketScreen from '../screens/RocketScreen';
 import GoalRushScreen from '../screens/GoalRushScreen';
 import BigCatchScreen from '../screens/BigCatchScreen';
 import CosmonautScreen from '../screens/CosmonautScreen';
+import SkyJetScreen from '../screens/SkyJetScreen';
 import FruitMachineScreen from '../screens/FruitMachineScreen';
 import FishermansCatchScreen from '../screens/FishermansCatchScreen';
 import BookOfPharaohScreen from '../screens/BookOfPharaohScreen';
@@ -112,6 +113,7 @@ function MainNavigator() {
       <Stack.Screen name="GoalRush" component={GoalRushScreen} />
       <Stack.Screen name="BigCatch" component={BigCatchScreen} />
       <Stack.Screen name="Cosmonaut" component={CosmonautScreen} />
+      <Stack.Screen name="SkyJet" component={SkyJetScreen} />
       <Stack.Screen name="FruitMachine" component={FruitMachineScreen} />
       <Stack.Screen name="FishermansCatch" component={FishermansCatchScreen} />
       <Stack.Screen name="BookOfPharaoh" component={BookOfPharaohScreen} />
