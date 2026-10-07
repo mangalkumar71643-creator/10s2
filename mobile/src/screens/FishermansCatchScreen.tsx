@@ -386,6 +386,203 @@ export function FishermansCatchTileArt({ size }: { size: number }) {
   );
 }
 
+// ---------- boat & lake props ----------
+
+/** Two layers of rolling waves across the foot of the lake, drifting sideways. */
+function Waves({ w, drift, night }: { w: number; drift: Animated.Value; night: boolean }) {
+  const layer = (amp: number, len: number, y: number, color: string, opacity: number, speed: number) => {
+    const n = Math.ceil((w * 2) / len) + 1;
+    let d = `M0 ${y}`;
+    for (let i = 0; i < n; i++) d += ` q ${len / 4} ${-amp} ${len / 2} 0 t ${len / 2} 0`;
+    d += ` L ${n * len} 40 L 0 40 Z`;
+    return (
+      <Animated.View style={{ position: 'absolute', left: 0, bottom: 0, transform: [{ translateX: drift.interpolate({ inputRange: [0, 1], outputRange: [0, -len * speed] }) }] }}>
+        <Svg width={n * len} height={40}>
+          <Path d={d} fill={color} opacity={opacity} />
+        </Svg>
+      </Animated.View>
+    );
+  };
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 40, overflow: 'hidden' }}>
+      {layer(5, 60, 14, night ? '#1E2A6A' : '#2A86B0', 0.6, 1)}
+      {layer(4, 44, 22, night ? '#101A4A' : '#0E5A80', 0.9, 2)}
+    </View>
+  );
+}
+
+/** A red-and-white float bobbing on the water. */
+function Bobber({ bob }: { bob: Animated.Value }) {
+  return (
+    <Animated.View pointerEvents="none" style={{ transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [-3, 3] }) }, { rotate: bob.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '8deg'] }) }] }}>
+      <Svg width={18} height={34} viewBox="0 0 18 34">
+        <Path d="M9 0 L 9 8" stroke="#E6E9F0" strokeWidth={1.2} />
+        <Ellipse cx={9} cy={15} rx={7} ry={8} fill="#E8132B" stroke="#6A0010" strokeWidth={1} />
+        <Path d="M2 17 C 4 26, 14 26, 16 17 Z" fill="#FFFFFF" stroke="#8A8E98" strokeWidth={1} />
+        <Ellipse cx={6} cy={12} rx={2} ry={3} fill="#FFFFFF" opacity={0.6} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** A spinning-reel style button: spool, spokes and crank handle; it turns while the cast plays. */
+function FishingReel({ size, turn, lit }: { size: number; turn: Animated.Value; lit: boolean }) {
+  const u = useId().replace(/:/g, '');
+  const c = 50;
+  return (
+    <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
+      <Svg width={size} height={size} viewBox="0 0 100 100">
+        <Defs>
+          <RadialGradient id={`fcReel${u}`} cx="40%" cy="35%" r="70%">
+            <Stop offset="0" stopColor={lit ? '#FFF4C8' : '#9A9EA8'} />
+            <Stop offset="0.5" stopColor={lit ? '#E8B23A' : '#5A5E68'} />
+            <Stop offset="1" stopColor={lit ? '#8A5A08' : '#2A2E38'} />
+          </RadialGradient>
+          <SvgLinearGradient id={`fcLine${u}`} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#B8F0FF" />
+            <Stop offset="1" stopColor="#3A9AC8" />
+          </SvgLinearGradient>
+        </Defs>
+        <Circle cx={c} cy={c} r={46} fill={`url(#fcReel${u})`} stroke="#3A2A08" strokeWidth={3} />
+        <Circle cx={c} cy={c} r={34} fill={`url(#fcLine${u})`} stroke="#2A5A78" strokeWidth={1.5} />
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <Circle key={i} cx={c} cy={c} r={24 + i * 1.6} fill="none" stroke="#FFFFFF" strokeOpacity={0.25} strokeWidth={0.8} />
+        ))}
+        {[0, 60, 120, 180, 240, 300].map((a) => (
+          <Path key={a} d={`M${c} ${c} L ${c + 22 * Math.cos((a * Math.PI) / 180)} ${c + 22 * Math.sin((a * Math.PI) / 180)}`} stroke="#3A2A08" strokeWidth={3} strokeLinecap="round" />
+        ))}
+        <Circle cx={c} cy={c} r={9} fill={`url(#fcReel${u})`} stroke="#3A2A08" strokeWidth={2} />
+        {/* Crank arm and knob */}
+        <Path d={`M${c} ${c} L ${c + 34} ${c - 30}`} stroke="#3A2A08" strokeWidth={7} strokeLinecap="round" />
+        <Path d={`M${c} ${c} L ${c + 34} ${c - 30}`} stroke={lit ? '#E8B23A' : '#6A6E78'} strokeWidth={4} strokeLinecap="round" />
+        <Circle cx={c + 34} cy={c - 30} r={8} fill="#5A2E10" stroke="#2A1004" strokeWidth={2} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** The free-spin multiplier on an orange-and-white life ring. */
+function LifeRing({ mult, size, pulse }: { mult: number; size: number; pulse: Animated.AnimatedInterpolation<number> | number }) {
+  const c = 50;
+  return (
+    <Animated.View style={{ transform: [{ scale: pulse }] }}>
+      <Svg width={size} height={size} viewBox="0 0 100 100">
+        <Circle cx={c} cy={c} r={40} fill="none" stroke="#FF6A1A" strokeWidth={18} />
+        {[0, 90, 180, 270].map((a) => (
+          <Path key={a} d={`M ${c + 31 * Math.cos(((a - 18) * Math.PI) / 180)} ${c + 31 * Math.sin(((a - 18) * Math.PI) / 180)} A 31 31 0 0 1 ${c + 31 * Math.cos(((a + 18) * Math.PI) / 180)} ${c + 31 * Math.sin(((a + 18) * Math.PI) / 180)} L ${c + 49 * Math.cos(((a + 18) * Math.PI) / 180)} ${c + 49 * Math.sin(((a + 18) * Math.PI) / 180)} A 49 49 0 0 0 ${c + 49 * Math.cos(((a - 18) * Math.PI) / 180)} ${c + 49 * Math.sin(((a - 18) * Math.PI) / 180)} Z`} fill="#FFFFFF" />
+        ))}
+        <Circle cx={c} cy={c} r={49} fill="none" stroke="#8A3A0A" strokeWidth={1.5} />
+        <Circle cx={c} cy={c} r={31} fill="#0B2A4A" stroke="#8A3A0A" strokeWidth={1.5} />
+        <SvgText x={c} y={c + 9} fontSize={mult >= 10 ? 22 : 26} fontWeight="900" fill="#FFD166" textAnchor="middle">
+          x{mult}
+        </SvgText>
+      </Svg>
+    </Animated.View>
+  );
+}
+
+/** Fisherman meter: hooks hanging from a rope; each collected Fisherman fills one. */
+function HookLine({ count, filled, width }: { count: number; filled: number; width: number }) {
+  const gap = width / (count + 1);
+  return (
+    <Svg width={width} height={40}>
+      <Path d={`M0 8 Q ${width / 2} 16 ${width} 8`} stroke="#C8A060" strokeWidth={3} fill="none" />
+      {Array.from({ length: count }, (_, i) => {
+        const x = gap * (i + 1);
+        const on = i < filled;
+        return (
+          <G key={i}>
+            <Path d={`M${x} 11 L ${x} 20 C ${x} 30, ${x - 9} 30, ${x - 8} 22`} stroke={on ? '#FFD166' : '#8A8E98'} strokeWidth={2.2} fill="none" strokeLinecap="round" />
+            {on && <Ellipse cx={x - 4} cy={32} rx={7} ry={4} fill="#8DBA3A" stroke="#2E4A10" strokeWidth={1} />}
+          </G>
+        );
+      })}
+    </Svg>
+  );
+}
+
+/** The win meter: a fish-shaped wooden catch board with carved figures. */
+function CatchBoard({ label, value, color, width }: { label: string; value: string; color: string; width: number }) {
+  const u = useId().replace(/:/g, '');
+  const h = 56;
+  return (
+    <View style={{ width, height: h }}>
+      <Svg width={width} height={h} viewBox={`0 0 ${width} ${h}`} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgLinearGradient id={`fcBoard${u}`} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#B8743A" />
+            <Stop offset="1" stopColor="#5A2E10" />
+          </SvgLinearGradient>
+        </Defs>
+        {/* Tail on the right, rounded nose on the left */}
+        <Path
+          d={`M 14 ${h / 2} C 14 6, ${width * 0.3} 3, ${width - 40} 6 L ${width - 2} 2 L ${width - 18} ${h / 2} L ${width - 2} ${h - 2} L ${width - 40} ${h - 6} C ${width * 0.3} ${h - 3}, 14 ${h - 6}, 14 ${h / 2} Z`}
+          fill={`url(#fcBoard${u})`}
+          stroke="#2A1004"
+          strokeWidth={2}
+        />
+        <Circle cx={30} cy={h / 2 - 6} r={4} fill="#2A1004" />
+        {[0.42, 0.58].map((t) => (
+          <Path key={t} d={`M ${width * 0.12} ${h * t} L ${width - 46} ${h * t}`} stroke="#2A1004" strokeOpacity={0.25} strokeWidth={1} />
+        ))}
+      </Svg>
+      <View style={{ position: 'absolute', left: Math.min(46, width * 0.15), right: Math.min(50, width * 0.2), top: 0, bottom: 0, justifyContent: 'center' }}>
+        <Text style={[styles.boardLabel, { color }]} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={[styles.boardValue, { color, fontSize: width < 240 ? 16 : 20 }]} numberOfLines={1} adjustsFontSizeToFit>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/** A cash tag flying from a fish on the reels to the catch board. */
+function Flyer({ from, to, text, progress }: { from: { x: number; y: number }; to: { x: number; y: number }; text: string; progress: Animated.Value }) {
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        transform: [
+          { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [from.x - 22, to.x - 22] }) },
+          { translateY: progress.interpolate({ inputRange: [0, 0.4, 1], outputRange: [from.y - 10, Math.min(from.y, to.y) - 40, to.y - 10] }) },
+          { scale: progress.interpolate({ inputRange: [0, 0.2, 0.9, 1], outputRange: [1, 1.25, 0.9, 0.5] }) },
+        ],
+        opacity: progress.interpolate({ inputRange: [0, 0.9, 1], outputRange: [1, 1, 0] }),
+      }}
+    >
+      <View style={styles.flyTag}>
+        <Text style={styles.flyText}>{text}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+/** A fish leaping across the lake on a big catch. */
+function JumpingFish({ width, progress }: { width: number; progress: Animated.Value }) {
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        transform: [
+          { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [-60, width + 10] }) },
+          { translateY: progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [150, 20, 150] }) },
+          { rotate: progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-35deg', '0deg', '35deg'] }) },
+        ],
+      }}
+    >
+      <FishArt s="FISH" size={64} />
+    </Animated.View>
+  );
+}
+
 // ---------- screen ----------
 
 const START: Cell[][] = [
@@ -421,6 +618,8 @@ export default function FishermansCatchScreen() {
   const [now, setNow] = useState(Date.now());
   const [cells, setCells] = useState<Cell[][]>(START);
   const [sceneH, setSceneH] = useState(0);
+  const [flyers, setFlyers] = useState<{ id: string; from: { x: number; y: number }; to: { x: number; y: number }; text: string }[]>([]);
+  const [jumping, setJumping] = useState(false);
 
   const mountedRef = useRef(true);
   const busyRef = useRef(false);
@@ -428,6 +627,15 @@ export default function FishermansCatchScreen() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bannerAnim = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
+  const drift = useRef(new Animated.Value(0)).current;
+  const bob = useRef(new Animated.Value(0)).current;
+  const reelTurn = useRef(new Animated.Value(0)).current;
+  const flyProg = useRef(new Animated.Value(0)).current;
+  const jumpProg = useRef(new Animated.Value(0)).current;
+  const reelFrameY = useRef(0);
+  const boardY = useRef(0);
+  const geom = useRef({ cabW: 0, reelW: 0, cell: 0, reelGap: 3, frame: 10, boardW: 0 });
+  const hullId = `fcHull${useId().replace(/:/g, '')}`;
   const reels = [useRef<ReelHandle>(null), useRef<ReelHandle>(null), useRef<ReelHandle>(null), useRef<ReelHandle>(null), useRef<ReelHandle>(null)];
 
   const lineCount = config?.lineCount ?? 10;
@@ -454,14 +662,38 @@ export default function FishermansCatchScreen() {
         Animated.timing(pulse, { toValue: 0, duration: 420, useNativeDriver: true }),
       ])
     );
+    const waves = Animated.loop(Animated.timing(drift, { toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true }));
+    const bobbing = Animated.loop(
+      Animated.sequence([
+        Animated.timing(bob, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(bob, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
     loop.start();
+    waves.start();
+    bobbing.start();
     return () => {
       mountedRef.current = false;
       clearInterval(clock);
       loop.stop();
+      waves.stop();
+      bobbing.stop();
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
-  }, [pulse]);
+  }, [pulse, drift, bob]);
+
+  // The cast reel turns while a spin plays out.
+  useEffect(() => {
+    if (!busy) {
+      reelTurn.stopAnimation();
+      reelTurn.setValue(0);
+      return;
+    }
+    reelTurn.setValue(0);
+    const turning = Animated.loop(Animated.timing(reelTurn, { toValue: 1, duration: 700, easing: Easing.linear, useNativeDriver: true }));
+    turning.start();
+    return () => turning.stop();
+  }, [busy, reelTurn]);
 
   const showToast = useCallback((text: string) => {
     setToast(text);
@@ -502,6 +734,41 @@ export default function FishermansCatchScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
+
+  /** Fish values on the reels fly as cash tags into the catch board when the Fishermen collect. */
+  const flyToBoard = useCallback(
+    async (target: Cell[][]) => {
+      const g = geom.current;
+      const to = { x: 10 + g.boardW / 2, y: boardY.current + 28 };
+      const list: { id: string; from: { x: number; y: number }; to: { x: number; y: number }; text: string }[] = [];
+      target.forEach((rows, reel) =>
+        rows.forEach((c, row) => {
+          if (c.s !== 'FISH' || !(c.v && c.v > 0)) return;
+          list.push({
+            id: `${reel}-${row}-${Date.now()}`,
+            from: { x: g.frame + 8 + reel * (g.reelW + 2 + g.reelGap) + g.reelW / 2 + 1, y: reelFrameY.current + 8 + row * g.cell + g.cell / 2 + 1 },
+            to,
+            text: shortMoney(c.v),
+          });
+        })
+      );
+      if (!list.length || !mountedRef.current) return;
+      flyProg.setValue(0);
+      setFlyers(list);
+      await new Promise<void>((r) => Animated.timing(flyProg, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start(() => r()));
+      if (mountedRef.current) setFlyers([]);
+    },
+    [flyProg]
+  );
+
+  /** A fish leaps across the lake on a big catch. */
+  const leap = useCallback(async () => {
+    if (!mountedRef.current) return;
+    jumpProg.setValue(0);
+    setJumping(true);
+    await new Promise<void>((r) => Animated.timing(jumpProg, { toValue: 1, duration: 1400, easing: Easing.linear, useNativeDriver: true }).start(() => r()));
+    if (mountedRef.current) setJumping(false);
+  }, [jumpProg]);
 
   const spin = useCallback(async () => {
     if (busyRef.current || !config) return;
@@ -576,6 +843,7 @@ export default function FishermansCatchScreen() {
           setCollecting(true);
           const got = scale(fs.collect);
           if (got > 0) {
+            await flyToBoard(target);
             await flashBanner(`+${money(got)}`, `${fs.fishermen} fisherman${fs.fishermen > 1 ? 'men' : ''} collected${fs.multiplier > 1 ? ` · x${fs.multiplier}` : ''}`, 700);
             await countUp('WIN', shown, round2(shown + got));
             shown = round2(shown + got);
@@ -595,6 +863,7 @@ export default function FishermansCatchScreen() {
         await wait(fs.win > 0 ? 450 : 250);
       }
       setCollecting(false);
+      if (state.won > 0) void leap();
       await flashBanner('FEATURE WIN', money(state.won), 1500);
       setFree(NO_FREE);
     }
@@ -602,6 +871,7 @@ export default function FishermansCatchScreen() {
     // Only a return above the stake is celebrated; a smaller one is shown plainly.
     if (payout > bet) {
       if (shown !== payout) await countUp('WIN', shown, payout);
+      if (payout >= bet * 10 && outcome.freeSpinsAwarded === 0) void leap();
       if (payout >= bet * 20 && outcome.freeSpinsAwarded === 0) await flashBanner(payout >= bet * 100 ? 'MEGA WIN' : 'BIG WIN', money(payout), 1300);
       setMeter({ label: 'WIN', amount: payout, tone: 'win' });
     } else if (payout > 0) {
@@ -618,7 +888,7 @@ export default function FishermansCatchScreen() {
     if (mountedRef.current) setBusy(false);
     // reels are stable refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, bet, shownBalance, cells, panel, multipliers, perLevel, flashBanner, countUp, spinReelsTo, refreshWallet, showToast]);
+  }, [config, bet, shownBalance, cells, panel, multipliers, perLevel, flashBanner, countUp, spinReelsTo, flyToBoard, leap, refreshWallet, showToast]);
 
   const stepBet = (dir: 1 | -1) => {
     if (busy) return;
@@ -643,6 +913,7 @@ export default function FishermansCatchScreen() {
   const reelW = Math.floor((reelsW - reelGap * 4 - 10) / 5);
   const cell = Math.floor(Math.min(reelW * 1.02, 96));
   const reelsH = cell * 3;
+  geom.current = { cabW, reelW, cell, reelGap, frame, boardW: free.active ? (cabW - 26) * 0.5 : cabW - 20 };
 
   const litCells = useMemo(() => {
     const lit = [0, 1, 2, 3, 4].map(() => [false, false, false]);
@@ -659,7 +930,9 @@ export default function FishermansCatchScreen() {
   const inLevel = levelIndex >= multipliers.length - 1 ? perLevel : free.collected % perLevel;
   const minutes = Math.floor((now - sessionStart.current) / 60000);
   const seconds = Math.floor(((now - sessionStart.current) % 60000) / 1000);
-  const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
+  const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const meterColor = meter.tone === 'win' ? '#D8FFB0' : meter.tone === 'return' ? '#FFE0A0' : '#FFF1D0';
+  const boardW = geom.current.boardW;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -673,7 +946,7 @@ export default function FishermansCatchScreen() {
           <Text style={styles.title}>FISHERMAN'S CATCH</Text>
         </Pressable>
         <View style={styles.balancePill}>
-          <MaterialCommunityIcons name="wallet" size={15} color={GOLD} />
+          <MaterialCommunityIcons name="anchor" size={15} color={GOLD} />
           <Text style={styles.balanceText}>{money(shownBalance)}</Text>
         </View>
       </View>
@@ -681,39 +954,36 @@ export default function FishermansCatchScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24, alignItems: 'center' }} scrollEnabled={!busy}>
         <View style={[styles.cabinet, { width: cabW }]} onLayout={(e) => setSceneH(Math.round(e.nativeEvent.layout.height))}>
           {sceneH > 0 && <LakeScene w={cabW} h={sceneH} night={free.active} />}
+          <Waves w={cabW} drift={drift} night={free.active} />
           <View style={{ alignItems: 'center', marginTop: 6 }}>
             <Title width={cabW * 0.94} free={free.active} />
           </View>
 
-          {/* Free spins bar: spins, multiplier and the Fisherman meter */}
-          <View style={[styles.freeBar, { opacity: free.active ? 1 : 0 }]}>
-            <View style={styles.freeBox}>
-              <Text style={styles.freeLabel}>FREE SPINS</Text>
-              <Text style={styles.freeValue}>
-                {free.played}/{free.total}
-              </Text>
-            </View>
-            <View style={styles.meterHooks}>
-              {Array.from({ length: perLevel }, (_, i) => (
-                <View key={i} style={[styles.hook, i < inLevel && styles.hookOn]}>
-                  <MaterialCommunityIcons name="hook" size={14} color={i < inLevel ? '#2A1600' : '#7A6A40'} />
-                </View>
-              ))}
-              <View style={{ flexDirection: 'row', gap: 3, marginLeft: 4 }}>
-                {multipliers.slice(1).map((m, i) => (
-                  <Text key={m} style={[styles.levelText, levelIndex >= i + 1 && styles.levelOn]}>
-                    x{m}
-                  </Text>
-                ))}
+          {/* Free spins: spins left, the Fisherman hook line and the life-ring multiplier */}
+          {free.active && (
+            <View style={styles.freeBar}>
+              <View style={styles.freeBox}>
+                <Text style={styles.freeLabel}>FREE SPINS</Text>
+                <Text style={styles.freeValue}>
+                  {free.played}/{free.total}
+                </Text>
               </View>
+              <View style={styles.hookBox}>
+                <HookLine count={perLevel} filled={inLevel} width={cabW * 0.36} />
+                <View style={{ flexDirection: 'row', gap: 4, marginTop: -4 }}>
+                  {multipliers.slice(1).map((m, i) => (
+                    <Text key={m} style={[styles.levelText, levelIndex >= i + 1 && styles.levelOn]}>
+                      x{m}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+              <LifeRing mult={free.multiplier} size={52} pulse={free.multiplier > 1 ? pulseScale : 1} />
             </View>
-            <Animated.View style={[styles.multBox, { transform: [{ scale: free.multiplier > 1 ? pulseScale : 1 }] }]}>
-              <Text style={styles.multText}>x{free.multiplier}</Text>
-            </Animated.View>
-          </View>
+          )}
 
           {/* Reels in a wooden frame */}
-          <View style={[styles.reelFrame, { marginHorizontal: frame }]}>
+          <View style={[styles.reelFrame, { marginHorizontal: frame }]} onLayout={(e) => (reelFrameY.current = e.nativeEvent.layout.y)}>
             <LinearGradient colors={['#A0612E', WOOD, WOOD_DARK]} style={[StyleSheet.absoluteFill, { borderRadius: 14 }]} />
             <View style={{ flexDirection: 'row', gap: reelGap, padding: 4 }}>
               {[0, 1, 2, 3, 4].map((i) => (
@@ -736,25 +1006,25 @@ export default function FishermansCatchScreen() {
                 })}
               </Svg>
             )}
+            {/* Rope tied along the top of the frame */}
+            <View pointerEvents="none" style={styles.rope} />
           </View>
 
-          {/* Win meter */}
-          <View style={[styles.meterRow, { marginBottom: 10 }]}>
-            <View style={styles.meter}>
-              <Text style={[styles.meterLabel, meter.tone === 'win' && { color: '#7CFF9A' }]}>{meter.label}</Text>
-              <Text style={[styles.meterValue, meter.tone === 'win' && { color: '#7CFF9A' }, meter.tone === 'return' && { color: '#FFD9A0' }]} numberOfLines={1} adjustsFontSizeToFit>
-                {meter.amount === null ? '— — —' : money(meter.amount)}
-              </Text>
-            </View>
-            {free.active && (
-              <View style={[styles.meter, { flex: 0.8 }]}>
-                <Text style={[styles.meterLabel, { color: GOLD }]}>FEATURE</Text>
-                <Text style={[styles.meterValue, { color: GOLD }]} numberOfLines={1} adjustsFontSizeToFit>
-                  {money(free.won)}
-                </Text>
-              </View>
-            )}
+          {/* Catch boards */}
+          <View style={styles.boardRow} onLayout={(e) => (boardY.current = e.nativeEvent.layout.y)}>
+            <CatchBoard label={meter.label} value={meter.amount === null ? '~ ~ ~' : money(meter.amount)} color={meterColor} width={boardW} />
+            {free.active && <CatchBoard label="FEATURE" value={money(free.won)} color="#FFE36B" width={(cabW - 26) * 0.5} />}
           </View>
+          <View style={{ height: 44 }} />
+          <View pointerEvents="none" style={{ position: 'absolute', right: cabW * 0.2, bottom: 4, height: 34, width: 18 }}>
+            <Bobber bob={bob} />
+          </View>
+
+          {/* Cash tags flying to the board, and the leaping fish */}
+          {flyers.map((f) => (
+            <Flyer key={f.id} from={f.from} to={f.to} text={f.text} progress={flyProg} />
+          ))}
+          {jumping && <JumpingFish width={cabW} progress={jumpProg} />}
         </View>
 
         {/* Line wins */}
@@ -774,6 +1044,64 @@ export default function FishermansCatchScreen() {
           )}
         </View>
 
+        {/* The boat: bait board, reel and the tackle crates */}
+        <View style={[styles.boat, { width: cabW }]}>
+          <Svg width={cabW} height={132} style={StyleSheet.absoluteFill} viewBox={`0 0 ${cabW} 132`}>
+            <Defs>
+              <SvgLinearGradient id={hullId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#A86A34" />
+                <Stop offset="0.6" stopColor="#6B3E1E" />
+                <Stop offset="1" stopColor="#3A1F0C" />
+              </SvgLinearGradient>
+            </Defs>
+            <Path d={`M 4 10 L ${cabW - 4} 10 C ${cabW - 14} 80, ${cabW - 50} 128, ${cabW / 2} 128 C 50 128, 14 80, 4 10 Z`} fill={`url(#${hullId})`} stroke="#2A1004" strokeWidth={2.5} />
+            {[34, 58, 82, 104].map((y) => (
+              <Path key={y} d={`M ${14 + (y - 10) * 0.18} ${y} L ${cabW - 14 - (y - 10) * 0.18} ${y}`} stroke="#2A1004" strokeOpacity={0.3} strokeWidth={1.2} />
+            ))}
+            <Rect x={0} y={2} width={cabW} height={12} rx={6} fill="#C88A48" stroke="#2A1004" strokeWidth={2} />
+            <Path d={`M 10 8 Q ${cabW / 4} 16 ${cabW / 2} 8 Q ${(cabW * 3) / 4} 16 ${cabW - 10} 8`} stroke="#E8D8B0" strokeWidth={2.5} fill="none" strokeDasharray="5 3" />
+          </Svg>
+          <View style={styles.boatRow}>
+            {/* Bait board hanging on two ropes */}
+            <View style={{ alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', gap: 52 }}>
+                <View style={styles.hangRope} />
+                <View style={styles.hangRope} />
+              </View>
+              <View style={styles.baitBoard}>
+                <Text style={styles.baitLabel}>BAIT</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Pressable onPress={() => stepBet(-1)} disabled={busy} style={[styles.knot, busy && styles.dim]} hitSlop={8}>
+                    <MaterialCommunityIcons name="minus" size={16} color="#3A1F0C" />
+                  </Pressable>
+                  <Text style={styles.baitValue}>{money(bet)}</Text>
+                  <Pressable onPress={() => stepBet(1)} disabled={busy} style={[styles.knot, busy && styles.dim]} hitSlop={8}>
+                    <MaterialCommunityIcons name="plus" size={16} color="#3A1F0C" />
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            {/* Cast: the fishing reel */}
+            <Pressable onPress={spin} disabled={busy || !config} style={({ pressed }) => [{ alignItems: 'center' }, pressed && { transform: [{ scale: 0.94 }] }]}>
+              <FishingReel size={78} turn={reelTurn} lit={!busy && !!config} />
+              <Text style={[styles.castText, (busy || !config) && { color: '#8A8E98' }]}>{busy ? 'REELING…' : 'CAST'}</Text>
+            </Pressable>
+
+            {/* Tackle crates */}
+            <View style={{ gap: 8 }}>
+              <Pressable onPress={() => setPanel('pay')} style={styles.crate} hitSlop={4}>
+                <MaterialCommunityIcons name="toolbox" size={18} color="#FFE9B0" />
+                <Text style={styles.crateText}>PAYS</Text>
+              </Pressable>
+              <Pressable onPress={openHistory} style={styles.crate} hitSlop={4}>
+                <MaterialCommunityIcons name="notebook" size={18} color="#FFE9B0" />
+                <Text style={styles.crateText}>LOG</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
         {/* Session (UK: time played and net position, always on show) */}
         <View style={[styles.session, { width: cabW }]}>
           <MaterialCommunityIcons name="timer-outline" size={15} color="#B9C3D6" />
@@ -785,42 +1113,6 @@ export default function FishermansCatchScreen() {
             Net {sessionNet >= 0 ? '+' : '−'}
             {money(Math.abs(sessionNet))}
           </Text>
-        </View>
-
-        {/* Controls */}
-        <View style={[styles.controls, { width: cabW }]}>
-          <Pressable onPress={() => setPanel('pay')} style={styles.sideBtn} hitSlop={6}>
-            <MaterialCommunityIcons name="information-outline" size={20} color={GOLD} />
-            <Text style={styles.sideBtnText}>PAYS</Text>
-          </Pressable>
-          <View style={styles.betBox}>
-            <Text style={styles.betLabel}>BET</Text>
-            <View style={styles.betRow}>
-              <Pressable onPress={() => stepBet(-1)} disabled={busy} style={[styles.betBtn, busy && styles.dim]} hitSlop={6}>
-                <MaterialCommunityIcons name="minus" size={18} color="#FFFFFF" />
-              </Pressable>
-              <Text style={styles.betValue}>{money(bet)}</Text>
-              <Pressable onPress={() => stepBet(1)} disabled={busy} style={[styles.betBtn, busy && styles.dim]} hitSlop={6}>
-                <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
-              </Pressable>
-            </View>
-          </View>
-          <Pressable onPress={spin} disabled={busy || !config} style={({ pressed }) => [styles.spinWrap, pressed && { transform: [{ scale: 0.95 }] }]}>
-            <LinearGradient colors={busy || !config ? ['#3A4A5A', '#1A2A3A'] : ['#5FD0FF', '#1E88E5', '#0B3A7A']} style={styles.spinBtn}>
-              {busy ? (
-                <Text style={styles.spinText}>…</Text>
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="fish" size={22} color="#FFFFFF" />
-                  <Text style={styles.spinText}>CAST</Text>
-                </>
-              )}
-            </LinearGradient>
-          </Pressable>
-          <Pressable onPress={openHistory} style={styles.sideBtn} hitSlop={6}>
-            <MaterialCommunityIcons name="history" size={20} color={GOLD} />
-            <Text style={styles.sideBtnText}>HISTORY</Text>
-          </Pressable>
         </View>
 
         <Text style={styles.footNote}>
@@ -851,7 +1143,7 @@ export default function FishermansCatchScreen() {
         <Pressable style={styles.modalBack} onPress={() => setPanel(null)}>
           <Pressable style={[styles.modalCard, { width: Math.min(W - 24, 440) }]} onPress={() => {}}>
             <View style={styles.modalHead}>
-              <Text style={styles.modalTitle}>{panel === 'pay' ? 'PAYTABLE' : 'MY SPINS'}</Text>
+              <Text style={styles.modalTitle}>{panel === 'pay' ? 'PAYTABLE' : 'CATCH LOG'}</Text>
               <Pressable onPress={() => setPanel(null)} hitSlop={8}>
                 <MaterialCommunityIcons name="close" size={22} color="#FFFFFF" />
               </Pressable>
@@ -950,25 +1242,17 @@ const styles = StyleSheet.create({
   balancePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,209,102,0.12)', borderWidth: 1, borderColor: 'rgba(255,209,102,0.4)' },
   balanceText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   cabinet: { borderRadius: 22, borderWidth: 3, borderColor: GOLD_DEEP, overflow: 'hidden', marginTop: 4 },
-  freeBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, height: 40, marginBottom: 4 },
+  freeBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, height: 56, marginBottom: 2 },
+  hookBox: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 14, paddingHorizontal: 6, paddingBottom: 3 },
   freeBox: { alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 2, borderWidth: 1, borderColor: GOLD },
   freeLabel: { color: GOLD, fontSize: 8, fontWeight: '900', letterSpacing: 1 },
   freeValue: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
-  meterHooks: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 14, paddingHorizontal: 8, paddingVertical: 4 },
-  hook: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#2A2410', borderWidth: 1, borderColor: '#7A6A40', alignItems: 'center', justifyContent: 'center' },
-  hookOn: { backgroundColor: '#FFC93C', borderColor: '#FFF3B0' },
   levelText: { color: '#6A6050', fontSize: 11, fontWeight: '900' },
   levelOn: { color: GOLD },
-  multBox: { backgroundColor: '#C0392B', borderRadius: 12, borderWidth: 2, borderColor: GOLD, paddingHorizontal: 12, paddingVertical: 4 },
-  multText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
   reelFrame: { borderRadius: 14, borderWidth: 2, borderColor: WOOD_DARK, padding: 4 },
   reelWindow: { borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0,0,0,0.35)' },
   fishTag: { position: 'absolute', alignSelf: 'center', backgroundColor: '#FFC93C', borderRadius: 8, borderWidth: 1.5, borderColor: '#8A5A00', paddingVertical: 1 },
   fishTagText: { color: '#3A1F00', fontWeight: '900' },
-  meterRow: { flexDirection: 'row', gap: 6, marginHorizontal: 12, marginTop: 8 },
-  meter: { flex: 1, borderRadius: 10, borderWidth: 2, borderColor: '#2A3A4A', backgroundColor: 'rgba(4,10,20,0.85)', paddingHorizontal: 10, paddingVertical: 3 },
-  meterLabel: { color: '#5FD0FF', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  meterValue: { color: '#5FD0FF', fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'] },
   lineWinsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 8, minHeight: 26 },
   lineWinHint: { color: '#A9B6CC', fontSize: 11, fontWeight: '700' },
   lineChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1.5, backgroundColor: 'rgba(0,0,0,0.35)' },
@@ -976,18 +1260,23 @@ const styles = StyleSheet.create({
   session: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
   sessionText: { color: '#B9C3D6', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   sessionSep: { color: '#5A6070', fontSize: 12 },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 4 },
-  sideBtn: { alignItems: 'center', gap: 2, width: 58 },
-  sideBtnText: { color: GOLD, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  betBox: { alignItems: 'center', gap: 4 },
-  betLabel: { color: '#A9B6CC', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  betRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#0E1A2A', borderRadius: 20, borderWidth: 1.5, borderColor: GOLD_DEEP, paddingHorizontal: 6, paddingVertical: 4 },
-  betBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#1E3A5A', alignItems: 'center', justifyContent: 'center' },
-  betValue: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', minWidth: 70, textAlign: 'center' },
   dim: { opacity: 0.4 },
-  spinWrap: { borderRadius: 40, borderWidth: 4, borderColor: GOLD, shadowColor: '#5FD0FF', shadowOpacity: 0.8, shadowRadius: 12, elevation: 8 },
-  spinBtn: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
-  spinText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 2 },
+  rope: { position: 'absolute', left: 6, right: 6, top: -3, height: 6, borderRadius: 3, backgroundColor: '#D8BC86', borderWidth: 1, borderColor: '#7A5A2A', borderStyle: 'dashed' },
+  boardRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10, marginTop: 10, gap: 6 },
+  boardLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 2, opacity: 0.85 },
+  boardValue: { fontSize: 20, fontWeight: '900', fontVariant: ['tabular-nums'], textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  flyTag: { width: 44, alignItems: 'center', backgroundColor: '#FFC93C', borderRadius: 9, borderWidth: 2, borderColor: '#FFF3B0', paddingVertical: 2, shadowColor: '#FFD166', shadowOpacity: 0.9, shadowRadius: 8, elevation: 6 },
+  flyText: { color: '#3A1F00', fontSize: 11, fontWeight: '900' },
+  boat: { height: 132, marginTop: 10 },
+  boatRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 12, paddingBottom: 18 },
+  hangRope: { width: 2, height: 10, backgroundColor: '#D8BC86' },
+  baitBoard: { alignItems: 'center', backgroundColor: '#E8C890', borderRadius: 8, borderWidth: 2, borderColor: '#5A2E10', paddingHorizontal: 8, paddingVertical: 4 },
+  baitLabel: { color: '#5A2E10', fontSize: 10, fontWeight: '900', letterSpacing: 3 },
+  baitValue: { color: '#2A1004', fontSize: 15, fontWeight: '900', minWidth: 62, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  knot: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#D8BC86', borderWidth: 2, borderColor: '#7A5A2A', alignItems: 'center', justifyContent: 'center' },
+  castText: { color: '#FFE9B0', fontSize: 13, fontWeight: '900', letterSpacing: 2, marginTop: 2, textShadowColor: '#000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  crate: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#5A3418', borderRadius: 6, borderWidth: 2, borderColor: '#2A1004', paddingHorizontal: 8, paddingVertical: 5, borderTopColor: '#A0612E' },
+  crateText: { color: '#FFE9B0', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   footNote: { color: '#7A8090', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '30%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 26, paddingVertical: 12, borderRadius: 18, borderWidth: 3, borderColor: '#FFF8D0', alignItems: 'center' },
