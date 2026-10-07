@@ -2471,6 +2471,84 @@ export function fetchFruitMachineHistory(limit = 30) {
   return apiFetch<FruitSpinRow[]>(`/fruit-machine/my-history?limit=${limit}`);
 }
 
+// ---------- Fisherman's Catch (5x3, ten lines, fish-collecting free spins) ----------
+
+export type FishSymbol = 'JACK' | 'QUEEN' | 'KING' | 'ACE' | 'LURE' | 'TACKLE' | 'ROD' | 'FISH' | 'BONUS' | 'WILD';
+export interface FishLineWin {
+  line: number;
+  symbol: FishSymbol;
+  count: number;
+  /** In line bets (the stake / lineCount). */
+  pays: number;
+}
+export interface FishFreeSpin {
+  stops: number[];
+  /** [reel][row] cash value of each fish, in stakes (0 where there's no fish). */
+  fishValues: number[][];
+  lines: FishLineWin[];
+  fishermen: number;
+  multiplier: number;
+  /** In stakes. */
+  collect: number;
+  /** In stakes. */
+  win: number;
+  collected: number;
+  spinsLeft: number;
+  retrigger: number;
+}
+export interface FishermanOutcome {
+  stops: number[];
+  fishValues: number[][];
+  lines: FishLineWin[];
+  baseWin: number;
+  boats: number;
+  freeSpinsAwarded: number;
+  freeSpins: FishFreeSpin[];
+  /** In stakes. */
+  totalWin: number;
+}
+export interface FishermanSpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  freeSpins: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface FishermanConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  baseStrips: FishSymbol[][];
+  freeStrips: FishSymbol[][];
+  lines: number[][];
+  lineCount: number;
+  pays: Partial<Record<FishSymbol, [number, number, number]>>;
+  wildPays: [number, number, number];
+  fishValues: { value: number; chancePercent: number }[];
+  freeSpinsFor: Record<string, number>;
+  multipliers: number[];
+  fishermenPerLevel: number;
+  retriggerSpins: number;
+  featureChancePercent: number;
+  rtpPercent: number;
+}
+
+export function fetchFishermanConfig() {
+  return apiFetch<FishermanConfig>('/fishermans-catch/config');
+}
+
+export function spinFisherman(stake: number) {
+  return apiFetch<{ spin: FishermanSpinRow; outcome: FishermanOutcome }>('/fishermans-catch/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchFishermanHistory(limit = 30) {
+  return apiFetch<FishermanSpinRow[]>(`/fishermans-catch/my-history?limit=${limit}`);
+}
+
 // ---- Money Coming --------------------------------------------------------------
 
 export interface MoneyComingSpecial {
