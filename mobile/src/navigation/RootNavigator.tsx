@@ -18,6 +18,7 @@ import RocketScreen from '../screens/RocketScreen';
 import GoalRushScreen from '../screens/GoalRushScreen';
 import FruitMachineScreen from '../screens/FruitMachineScreen';
 import FishermansCatchScreen from '../screens/FishermansCatchScreen';
+import BookOfPharaohScreen from '../screens/BookOfPharaohScreen';
 import MoneyComingScreen from '../screens/MoneyComingScreen';
 import GiftCodeScreen from '../screens/GiftCodeScreen';
 import JhandiMundaScreen from '../screens/JhandiMundaScreen';
@@ -109,6 +110,7 @@ function MainNavigator() {
       <Stack.Screen name="GoalRush" component={GoalRushScreen} />
       <Stack.Screen name="FruitMachine" component={FruitMachineScreen} />
       <Stack.Screen name="FishermansCatch" component={FishermansCatchScreen} />
+      <Stack.Screen name="BookOfPharaoh" component={BookOfPharaohScreen} />
       <Stack.Screen name="MoneyComing" component={MoneyComingScreen} />
       <Stack.Screen name="GiftCode" component={GiftCodeScreen} />
       <Stack.Screen name="JhandiMunda" component={JhandiMundaScreen} />

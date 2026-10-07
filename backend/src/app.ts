@@ -49,6 +49,7 @@ import rocketRoutes from "./routes/rocket.routes";
 import goalRushRoutes from "./routes/goalRush.routes";
 import fruitMachineRoutes from "./routes/fruitMachine.routes";
 import fishermanRoutes from "./routes/fisherman.routes";
+import bookOfPharaohRoutes from "./routes/bookOfPharaoh.routes";
 import moneyComingRoutes from "./routes/moneyComing.routes";
 import { closeOutRetiredGames } from "./services/retiredGamesCloseout";
 import { refreshSettingsIfStale } from "./services/settingsService";
@@ -113,6 +114,7 @@ app.use("/rocket", rocketRoutes);
 app.use("/goal-rush", goalRushRoutes);
 app.use("/fruit-machine", fruitMachineRoutes);
 app.use("/fishermans-catch", fishermanRoutes);
+app.use("/book-of-pharaoh", bookOfPharaohRoutes);
 app.use("/money-coming", moneyComingRoutes);
 
 app.use(errorHandler);

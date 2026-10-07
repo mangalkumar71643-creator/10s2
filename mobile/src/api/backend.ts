@@ -2549,6 +2549,78 @@ export function fetchFishermanHistory(limit = 30) {
   return apiFetch<FishermanSpinRow[]>(`/fishermans-catch/my-history?limit=${limit}`);
 }
 
+// ---------- Book of Pharaoh (5x3, ten lines, book wild/scatter, expanding free-spin symbol) ----------
+
+export type PharaohSymbol = 'TEN' | 'JACK' | 'QUEEN' | 'KING' | 'ACE' | 'ANKH' | 'SCARAB' | 'EYE' | 'PHARAOH' | 'BOOK';
+export interface PharaohLineWin {
+  line: number;
+  symbol: PharaohSymbol;
+  count: number;
+  /** In line bets (the stake / lineCount). */
+  pays: number;
+}
+export interface PharaohFreeSpin {
+  stops: number[];
+  lines: PharaohLineWin[];
+  books: number;
+  /** Reels the special symbol filled (empty when it didn't pay). */
+  expandReels: number[];
+  /** In stakes. */
+  expand: number;
+  /** In stakes. */
+  win: number;
+  retrigger: number;
+  spinsLeft: number;
+}
+export interface PharaohOutcome {
+  stops: number[];
+  lines: PharaohLineWin[];
+  books: number;
+  /** Lines plus book scatter, in stakes. */
+  baseWin: number;
+  special: PharaohSymbol | null;
+  freeSpins: PharaohFreeSpin[];
+  /** In stakes. */
+  totalWin: number;
+}
+export interface PharaohSpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  freeSpins: number;
+  special: PharaohSymbol | null;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface BookOfPharaohConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  strips: PharaohSymbol[][];
+  lines: number[][];
+  lineCount: number;
+  pays: Record<Exclude<PharaohSymbol, 'BOOK'>, [number, number, number, number]>;
+  scatterPays: Record<string, number>;
+  freeSpins: number;
+  featureChancePercent: number;
+  rtpPercent: number;
+}
+
+export function fetchBookOfPharaohConfig() {
+  return apiFetch<BookOfPharaohConfig>('/book-of-pharaoh/config');
+}
+
+export function spinBookOfPharaoh(stake: number) {
+  return apiFetch<{ spin: PharaohSpinRow; outcome: PharaohOutcome }>('/book-of-pharaoh/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchBookOfPharaohHistory(limit = 30) {
+  return apiFetch<PharaohSpinRow[]>(`/book-of-pharaoh/my-history?limit=${limit}`);
+}
+
 // ---- Money Coming --------------------------------------------------------------
 
 export interface MoneyComingSpecial {
