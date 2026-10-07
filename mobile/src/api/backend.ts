@@ -1027,6 +1027,55 @@ export function fetchBigCatchMyBets() {
   return apiFetch<BigCatchMyBet[]>('/big-catch/my-bets');
 }
 
+// ---- Cosmonaut (the crash engine with manual and automatic half cash-outs) --
+
+export interface CosmonautConfig extends BigCatchConfig {
+  autoHalf: boolean;
+}
+
+export interface CosmonautBet extends BigCatchBet {
+  autoHalfAt: string | null;
+}
+
+export interface CosmonautMyBet extends CosmonautBet {
+  round: { periodNumber: string; crashMultiplier: string; settled: boolean };
+}
+
+export function fetchCosmonautConfig() {
+  return apiFetch<CosmonautConfig>('/cosmonaut/config');
+}
+
+export function fetchCosmonautCurrentRound() {
+  return apiFetch<AviatorRoundView>('/cosmonaut/current');
+}
+
+export function fetchCosmonautHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/cosmonaut/history?limit=${limit}`);
+}
+
+export function placeCosmonautBet(amount: number, autoCashoutAt?: number, autoHalfAt?: number) {
+  return apiFetch<CosmonautBet>('/cosmonaut/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt, autoHalfAt }),
+  });
+}
+
+/**
+ * Cash out the whole bet, or with `half` take half the stake and leave the
+ * rest flying (once per bet). A full cash-out past the Auto ½ target also
+ * reports the half it settled on the way (`halfAt`).
+ */
+export function cashOutCosmonautBet(betId: string, half = false) {
+  return apiFetch<{ multiplier: number; payout: number; half: boolean; halfAt?: number | null; halfPaid?: number }>('/cosmonaut/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId, half }),
+  });
+}
+
+export function fetchCosmonautMyBets() {
+  return apiFetch<CosmonautMyBet[]>('/cosmonaut/my-bets');
+}
+
 // ---- Jhandi Munda ------------------------------------------------------------
 
 export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';

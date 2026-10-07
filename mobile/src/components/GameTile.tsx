@@ -24,6 +24,7 @@ import { Neon777TileArt } from '../screens/Neon777Screen';
 import { RocketTileArt } from '../screens/RocketScreen';
 import { GoalRushTileArt } from '../screens/GoalRushScreen';
 import { BigCatchTileArt } from '../screens/BigCatchScreen';
+import { CosmonautTileArt } from '../screens/CosmonautScreen';
 import { FruitMachineTileArt } from '../screens/FruitMachineScreen';
 import { FishermansCatchTileArt } from '../screens/FishermansCatchScreen';
 import { BookOfPharaohTileArt } from '../screens/BookOfPharaohScreen';
@@ -72,6 +73,7 @@ export type GameId =
   | 'Rocket'
   | 'GoalRush'
   | 'BigCatch'
+  | 'Cosmonaut'
   | 'FruitMachine'
   | 'FishermansCatch'
   | 'BookOfPharaoh'
@@ -92,7 +94,7 @@ export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
   { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
   { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777', 'MoneyComing', 'FruitMachine', 'FishermansCatch', 'BookOfPharaoh'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
-  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket', 'GoalRush', 'BigCatch'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
+  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket', 'GoalRush', 'BigCatch', 'Cosmonaut'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
 ];
 
 /** Games drawn with a supplied icon image instead of their built-in tile art. */
@@ -855,6 +857,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <BigCatchTileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2, textAlign: 'center', lineHeight: 19, textShadowColor: '#3CF0D0', textShadowRadius: 8 }}>{'BIG\nCATCH'}</Text>
+        </Pressable>
+      );
+    case 'Cosmonaut':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('Cosmonaut')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#9B7BFF',
+            backgroundColor: '#0A0420',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 10,
+          }}
+        >
+          <CosmonautTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1, textShadowColor: '#9B7BFF', textShadowRadius: 8 }}>COSMONAUT</Text>
         </Pressable>
       );
     case 'FruitMachine':

@@ -186,6 +186,7 @@ model User {
   RocketBet          RocketBet[]
   GoalRushBet        GoalRushBet[]
   BigCatchBet        BigCatchBet[]
+  CosmonautBet       CosmonautBet[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1637,6 +1638,46 @@ model BigCatchBet {
   // Total paid on the bet, the Half Reel included.
   payout                Decimal       @default(0) @db.Decimal(12, 2)
   createdAt             DateTime      @default(now())
+
+  @@index([userId])
+  @@index([roundId])
+}
+
+model CosmonautRound {
+  id               String         @id @default(uuid())
+  periodNumber     String         @unique
+  bettingStartTime DateTime
+  flyStartTime     DateTime
+  crashTime        DateTime
+  endTime          DateTime
+  crashMultiplier  Decimal        @db.Decimal(10, 2)
+  serverSeed       String
+  serverSeedHash   String
+  settled          Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  bets             CosmonautBet[]
+
+  @@index([bettingStartTime])
+}
+
+model CosmonautBet {
+  id                    String         @id @default(uuid())
+  roundId               String
+  round                 CosmonautRound @relation(fields: [roundId], references: [id])
+  userId                String
+  user                  User           @relation(fields: [userId], references: [id])
+  amount                Decimal        @db.Decimal(12, 2)
+  autoCashoutAt         Decimal?       @db.Decimal(10, 2)
+  // Auto ½: half the stake is taken by itself when the flight reaches this.
+  autoHalfAt            Decimal?       @db.Decimal(10, 2)
+  cashoutMultiplier     Decimal?       @db.Decimal(10, 2)
+  // The multiplier half the stake was taken at (by hand or Auto ½), and what it paid.
+  halfCashoutMultiplier Decimal?       @db.Decimal(10, 2)
+  halfPayout            Decimal        @default(0) @db.Decimal(12, 2)
+  status                BetStatus      @default(PENDING)
+  // Total paid on the bet, the half included.
+  payout                Decimal        @default(0) @db.Decimal(12, 2)
+  createdAt             DateTime       @default(now())
 
   @@index([userId])
   @@index([roundId])

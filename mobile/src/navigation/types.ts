@@ -37,6 +37,7 @@ export type RootStackParamList = {
   Rocket: undefined;
   GoalRush: undefined;
   BigCatch: undefined;
+  Cosmonaut: undefined;
   FruitMachine: undefined;
   FishermansCatch: undefined;
   BookOfPharaoh: undefined;
