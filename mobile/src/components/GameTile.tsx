@@ -27,6 +27,7 @@ import { BigCatchTileArt } from '../screens/BigCatchScreen';
 import { CosmonautTileArt } from '../screens/CosmonautScreen';
 import { SkyJetTileArt } from '../screens/SkyJetScreen';
 import { NightRacerTileArt } from '../screens/NightRacerScreen';
+import { AirshipTileArt } from '../screens/AirshipScreen';
 import { FruitMachineTileArt } from '../screens/FruitMachineScreen';
 import { FishermansCatchTileArt } from '../screens/FishermansCatchScreen';
 import { BookOfPharaohTileArt } from '../screens/BookOfPharaohScreen';
@@ -78,6 +79,7 @@ export type GameId =
   | 'Cosmonaut'
   | 'SkyJet'
   | 'NightRacer'
+  | 'Airship'
   | 'FruitMachine'
   | 'FishermansCatch'
   | 'BookOfPharaoh'
@@ -98,7 +100,7 @@ export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
   { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
   { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777', 'MoneyComing', 'FruitMachine', 'FishermansCatch', 'BookOfPharaoh'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
-  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket', 'GoalRush', 'BigCatch', 'Cosmonaut', 'SkyJet', 'NightRacer'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
+  { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket', 'GoalRush', 'BigCatch', 'Cosmonaut', 'SkyJet', 'NightRacer', 'Airship'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
 ];
 
 /** Games drawn with a supplied icon image instead of their built-in tile art. */
@@ -924,6 +926,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <NightRacerTileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFFFFF', fontSize: 17, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2, textAlign: 'center', lineHeight: 19, textShadowColor: '#FF2E88', textShadowRadius: 8 }}>{'NIGHT\nRACER'}</Text>
+        </Pressable>
+      );
+    case 'Airship':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('Airship')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#D8A84A',
+            backgroundColor: '#2A1E3A',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 10,
+          }}
+        >
+          <AirshipTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFE2A0', fontSize: 19, fontWeight: '900', letterSpacing: 3, fontFamily: 'serif', textShadowColor: '#000', textShadowRadius: 6 }}>AIRSHIP</Text>
         </Pressable>
       );
     case 'FruitMachine':

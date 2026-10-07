@@ -1190,6 +1190,38 @@ export function fetchNightRacerMyBets() {
   return apiFetch<NightRacerMyBet[]>('/night-racer/my-bets');
 }
 
+// ---- Airship (same crash engine and shapes as Aviator) ---------------------
+
+export function fetchAirshipConfig() {
+  return apiFetch<AviatorConfig>('/airship/config');
+}
+
+export function fetchAirshipCurrentRound() {
+  return apiFetch<AviatorRoundView>('/airship/current');
+}
+
+export function fetchAirshipHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/airship/history?limit=${limit}`);
+}
+
+export function placeAirshipBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<AviatorBetResult>('/airship/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+export function cashOutAirshipBet(betId: string) {
+  return apiFetch<{ multiplier: number; payout: number }>('/airship/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+export function fetchAirshipMyBets() {
+  return apiFetch<AviatorMyBet[]>('/airship/my-bets');
+}
+
 // ---- Jhandi Munda ------------------------------------------------------------
 
 export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';

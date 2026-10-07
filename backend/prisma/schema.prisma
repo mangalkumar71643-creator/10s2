@@ -190,6 +190,7 @@ model User {
   SkyJetBet          SkyJetBet[]
   SkyJetJackpotWin   SkyJetJackpotWin[]
   NightRacerBet      NightRacerBet[]
+  AirshipBet         AirshipBet[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1775,6 +1776,40 @@ model NightRacerBet {
   status            BetStatus       @default(PENDING)
   payout            Decimal         @default(0) @db.Decimal(12, 2)
   createdAt         DateTime        @default(now())
+
+  @@index([userId])
+  @@index([roundId])
+}
+
+model AirshipRound {
+  id               String       @id @default(uuid())
+  periodNumber     String       @unique
+  bettingStartTime DateTime
+  flyStartTime     DateTime
+  crashTime        DateTime
+  endTime          DateTime
+  crashMultiplier  Decimal      @db.Decimal(10, 2)
+  serverSeed       String
+  serverSeedHash   String
+  settled          Boolean      @default(false)
+  createdAt        DateTime     @default(now())
+  bets             AirshipBet[]
+
+  @@index([bettingStartTime])
+}
+
+model AirshipBet {
+  id                String       @id @default(uuid())
+  roundId           String
+  round             AirshipRound @relation(fields: [roundId], references: [id])
+  userId            String
+  user              User         @relation(fields: [userId], references: [id])
+  amount            Decimal      @db.Decimal(12, 2)
+  autoCashoutAt     Decimal?     @db.Decimal(10, 2)
+  cashoutMultiplier Decimal?     @db.Decimal(10, 2)
+  status            BetStatus    @default(PENDING)
+  payout            Decimal      @default(0) @db.Decimal(12, 2)
+  createdAt         DateTime     @default(now())
 
   @@index([userId])
   @@index([roundId])
