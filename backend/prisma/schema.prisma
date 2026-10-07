@@ -189,6 +189,7 @@ model User {
   CosmonautBet       CosmonautBet[]
   SkyJetBet          SkyJetBet[]
   SkyJetJackpotWin   SkyJetJackpotWin[]
+  NightRacerBet      NightRacerBet[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1739,6 +1740,44 @@ model SkyJetJackpotWin {
   createdAt    DateTime @default(now())
 
   @@index([createdAt])
+}
+
+model NightRacerRound {
+  id               String          @id @default(uuid())
+  periodNumber     String          @unique
+  bettingStartTime DateTime
+  flyStartTime     DateTime
+  crashTime        DateTime
+  endTime          DateTime
+  crashMultiplier  Decimal         @db.Decimal(10, 2)
+  serverSeed       String
+  serverSeedHash   String
+  settled          Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  bets             NightRacerBet[]
+
+  @@index([bettingStartTime])
+}
+
+model NightRacerBet {
+  id                String          @id @default(uuid())
+  roundId           String
+  round             NightRacerRound @relation(fields: [roundId], references: [id])
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  amount            Decimal         @db.Decimal(12, 2)
+  // On the bet's own multiplier (which runs faster once the nitro fires).
+  autoCashoutAt     Decimal?        @db.Decimal(10, 2)
+  // Round multiplier the nitro was fired at, and where the engine blew.
+  nitroAt           Decimal?        @db.Decimal(10, 2)
+  engineBlownAt     Decimal?        @db.Decimal(12, 2)
+  cashoutMultiplier Decimal?        @db.Decimal(12, 2)
+  status            BetStatus       @default(PENDING)
+  payout            Decimal         @default(0) @db.Decimal(12, 2)
+  createdAt         DateTime        @default(now())
+
+  @@index([userId])
+  @@index([roundId])
 }
 
 // Admin-changeable settings, one row per key (e.g. "maxPayout").

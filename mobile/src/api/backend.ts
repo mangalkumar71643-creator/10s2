@@ -1133,6 +1133,63 @@ export function fetchSkyJetMyBets() {
   return apiFetch<SkyJetMyBet[]>('/sky-jet/my-bets');
 }
 
+// ---- Night Racer (the crash engine with a per-bet nitro) -------------------
+
+export interface NightRacerConfig extends AviatorConfig {
+  nitro: boolean;
+}
+
+export interface NightRacerBet extends AviatorBetResult {
+  nitroAt: string | null;
+  engineBlownAt: string | null;
+}
+
+export interface NightRacerMyBet extends NightRacerBet {
+  round: { periodNumber: string; crashMultiplier: string; settled: boolean };
+}
+
+export function fetchNightRacerConfig() {
+  return apiFetch<NightRacerConfig>('/night-racer/config');
+}
+
+export function fetchNightRacerCurrentRound() {
+  return apiFetch<AviatorRoundView>('/night-racer/current');
+}
+
+export function fetchNightRacerHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/night-racer/history?limit=${limit}`);
+}
+
+export function placeNightRacerBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<NightRacerBet>('/night-racer/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+export function cashOutNightRacerBet(betId: string) {
+  return apiFetch<{ multiplier: number; payout: number }>('/night-racer/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+/** Fires the bet's nitro at the live multiplier: its own multiplier then runs twice as fast, with a chance the engine blows. */
+export function fireNightRacerNitro(betId: string) {
+  return apiFetch<{ nitroAt: number }>('/night-racer/nitro', {
+    method: 'POST',
+    body: JSON.stringify({ betId }),
+  });
+}
+
+export function fetchNightRacerNitroStatus(betId: string) {
+  return apiFetch<{ nitroAt: number | null; blown: boolean; blownAt: number | null; status: string }>(`/night-racer/nitro-status?betId=${encodeURIComponent(betId)}`);
+}
+
+export function fetchNightRacerMyBets() {
+  return apiFetch<NightRacerMyBet[]>('/night-racer/my-bets');
+}
+
 // ---- Jhandi Munda ------------------------------------------------------------
 
 export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';
