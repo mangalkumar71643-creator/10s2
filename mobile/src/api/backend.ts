@@ -981,6 +981,52 @@ export function fetchGoalRushMyBets() {
   return apiFetch<AviatorMyBet[]>('/goal-rush/my-bets');
 }
 
+// ---- Big Catch (the crash engine with a Half Reel cash-out) ----------------
+
+export interface BigCatchConfig extends AviatorConfig {
+  halfCashout: boolean;
+}
+
+export interface BigCatchBet extends AviatorBetResult {
+  halfCashoutMultiplier: string | null;
+  halfPayout: string;
+}
+
+export interface BigCatchMyBet extends BigCatchBet {
+  round: { periodNumber: string; crashMultiplier: string; settled: boolean };
+}
+
+export function fetchBigCatchConfig() {
+  return apiFetch<BigCatchConfig>('/big-catch/config');
+}
+
+export function fetchBigCatchCurrentRound() {
+  return apiFetch<AviatorRoundView>('/big-catch/current');
+}
+
+export function fetchBigCatchHistory(limit = 30) {
+  return apiFetch<AviatorHistoryEntry[]>(`/big-catch/history?limit=${limit}`);
+}
+
+export function placeBigCatchBet(amount: number, autoCashoutAt?: number) {
+  return apiFetch<BigCatchBet>('/big-catch/bet', {
+    method: 'POST',
+    body: JSON.stringify({ amount, autoCashoutAt }),
+  });
+}
+
+/** Cash out the whole bet, or with `half` take half the stake and leave the rest riding (once per bet). */
+export function cashOutBigCatchBet(betId: string, half = false) {
+  return apiFetch<{ multiplier: number; payout: number; half: boolean }>('/big-catch/cashout', {
+    method: 'POST',
+    body: JSON.stringify({ betId, half }),
+  });
+}
+
+export function fetchBigCatchMyBets() {
+  return apiFetch<BigCatchMyBet[]>('/big-catch/my-bets');
+}
+
 // ---- Jhandi Munda ------------------------------------------------------------
 
 export type JhandiSymbol = 'HEART' | 'SPADE' | 'DIAMOND' | 'CLUB' | 'FLAG' | 'CROWN';

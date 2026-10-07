@@ -36,6 +36,7 @@ export type RootStackParamList = {
   CricketX: undefined;
   Rocket: undefined;
   GoalRush: undefined;
+  BigCatch: undefined;
   FruitMachine: undefined;
   FishermansCatch: undefined;
   BookOfPharaoh: undefined;

@@ -185,6 +185,7 @@ model User {
   CricketXBet        CricketXBet[]
   RocketBet          RocketBet[]
   GoalRushBet        GoalRushBet[]
+  BigCatchBet        BigCatchBet[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1598,6 +1599,44 @@ model GoalRushBet {
   status            BetStatus     @default(PENDING)
   payout            Decimal       @default(0) @db.Decimal(12, 2)
   createdAt         DateTime      @default(now())
+
+  @@index([userId])
+  @@index([roundId])
+}
+
+model BigCatchRound {
+  id               String        @id @default(uuid())
+  periodNumber     String        @unique
+  bettingStartTime DateTime
+  flyStartTime     DateTime
+  crashTime        DateTime
+  endTime          DateTime
+  crashMultiplier  Decimal       @db.Decimal(10, 2)
+  serverSeed       String
+  serverSeedHash   String
+  settled          Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  bets             BigCatchBet[]
+
+  @@index([bettingStartTime])
+}
+
+model BigCatchBet {
+  id                    String        @id @default(uuid())
+  roundId               String
+  round                 BigCatchRound @relation(fields: [roundId], references: [id])
+  userId                String
+  user                  User          @relation(fields: [userId], references: [id])
+  amount                Decimal       @db.Decimal(12, 2)
+  autoCashoutAt         Decimal?      @db.Decimal(10, 2)
+  cashoutMultiplier     Decimal?      @db.Decimal(10, 2)
+  // Half Reel: the multiplier half the stake was taken at, and what it paid.
+  halfCashoutMultiplier Decimal?      @db.Decimal(10, 2)
+  halfPayout            Decimal       @default(0) @db.Decimal(12, 2)
+  status                BetStatus     @default(PENDING)
+  // Total paid on the bet, the Half Reel included.
+  payout                Decimal       @default(0) @db.Decimal(12, 2)
+  createdAt             DateTime      @default(now())
 
   @@index([userId])
   @@index([roundId])
