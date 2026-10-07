@@ -49,8 +49,8 @@ export const PAYS: Partial<Record<FishSymbol, [number, number, number]>> = {
   TACKLE: [50, 200, 800],
   LURE: [40, 120, 480],
   FISH: [40, 120, 480],
-  ACE: [20, 80, 240],
-  KING: [20, 80, 240],
+  ACE: [18, 70, 220],
+  KING: [18, 70, 220],
   QUEEN: [15, 50, 160],
   JACK: [15, 50, 160],
 };
@@ -74,14 +74,14 @@ export const LINES: number[][] = [
 
 /** Fish cash values, in stakes, with their weights. */
 export const FISH_VALUES = [
-  { value: 0.5, weight: 390 },
-  { value: 1, weight: 250 },
+  { value: 0.5, weight: 430 },
+  { value: 1, weight: 260 },
   { value: 2, weight: 150 },
-  { value: 3, weight: 95 },
-  { value: 4, weight: 60 },
-  { value: 5, weight: 32 },
-  { value: 10, weight: 16 },
-  { value: 50, weight: 7 },
+  { value: 3, weight: 84 },
+  { value: 4, weight: 48 },
+  { value: 5, weight: 18 },
+  { value: 10, weight: 9 },
+  { value: 50, weight: 5 },
 ];
 /** Free spins for 3, 4 and 5 boats. */
 export const FREE_SPINS_FOR: Record<number, number> = { 3: 10, 4: 15, 5: 20 };

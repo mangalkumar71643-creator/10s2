@@ -41,13 +41,13 @@ export const STRIPS: number[][] = [
 export const PAYS: Record<Exclude<PharaohSymbol, "BOOK">, [number, number, number, number]> = {
   PHARAOH: [8, 80, 800, 4000],
   EYE: [4, 32, 320, 1600],
-  SCARAB: [4, 24, 80, 600],
-  ANKH: [4, 24, 80, 600],
-  ACE: [0, 4, 32, 120],
-  KING: [0, 4, 32, 120],
-  QUEEN: [0, 4, 20, 80],
-  JACK: [0, 4, 20, 80],
-  TEN: [0, 4, 20, 80],
+  SCARAB: [4, 20, 80, 500],
+  ANKH: [4, 20, 80, 500],
+  ACE: [0, 4, 25, 100],
+  KING: [0, 4, 25, 100],
+  QUEEN: [0, 4, 18, 70],
+  JACK: [0, 4, 18, 70],
+  TEN: [0, 4, 18, 70],
 };
 /** Books anywhere, in stakes. */
 export const SCATTER_PAYS: Record<number, number> = { 3: 2, 4: 20, 5: 200 };

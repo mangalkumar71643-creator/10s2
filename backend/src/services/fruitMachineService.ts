@@ -56,10 +56,10 @@ export const LINES: number[][] = [
 
 /** Nudges awarded to a losing spin, with weights out of 100. */
 export const NUDGE_TABLE = [
-  { nudges: 0, weight: 80 },
+  { nudges: 0, weight: 82 },
   { nudges: 1, weight: 10 },
-  { nudges: 2, weight: 6 },
-  { nudges: 3, weight: 4 },
+  { nudges: 2, weight: 5 },
+  { nudges: 3, weight: 3 },
 ];
 
 /** Cash Ladder rungs, in stakes, and the chance (out of 100) to climb from each rung to the next. */
