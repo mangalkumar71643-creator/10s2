@@ -2,7 +2,7 @@ import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { forwardRef, memo, useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgLinearGradient, Path, Polygon, Polyline, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
@@ -399,6 +399,224 @@ export function FruitMachineTileArt({ size }: { size: number }) {
   );
 }
 
+// ---------- pub-machine hardware ----------
+
+/** Which of the seven segments (a top, b top-right, c bottom-right, d bottom, e bottom-left, f top-left, g middle) each character lights. */
+const SEGMENTS: Record<string, string> = {
+  '0': 'abcdef',
+  '1': 'bc',
+  '2': 'abged',
+  '3': 'abgcd',
+  '4': 'fgbc',
+  '5': 'afgcd',
+  '6': 'afgedc',
+  '7': 'abc',
+  '8': 'abcdefg',
+  '9': 'abcdfg',
+  '-': 'g',
+  ' ': '',
+};
+
+/** A red LED seven-segment display, right-aligned in `digits` cells; '.' sits between cells. */
+const SevenSeg = memo(function SevenSeg({ text, digits, height, color }: { text: string; digits: number; height: number; color: string }) {
+  const chars = text.replace('.', '').padStart(digits, ' ').slice(-digits).split('');
+  const dotAfter = text.includes('.') ? digits - (text.length - text.indexOf('.')) : -1;
+  const w = height * 0.55;
+  const t = height * 0.15;
+  const gap = height * 0.18;
+  const seg = (k: string, x: number) => {
+    const h2 = height / 2;
+    switch (k) {
+      case 'a':
+        return `M${x + t} 0 L${x + w - t} 0 L${x + w - t * 1.6} ${t} L${x + t * 1.6} ${t} Z`;
+      case 'd':
+        return `M${x + t * 1.6} ${height - t} L${x + w - t * 1.6} ${height - t} L${x + w - t} ${height} L${x + t} ${height} Z`;
+      case 'g':
+        return `M${x + t} ${h2} L${x + t * 1.6} ${h2 - t / 2} L${x + w - t * 1.6} ${h2 - t / 2} L${x + w - t} ${h2} L${x + w - t * 1.6} ${h2 + t / 2} L${x + t * 1.6} ${h2 + t / 2} Z`;
+      case 'f':
+        return `M${x} ${t} L${x + t} ${t * 1.6} L${x + t} ${h2 - t * 0.6} L${x} ${h2 - t * 0.2} Z`;
+      case 'e':
+        return `M${x} ${h2 + t * 0.2} L${x + t} ${h2 + t * 0.6} L${x + t} ${height - t * 1.6} L${x} ${height - t} Z`;
+      case 'b':
+        return `M${x + w} ${t} L${x + w} ${h2 - t * 0.2} L${x + w - t} ${h2 - t * 0.6} L${x + w - t} ${t * 1.6} Z`;
+      default:
+        return `M${x + w} ${h2 + t * 0.2} L${x + w} ${height - t} L${x + w - t} ${height - t * 1.6} L${x + w - t} ${h2 + t * 0.6} Z`;
+    }
+  };
+  const total = digits * w + (digits - 1) * gap;
+  return (
+    <Svg width={total + t} height={height}>
+      {chars.map((ch, i) => {
+        const x = i * (w + gap);
+        const on = SEGMENTS[ch] ?? '';
+        return (
+          <G key={i}>
+            {'abcdefg'.split('').map((k) => (
+              <Path key={k} d={seg(k, x)} fill={color} opacity={on.includes(k) ? 1 : 0.1} />
+            ))}
+            {dotAfter === i && <Circle cx={x + w + gap / 2} cy={height - t / 2} r={t * 0.6} fill={color} />}
+          </G>
+        );
+      })}
+    </Svg>
+  );
+});
+
+/** A labelled LED meter in a dark glass window. */
+function LedMeter({ label, value, digits, height, color, flex }: { label: string; value: string; digits: number; height: number; color: string; flex?: number }) {
+  return (
+    <View style={[styles.led, flex !== undefined && { flex }]}>
+      <Text style={[styles.ledLabel, { color }]} numberOfLines={1}>
+        {label}
+      </Text>
+      <SevenSeg text={value} digits={digits} height={height} color={color} />
+    </View>
+  );
+}
+
+/** A round illuminated arcade button: lit and glowing when it can be pressed, dark when it can't. */
+function ArcadeButton({ label, color, size, lit, onPress, children }: { label: string; color: string; size: number; lit: boolean; onPress: () => void; children?: React.ReactNode }) {
+  return (
+    <Pressable onPress={onPress} disabled={!lit} style={({ pressed }) => [{ alignItems: 'center', gap: 4 }, pressed && { transform: [{ translateY: 2 }] }]} hitSlop={6}>
+      <View style={[styles.btnBezel, { width: size + 10, height: size + 10, borderRadius: (size + 10) / 2 }]}>
+        <View
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            overflow: 'hidden',
+            shadowColor: color,
+            shadowOpacity: lit ? 0.9 : 0,
+            shadowRadius: lit ? 10 : 0,
+            elevation: lit ? 6 : 0,
+          }}
+        >
+          <LinearGradient colors={lit ? ['#FFFFFF', color, color] : ['#5A5A60', '#2A2A30', '#1A1A20']} locations={[0, 0.35, 1]} start={{ x: 0.3, y: 0 }} end={{ x: 0.7, y: 1 }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            {children}
+          </LinearGradient>
+        </View>
+      </View>
+      <Text style={[styles.btnLabel, !lit && { color: '#6A6A70' }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * The side handle: drag the red ball down (or tap it) to play. Past 60% of
+ * its travel it snaps to the bottom, fires, and springs back up.
+ */
+function Lever({ height, disabled, onPull }: { height: number; disabled: boolean; onPull: () => void }) {
+  const pull = useRef(new Animated.Value(0)).current;
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
+  const onPullRef = useRef(onPull);
+  onPullRef.current = onPull;
+  const knob = 30;
+  const travel = height - knob - 34;
+  const fire = useCallback(() => {
+    Animated.timing(pull, { toValue: 1, duration: 140, easing: Easing.in(Easing.quad), useNativeDriver: false }).start(() => {
+      onPullRef.current();
+      Animated.spring(pull, { toValue: 0, friction: 4, tension: 60, useNativeDriver: false }).start();
+    });
+  }, [pull]);
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => !disabledRef.current,
+        onMoveShouldSetPanResponder: () => !disabledRef.current,
+        onPanResponderMove: (_, g) => pull.setValue(Math.max(0, Math.min(1, g.dy / travel))),
+        onPanResponderRelease: (_, g) => {
+          const p = Math.max(0, Math.min(1, g.dy / travel));
+          if (p > 0.6 || Math.abs(g.dy) < 6) fire();
+          else Animated.spring(pull, { toValue: 0, friction: 5, useNativeDriver: false }).start();
+        },
+        onPanResponderTerminate: () => Animated.spring(pull, { toValue: 0, friction: 5, useNativeDriver: false }).start(),
+      }),
+    [pull, travel, fire]
+  );
+  const knobTop = pull.interpolate({ inputRange: [0, 1], outputRange: [0, travel] });
+  const shaftH = pull.interpolate({ inputRange: [0, 1], outputRange: [travel + 8, 8] });
+  return (
+    <View style={{ width: 34, height, alignItems: 'center' }} {...responder.panHandlers}>
+      {/* Slot the handle rides in */}
+      <View style={[styles.leverSlot, { top: knob / 2, bottom: 24 }]} />
+      {/* Chrome shaft from the ball down to the pivot housing */}
+      <Animated.View style={[styles.leverShaft, { height: shaftH, bottom: 24 }]}>
+        <LinearGradient colors={['#8A8E98', '#FFFFFF', '#8A8E98']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ flex: 1 }} />
+      </Animated.View>
+      <Animated.View style={{ position: 'absolute', top: knobTop, opacity: disabled ? 0.55 : 1 }}>
+        <Svg width={knob} height={knob} viewBox="0 0 30 30">
+          <Defs>
+            <RadialGradient id="fmKnob" cx="35%" cy="30%" r="70%">
+              <Stop offset="0" stopColor="#FFB0B8" />
+              <Stop offset="0.4" stopColor="#E8132B" />
+              <Stop offset="1" stopColor="#6A0010" />
+            </RadialGradient>
+          </Defs>
+          <Circle cx={15} cy={15} r={14} fill="url(#fmKnob)" stroke="#3A0008" strokeWidth={1} />
+          <Ellipse cx={11} cy={10} rx={4} ry={3} fill="#FFFFFF" opacity={0.7} />
+        </Svg>
+      </Animated.View>
+      <View style={styles.leverHousing}>
+        <LinearGradient colors={['#E6E9F0', '#8A8E98', '#4A4E58']} style={{ flex: 1, borderRadius: 8 }} />
+      </View>
+    </View>
+  );
+}
+
+/** Cash Ladder as a pub-machine feature trail: a row of lamps lit left to right as it climbs. */
+function FeatureTrail({ prizes, bet, state, phase, width }: { prizes: number[]; bet: number; state: LadderState; phase: number; width: number }) {
+  const lampW = Math.floor((width - 12 - (prizes.length - 1) * 4) / prizes.length);
+  return (
+    <View style={[styles.trail, { width }]}>
+      <Text style={styles.trailTitle}>★ CASH LADDER ★</Text>
+      <View style={{ flexDirection: 'row', gap: 4 }}>
+        {prizes.map((p, i) => {
+          const lit = state.active && state.lit >= i;
+          const top = state.active && state.lit === i;
+          // Idle: a slow chase runs along the trail so it looks alive.
+          const chase = !state.active && phase % prizes.length === i;
+          const flash = top && state.final && phase % 2 === 0;
+          return (
+            <View key={p} style={[styles.lamp, { width: lampW }, chase && styles.lampChase, lit && styles.lampLit, top && styles.lampTop, flash && styles.lampFlash]}>
+              <Text style={[styles.lampX, (lit || chase) && { color: '#3A1A00' }]}>{p}x</Text>
+              <Text style={[styles.lampAmt, (lit || chase) && { color: '#5A3A00' }]} numberOfLines={1} adjustsFontSizeToFit>
+                {money(p * bet)}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+/** The pay chart printed on the cabinet glass under the reels. */
+function GlassPayChart({ pays, bet, lineCount }: { pays: Partial<Record<FruitSymbol, number>>; bet: number; lineCount: number }) {
+  const lineBet = bet / lineCount;
+  const items: FruitSymbol[] = ['SEVEN', 'BAR', 'BELL', 'MELON', 'GRAPES', 'PLUM', 'ORANGE', 'LEMON', 'CHERRY'];
+  return (
+    <View style={styles.glass}>
+      <LinearGradient colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'rgba(255,255,255,0.08)']} style={StyleSheet.absoluteFill} />
+      <View style={styles.glassGrid}>
+        {items.map((s) => (
+          <View key={s} style={styles.glassItem}>
+            <View style={{ flexDirection: 'row' }}>
+              {[0, 1, 2].map((i) => (
+                <View key={i} style={{ marginLeft: i ? -5 : 0 }}>
+                  <FruitArt s={s} size={17} />
+                </View>
+              ))}
+            </View>
+            <Text style={styles.glassPay}>{money(round2((pays[s] ?? 0) * lineBet))}</Text>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.glassNote}>PRIZES PER LINE · 5 LINES PLAYED · ★★★ STARTS THE LADDER</Text>
+    </View>
+  );
+}
+
 // ---------- screen ----------
 
 const START_ROWS: FruitSymbol[][] = [
@@ -617,16 +835,19 @@ export default function FruitMachineScreen() {
   };
 
   // ---------- layout ----------
-  const cabW = Math.min(W - 16, 440);
-  const frame = 10;
-  const ladderW = Math.floor(cabW * 0.2);
+  const outerW = Math.min(W - 12, 450);
+  const leverW = 34;
+  const cabW = outerW - leverW - 4;
+  const pad = 10;
   const tabW = 16;
   const reelGap = 4;
-  const reelsInner = cabW - frame * 2 - ladderW - 8 - tabW * 2;
-  const reelW = Math.floor((reelsInner - reelGap * 2) / 3);
-  const cell = Math.floor(Math.min(reelW, 112));
+  // Chrome bezel: 3px border on each side.
+  const reelW = Math.floor((cabW - pad * 2 - 6 - tabW * 2 - reelGap * 2) / 3);
+  const cell = Math.floor(Math.min(reelW * 0.8, 96));
   const reelsW = reelW * 3 + reelGap * 2;
   const reelsH = cell * 3;
+  const logoW = cabW * 0.72;
+  const leverTop = 14 + logoW * 0.3 + 72;
 
   // Which cells take part in a winning line, so the rest can be dimmed.
   const litCells = useMemo(() => {
@@ -640,9 +861,23 @@ export default function FruitMachineScreen() {
   const minutes = Math.floor((now - sessionStart.current) / 60000);
   const seconds = Math.floor(((now - sessionStart.current) % 60000) / 1000);
 
+  // LED meters: size the digits so each display fits its share of the cabinet.
+  const inner = cabW - pad * 2;
+  const ledFit = (text: string, share: number, max: number) => {
+    const digits = Math.max(4, text.replace('.', '').length);
+    return { digits, height: Math.floor(Math.min(max, (inner * share - 20) / (digits * 0.73 + 0.2))) };
+  };
+  const winText = meter.amount === null ? '' : meter.amount.toFixed(2);
+  const creditText = shownBalance.toFixed(2);
+  const betText = bet.toFixed(2);
+  const winFit = ledFit(winText || '0.00', 0.62, 24);
+  const creditFit = ledFit(creditText, 0.56, 18);
+  const betFit = ledFit(betText, 0.4, 18);
+  const winColor = meter.tone === 'win' ? '#3CFF6A' : meter.tone === 'return' ? '#FFB43C' : '#FF2A2A';
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <LinearGradient colors={['#2A0006', '#12000A', '#050005']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={['#1A0004', '#0A0003', '#000000']} style={StyleSheet.absoluteFill} />
 
       {/* Top bar */}
       <View style={styles.topBar}>
@@ -650,47 +885,32 @@ export default function FruitMachineScreen() {
           <MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
           <Text style={styles.title}>FRUIT MACHINE</Text>
         </Pressable>
-        <View style={styles.balancePill}>
-          <MaterialCommunityIcons name="wallet" size={15} color={GOLD} />
-          <Text style={styles.balanceText}>{money(shownBalance)}</Text>
+        <View style={styles.pubTag}>
+          <MaterialCommunityIcons name="glass-mug-variant" size={15} color={GOLD} />
+          <Text style={styles.pubTagText}>PUB CLASSIC</Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24, alignItems: 'center' }}>
-        {/* Cabinet */}
-        <View style={[styles.cabinet, { width: cabW }]}>
-          <LinearGradient colors={['#8E1426', CABINET, '#2A0006']} style={[StyleSheet.absoluteFill, { borderRadius: 22 }]} />
-          <View style={styles.bulbRow}>
-            <Bulbs count={Math.floor(cabW / 22)} size={9} phase={phase} />
-          </View>
-          <View style={{ alignItems: 'center', marginTop: 2 }}>
-            <Logo width={cabW * 0.86} />
-          </View>
-
-          <View style={{ flexDirection: 'row', paddingHorizontal: frame, gap: 8, alignItems: 'stretch' }}>
-            {/* Cash Ladder */}
-            <View style={[styles.ladder, { width: ladderW, height: reelsH + 52 }]}>
-              <Text style={styles.ladderTitle}>CASH{'\n'}LADDER</Text>
-              <View style={{ flex: 1, justifyContent: 'space-between', paddingVertical: 4 }}>
-                {[...ladderPrizes].reverse().map((prize, ri) => {
-                  const i = ladderPrizes.length - 1 - ri;
-                  const lit = ladder.active && ladder.lit >= i;
-                  const top = ladder.active && ladder.lit === i;
-                  const flash = top && ladder.final && phase % 2 === 0;
-                  return (
-                    <View key={prize} style={[styles.rung, lit && styles.rungLit, top && styles.rungTop, flash && styles.rungFlash]}>
-                      <Text style={[styles.rungX, lit && { color: '#2A1600' }]}>{prize}x</Text>
-                      <Text style={[styles.rungAmt, lit && { color: '#4A2A00' }]} numberOfLines={1} adjustsFontSizeToFit>
-                        {money(prize * bet)}
-                      </Text>
-                    </View>
-                  );
-                })}
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24, alignItems: 'center' }} scrollEnabled={!busy}>
+        <View style={{ flexDirection: 'row', width: outerW, marginTop: 4 }}>
+          {/* Cabinet */}
+          <View style={[styles.cabinet, { width: cabW }]}>
+            <LinearGradient colors={['#B3122B', '#7A0A1A', '#4A0610', '#2A0308']} style={[StyleSheet.absoluteFill, { borderRadius: 20 }]} />
+            {/* Topper: arched marquee with chasing bulbs */}
+            <View style={styles.topper}>
+              <LinearGradient colors={['#2A0006', '#5A0A14']} style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 60, borderTopRightRadius: 60, borderRadius: 10 }]} />
+              <View style={styles.bulbRow}>
+                <Bulbs count={Math.floor(cabW / 20)} size={9} phase={phase} />
+              </View>
+              <View style={{ alignItems: 'center' }}>
+                <Logo width={logoW} />
               </View>
             </View>
 
-            {/* Reels with line tabs */}
-            <View style={{ flex: 1 }}>
+            <View style={{ paddingHorizontal: pad, alignItems: 'center' }}>
+              <FeatureTrail prizes={ladderPrizes} bet={bet} state={ladder} phase={phase} width={inner} />
+
+              {/* Reels behind a chrome bezel, with line tabs */}
               <View style={styles.reelFrame}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <LineTabs side="left" rows={tabRows} cell={cell} width={tabW} winLines={winLines} />
@@ -698,11 +918,13 @@ export default function FruitMachineScreen() {
                     <View style={{ flexDirection: 'row', gap: reelGap }}>
                       {[0, 1, 2].map((i) => (
                         <View key={i} style={styles.reelWindow}>
-                          <LinearGradient colors={['#D9D4C7', '#FFFFFF', '#FFFFFF', '#D9D4C7']} locations={[0, 0.18, 0.82, 1]} style={StyleSheet.absoluteFill} />
+                          <LinearGradient colors={['#CFC8B8', '#FFFFFF', '#FFFFFF', '#CFC8B8']} locations={[0, 0.2, 0.8, 1]} style={StyleSheet.absoluteFill} />
                           <Reel ref={reels[i]} initial={START_ROWS[i]} cell={cell} width={reelW} dimmed={dimFor(i)} />
                         </View>
                       ))}
                     </View>
+                    {/* Glass reflection */}
+                    <LinearGradient pointerEvents="none" colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 0.6, y: 0.5 }} style={[StyleSheet.absoluteFill, { borderRadius: 6 }]} />
                     {/* Winning lines drawn over the reels */}
                     <Svg width={reelsW} height={reelsH} style={StyleSheet.absoluteFill} pointerEvents="none">
                       {winLines.map((w) => {
@@ -721,52 +943,86 @@ export default function FruitMachineScreen() {
                 </View>
               </View>
 
-              {/* Nudge lamps and win meter */}
-              <View style={styles.underReels}>
+              {/* Nudge domes and the WIN display */}
+              <View style={[styles.ledRow, { width: inner }]}>
                 <View style={styles.nudgeBox}>
                   <Text style={styles.nudgeLabel}>NUDGE</Text>
-                  <View style={{ flexDirection: 'row', gap: 4 }}>
+                  <View style={{ flexDirection: 'row', gap: 5 }}>
                     {[1, 2, 3].map((n) => (
-                      <View key={n} style={[styles.nudgeLamp, nudgeLamps >= n && styles.nudgeLampOn]}>
-                        <Text style={[styles.nudgeLampText, nudgeLamps >= n && { color: '#2A1600' }]}>{n}</Text>
+                      <View key={n} style={[styles.dome, nudgeLamps >= n && styles.domeOn]}>
+                        <Text style={[styles.domeText, nudgeLamps >= n && { color: '#3A1A00' }]}>{n}</Text>
                       </View>
                     ))}
                   </View>
                 </View>
-                <View style={styles.meter}>
-                  <Text style={[styles.meterLabel, meter.tone === 'win' && { color: '#7CFF9A' }]}>{meter.label}</Text>
-                  <Text style={[styles.meterValue, meter.tone === 'win' && { color: '#7CFF9A' }, meter.tone === 'return' && { color: '#FFD9A0' }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {meter.amount === null ? '— — —' : money(meter.amount)}
+                <View style={[styles.led, { flex: 1 }]}>
+                  <Text style={[styles.ledLabel, { color: winColor }]} numberOfLines={1}>
+                    {meter.label}
                   </Text>
+                  <SevenSeg text={winText} digits={winFit.digits} height={winFit.height} color={winColor} />
                 </View>
               </View>
+              <View style={[styles.ledRow, { width: inner }]}>
+                <LedMeter label="CREDIT ₹" value={creditText} digits={creditFit.digits} height={creditFit.height} color="#FF2A2A" flex={1.4} />
+                <LedMeter label="STAKE ₹" value={betText} digits={betFit.digits} height={betFit.height} color="#FFB43C" flex={1} />
+              </View>
+
+              {/* Line wins */}
+              <View style={styles.lineWinsRow}>
+                {winLines.length === 0 ? (
+                  <Text style={styles.lineWinHint}>5 lines · 3 rows and both diagonals</Text>
+                ) : (
+                  winLines.map((w) => (
+                    <View key={w.line} style={[styles.lineChip, { borderColor: LINE_COLORS[w.line] }]}>
+                      <Text style={[styles.lineChipText, { color: LINE_COLORS[w.line] }]}>
+                        L{w.line + 1} {w.count === 3 ? '3×' : '2×'}
+                      </Text>
+                      <FruitArt s={w.symbol} size={16} />
+                      <Text style={styles.lineChipText}>{money(round2((w.pays * bet) / lineCount))}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              <GlassPayChart pays={threePays} bet={bet} lineCount={lineCount} />
+            </View>
+
+            <View style={[styles.bulbRow, { marginTop: 8 }]}>
+              <Bulbs count={Math.floor(cabW / 20)} size={9} phase={phase + 1} />
             </View>
           </View>
 
-          {/* Line wins */}
-          <View style={styles.lineWinsRow}>
-            {winLines.length === 0 ? (
-              <Text style={styles.lineWinHint}>5 lines · 3 rows and both diagonals</Text>
-            ) : (
-              winLines.map((w) => (
-                <View key={w.line} style={[styles.lineChip, { borderColor: LINE_COLORS[w.line] }]}>
-                  <Text style={[styles.lineChipText, { color: LINE_COLORS[w.line] }]}>
-                    L{w.line + 1} {w.count === 3 ? '3×' : '2×'}
-                  </Text>
-                  <FruitArt s={w.symbol} size={16} />
-                  <Text style={styles.lineChipText}>{money(round2((w.pays * bet) / lineCount))}</Text>
-                </View>
-              ))
-            )}
+          {/* Pull handle */}
+          <View style={{ marginLeft: 4, marginTop: leverTop }}>
+            <Lever height={reelsH + 70} disabled={busy || !config} onPull={spin} />
+            <Text style={styles.leverHint}>PULL</Text>
           </View>
+        </View>
 
-          <View style={[styles.bulbRow, { marginTop: 6 }]}>
-            <Bulbs count={Math.floor(cabW / 22)} size={9} phase={phase + 1} />
+        {/* Button deck */}
+        <View style={[styles.deck, { width: outerW }]}>
+          <LinearGradient colors={['#C9CED8', '#7A808C', '#4A4E58']} style={[StyleSheet.absoluteFill, { borderRadius: 16 }]} />
+          <View style={styles.deckInner}>
+            <ArcadeButton label="PAYS" color="#2F8BFF" size={40} lit={!busy} onPress={() => setPanel('pay')}>
+              <MaterialCommunityIcons name="information-variant" size={22} color="#FFFFFF" />
+            </ArcadeButton>
+            <ArcadeButton label="STAKE −" color="#FFB43C" size={40} lit={!busy && betLevels.indexOf(bet) > 0} onPress={() => stepBet(-1)}>
+              <MaterialCommunityIcons name="minus" size={22} color="#3A1A00" />
+            </ArcadeButton>
+            <ArcadeButton label={busy ? 'PLAYING' : 'START'} color={phase % 2 === 0 ? '#2FE07A' : '#1FB85A'} size={60} lit={!busy && !!config} onPress={spin}>
+              <Text style={styles.startText}>{busy ? '…' : 'START'}</Text>
+            </ArcadeButton>
+            <ArcadeButton label="STAKE +" color="#FFB43C" size={40} lit={!busy && betLevels.indexOf(bet) < betLevels.length - 1} onPress={() => stepBet(1)}>
+              <MaterialCommunityIcons name="plus" size={22} color="#3A1A00" />
+            </ArcadeButton>
+            <ArcadeButton label="HISTORY" color="#E6E9F0" size={40} lit={!busy} onPress={openHistory}>
+              <MaterialCommunityIcons name="history" size={22} color="#2A2A30" />
+            </ArcadeButton>
           </View>
         </View>
 
         {/* Session (UK: time played and net position, always on show) */}
-        <View style={[styles.session, { width: cabW }]}>
+        <View style={[styles.session, { width: outerW }]}>
           <MaterialCommunityIcons name="timer-outline" size={15} color="#C9B6BC" />
           <Text style={styles.sessionText}>
             Session {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
@@ -776,35 +1032,6 @@ export default function FruitMachineScreen() {
             Net {sessionNet >= 0 ? '+' : '−'}
             {money(Math.abs(sessionNet))}
           </Text>
-        </View>
-
-        {/* Controls */}
-        <View style={[styles.controls, { width: cabW }]}>
-          <Pressable onPress={() => setPanel('pay')} style={styles.sideBtn} hitSlop={6}>
-            <MaterialCommunityIcons name="information-outline" size={20} color={GOLD} />
-            <Text style={styles.sideBtnText}>PAYS</Text>
-          </Pressable>
-          <View style={styles.betBox}>
-            <Text style={styles.betLabel}>BET</Text>
-            <View style={styles.betRow}>
-              <Pressable onPress={() => stepBet(-1)} disabled={busy} style={[styles.betBtn, busy && styles.dim]} hitSlop={6}>
-                <MaterialCommunityIcons name="minus" size={18} color="#FFFFFF" />
-              </Pressable>
-              <Text style={styles.betValue}>{money(bet)}</Text>
-              <Pressable onPress={() => stepBet(1)} disabled={busy} style={[styles.betBtn, busy && styles.dim]} hitSlop={6}>
-                <MaterialCommunityIcons name="plus" size={18} color="#FFFFFF" />
-              </Pressable>
-            </View>
-          </View>
-          <Pressable onPress={spin} disabled={busy} style={({ pressed }) => [styles.spinWrap, pressed && { transform: [{ scale: 0.95 }] }]}>
-            <LinearGradient colors={busy ? ['#6A3A40', '#3A1A20'] : ['#FF5A6A', '#D4102A', '#8A0012']} style={styles.spinBtn}>
-              <Text style={styles.spinText}>{busy ? '…' : 'SPIN'}</Text>
-            </LinearGradient>
-          </Pressable>
-          <Pressable onPress={openHistory} style={styles.sideBtn} hitSlop={6}>
-            <MaterialCommunityIcons name="history" size={20} color={GOLD} />
-            <Text style={styles.sideBtnText}>HISTORY</Text>
-          </Pressable>
         </View>
 
         <Text style={styles.footNote}>
@@ -965,54 +1192,57 @@ function History({ spins }: { spins: FruitSpinRow[] | null }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#050005' },
+  root: { flex: 1, backgroundColor: '#000000' },
   topBar: { height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 },
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   title: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2 },
-  balancePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(255,209,102,0.12)', borderWidth: 1, borderColor: 'rgba(255,209,102,0.4)' },
-  balanceText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  cabinet: { borderRadius: 22, borderWidth: 3, borderColor: GOLD, paddingVertical: 8, overflow: 'hidden', marginTop: 4 },
-  bulbRow: { height: 14, flexDirection: 'row', paddingHorizontal: 14 },
-  ladder: { borderRadius: 12, borderWidth: 2, borderColor: GOLD_DEEP, backgroundColor: '#1A0006', padding: 4 },
-  ladderTitle: { color: GOLD, fontSize: 10, fontWeight: '900', textAlign: 'center', letterSpacing: 1, lineHeight: 11 },
-  rung: { borderRadius: 6, borderWidth: 1, borderColor: '#5A3A10', backgroundColor: '#2A0A0E', paddingVertical: 2, alignItems: 'center' },
-  rungLit: { backgroundColor: '#FFC93C', borderColor: '#FFF3B0' },
-  rungTop: { shadowColor: '#FFD23F', shadowOpacity: 1, shadowRadius: 10, elevation: 6 },
-  rungFlash: { backgroundColor: '#FFFFFF' },
-  rungX: { color: GOLD, fontSize: 12, fontWeight: '900' },
-  rungAmt: { color: '#C9A86A', fontSize: 8, fontWeight: '700' },
-  reelFrame: { borderRadius: 12, borderWidth: 3, borderColor: CHROME, backgroundColor: '#1A0006', paddingVertical: 4 },
+  pubTag: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1.5, borderColor: GOLD_DEEP, backgroundColor: 'rgba(255,209,102,0.08)' },
+  pubTagText: { color: GOLD, fontSize: 11, fontWeight: '900', letterSpacing: 2 },
+  cabinet: { borderRadius: 20, borderWidth: 3, borderColor: CHROME, paddingBottom: 8, overflow: 'hidden' },
+  topper: { paddingTop: 6, marginHorizontal: 6, marginTop: 6, borderTopLeftRadius: 60, borderTopRightRadius: 60, borderRadius: 10, borderWidth: 2, borderColor: GOLD, overflow: 'hidden' },
+  bulbRow: { height: 14, flexDirection: 'row', paddingHorizontal: 16 },
+  trail: { marginTop: 8, padding: 6, borderRadius: 10, borderWidth: 2, borderColor: GOLD_DEEP, backgroundColor: '#1A0004', gap: 4 },
+  trailTitle: { color: GOLD, fontSize: 10, fontWeight: '900', letterSpacing: 3, textAlign: 'center' },
+  lamp: { borderRadius: 8, borderWidth: 1.5, borderColor: '#5A3A10', backgroundColor: '#2A0A0E', paddingVertical: 3, alignItems: 'center' },
+  lampChase: { backgroundColor: '#7A5A1A', borderColor: '#C8962A' },
+  lampLit: { backgroundColor: '#FFC93C', borderColor: '#FFF3B0' },
+  lampTop: { shadowColor: '#FFD23F', shadowOpacity: 1, shadowRadius: 10, elevation: 6 },
+  lampFlash: { backgroundColor: '#FFFFFF' },
+  lampX: { color: GOLD, fontSize: 12, fontWeight: '900' },
+  lampAmt: { color: '#C9A86A', fontSize: 8, fontWeight: '700' },
+  reelFrame: { marginTop: 8, borderRadius: 12, borderWidth: 3, borderColor: CHROME, backgroundColor: '#14000A', paddingVertical: 4, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 8, elevation: 6 },
   reelWindow: { borderRadius: 6, overflow: 'hidden' },
   tab: { position: 'absolute', height: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   tabText: { fontSize: 10, fontWeight: '900' },
-  underReels: { flexDirection: 'row', gap: 6, marginTop: 6 },
-  nudgeBox: { borderRadius: 10, borderWidth: 1.5, borderColor: GOLD_DEEP, backgroundColor: '#1A0006', paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center', gap: 3 },
+  ledRow: { flexDirection: 'row', gap: 6, marginTop: 8, alignItems: 'stretch' },
+  led: { borderRadius: 8, borderWidth: 2, borderColor: '#3A3A44', backgroundColor: '#050507', paddingHorizontal: 8, paddingVertical: 4, gap: 3, alignItems: 'flex-end', justifyContent: 'center' },
+  ledLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 2, alignSelf: 'flex-start' },
+  nudgeBox: { borderRadius: 10, borderWidth: 1.5, borderColor: GOLD_DEEP, backgroundColor: '#1A0004', paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center', gap: 4 },
   nudgeLabel: { color: GOLD, fontSize: 9, fontWeight: '900', letterSpacing: 2 },
-  nudgeLamp: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#3A1A0A', borderWidth: 1, borderColor: '#7A5A1A', alignItems: 'center', justifyContent: 'center' },
-  nudgeLampOn: { backgroundColor: '#FFC93C', borderColor: '#FFF3B0', shadowColor: '#FFD23F', shadowOpacity: 1, shadowRadius: 8, elevation: 5 },
-  nudgeLampText: { color: '#7A5A1A', fontSize: 10, fontWeight: '900' },
-  meter: { flex: 1, borderRadius: 10, borderWidth: 2, borderColor: '#3A3A44', backgroundColor: '#0A0A0C', paddingHorizontal: 10, paddingVertical: 4, justifyContent: 'center' },
-  meterLabel: { color: '#FF6A3A', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  meterValue: { color: '#FF6A3A', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'], letterSpacing: 1 },
-  lineWinsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, paddingHorizontal: 10, marginTop: 8, minHeight: 26 },
+  dome: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#3A1A0A', borderWidth: 1.5, borderColor: '#7A5A1A', alignItems: 'center', justifyContent: 'center' },
+  domeOn: { backgroundColor: '#FFB43C', borderColor: '#FFF3B0', shadowColor: '#FFB43C', shadowOpacity: 1, shadowRadius: 10, elevation: 6 },
+  domeText: { color: '#7A5A1A', fontSize: 11, fontWeight: '900' },
+  lineWinsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 8, minHeight: 24 },
   lineWinHint: { color: '#C9A86A', fontSize: 11, fontWeight: '700' },
   lineChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1.5, backgroundColor: 'rgba(0,0,0,0.35)' },
   lineChipText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
+  glass: { marginTop: 8, alignSelf: 'stretch', borderRadius: 10, borderWidth: 1.5, borderColor: 'rgba(255,209,102,0.5)', backgroundColor: 'rgba(20,0,6,0.55)', paddingVertical: 6, paddingHorizontal: 6, overflow: 'hidden' },
+  glassGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 4 },
+  glassItem: { width: '32%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
+  glassPay: { color: '#FFE9B0', fontSize: 10, fontWeight: '900' },
+  glassNote: { color: '#C9A86A', fontSize: 8, fontWeight: '900', letterSpacing: 1, textAlign: 'center', marginTop: 4 },
+  leverSlot: { position: 'absolute', width: 10, borderRadius: 5, backgroundColor: '#0A0A0C', borderWidth: 1, borderColor: '#3A3A44' },
+  leverShaft: { position: 'absolute', width: 8, borderRadius: 4, overflow: 'hidden' },
+  leverHousing: { position: 'absolute', bottom: 0, width: 30, height: 28, borderRadius: 8, borderWidth: 1, borderColor: '#2A2A30' },
+  leverHint: { color: '#8A8E98', fontSize: 9, fontWeight: '900', letterSpacing: 2, textAlign: 'center', marginTop: 4 },
+  deck: { marginTop: 12, borderRadius: 16, padding: 4 },
+  deckInner: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.4)', paddingVertical: 10, backgroundColor: 'rgba(20,20,26,0.35)' },
+  btnBezel: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1A1A20', borderWidth: 2, borderColor: '#C9CED8' },
+  btnLabel: { color: '#FFFFFF', fontSize: 9, fontWeight: '900', letterSpacing: 1, textShadowColor: 'rgba(0,0,0,0.6)', textShadowRadius: 3 },
+  startText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', letterSpacing: 1, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
   session: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
   sessionText: { color: '#C9B6BC', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   sessionSep: { color: '#6A5A60', fontSize: 12 },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingHorizontal: 4 },
-  sideBtn: { alignItems: 'center', gap: 2, width: 58 },
-  sideBtnText: { color: GOLD, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  betBox: { alignItems: 'center', gap: 4 },
-  betLabel: { color: '#C9A86A', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  betRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#1A0006', borderRadius: 20, borderWidth: 1.5, borderColor: GOLD_DEEP, paddingHorizontal: 6, paddingVertical: 4 },
-  betBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#4A0A14', alignItems: 'center', justifyContent: 'center' },
-  betValue: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', minWidth: 70, textAlign: 'center' },
-  dim: { opacity: 0.4 },
-  spinWrap: { borderRadius: 40, borderWidth: 4, borderColor: GOLD, shadowColor: '#FF3B4E', shadowOpacity: 0.8, shadowRadius: 12, elevation: 8 },
-  spinBtn: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
-  spinText: { color: '#FFFFFF', fontSize: 20, fontWeight: '900', letterSpacing: 2, textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 4 },
   footNote: { color: '#8A7A80', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '32%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 26, paddingVertical: 12, borderRadius: 18, borderWidth: 3, borderColor: '#FFF8D0' },
