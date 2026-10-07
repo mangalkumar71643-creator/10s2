@@ -2407,6 +2407,70 @@ export function fetchNeon777History(limit = 30) {
   return apiFetch<Neon777SpinRow[]>(`/neon-777/my-history?limit=${limit}`);
 }
 
+// ---------- Fruit Machine (pub-style 3x3, five lines, Auto Nudge and Cash Ladder) ----------
+
+export type FruitSymbol = 'CHERRY' | 'LEMON' | 'ORANGE' | 'PLUM' | 'GRAPES' | 'MELON' | 'BELL' | 'BAR' | 'SEVEN' | 'STAR';
+export interface FruitLineWin {
+  /** Index into the config's lines. */
+  line: number;
+  symbol: FruitSymbol;
+  count: number;
+  /** In line bets (the stake / lineCount). */
+  pays: number;
+}
+export interface FruitOutcome {
+  /** Where the reels first stop (the middle row's position on each strip). */
+  stops: number[];
+  nudges: number;
+  /** Drops spent on each reel. */
+  nudgePlan: number[];
+  finalStops: number[];
+  lines: FruitLineWin[];
+  /** Top Cash Ladder rung reached (index into the config's ladder), or -1. */
+  ladderRung: number;
+  /** In stakes. */
+  totalWin: number;
+}
+export interface FruitSpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  nudges: number;
+  ladderRung: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface FruitMachineConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  strips: FruitSymbol[][];
+  lines: number[][];
+  threePays: Partial<Record<FruitSymbol, number>>;
+  twoCherries: number;
+  lineCount: number;
+  nudgeChances: { nudges: number; chancePercent: number }[];
+  ladder: number[];
+  climbChancePercent: number[];
+  hitRatePercent: number;
+  rtpPercent: number;
+}
+
+export function fetchFruitMachineConfig() {
+  return apiFetch<FruitMachineConfig>('/fruit-machine/config');
+}
+
+export function spinFruitMachine(stake: number) {
+  return apiFetch<{ spin: FruitSpinRow; outcome: FruitOutcome }>('/fruit-machine/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchFruitMachineHistory(limit = 30) {
+  return apiFetch<FruitSpinRow[]>(`/fruit-machine/my-history?limit=${limit}`);
+}
+
 // ---- Money Coming --------------------------------------------------------------
 
 export interface MoneyComingSpecial {

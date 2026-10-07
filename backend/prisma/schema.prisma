@@ -185,6 +185,7 @@ model User {
   CricketXBet        CricketXBet[]
   RocketBet          RocketBet[]
   GoalRushBet        GoalRushBet[]
+  fruitMachineSpins  FruitMachineSpin[]
   JhandiMundaBet     JhandiMundaBet[]
   RouletteBet        RouletteBet[]
   K3Bet              K3Bet[]
@@ -1436,6 +1437,27 @@ model Neon777Spin {
   totalWin       Decimal  @db.Decimal(12, 4)
   payout         Decimal  @db.Decimal(12, 2)
   respins        Int
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model FruitMachineSpin {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// Whole spin's win in stakes (Cash Ladder included), before the payout cap.
+  totalWin       Decimal  @db.Decimal(12, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  /// Nudges awarded (0 on a spin that won before any nudge).
+  nudges         Int
+  /// Cash Ladder rung reached (index into LADDER), or -1 if it didn't start.
+  ladderRung     Int
   serverSeed     String
   serverSeedHash String
   clientSeed     String

@@ -16,6 +16,7 @@ import TeenPattiScreen from '../screens/TeenPattiScreen';
 import CricketXScreen from '../screens/CricketXScreen';
 import RocketScreen from '../screens/RocketScreen';
 import GoalRushScreen from '../screens/GoalRushScreen';
+import FruitMachineScreen from '../screens/FruitMachineScreen';
 import MoneyComingScreen from '../screens/MoneyComingScreen';
 import GiftCodeScreen from '../screens/GiftCodeScreen';
 import JhandiMundaScreen from '../screens/JhandiMundaScreen';
@@ -105,6 +106,7 @@ function MainNavigator() {
       <Stack.Screen name="CricketX" component={CricketXScreen} />
       <Stack.Screen name="Rocket" component={RocketScreen} />
       <Stack.Screen name="GoalRush" component={GoalRushScreen} />
+      <Stack.Screen name="FruitMachine" component={FruitMachineScreen} />
       <Stack.Screen name="MoneyComing" component={MoneyComingScreen} />
       <Stack.Screen name="GiftCode" component={GiftCodeScreen} />
       <Stack.Screen name="JhandiMunda" component={JhandiMundaScreen} />
