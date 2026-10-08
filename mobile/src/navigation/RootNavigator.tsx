@@ -27,6 +27,7 @@ import PenaltyHeroScreen from '../screens/PenaltyHeroScreen';
 import LuckyCupsScreen from '../screens/LuckyCupsScreen';
 import BombSquadScreen from '../screens/BombSquadScreen';
 import VaultHeistScreen from '../screens/VaultHeistScreen';
+import TreasureDigScreen from '../screens/TreasureDigScreen';
 import FruitMachineScreen from '../screens/FruitMachineScreen';
 import FishermansCatchScreen from '../screens/FishermansCatchScreen';
 import BookOfPharaohScreen from '../screens/BookOfPharaohScreen';
@@ -130,6 +131,7 @@ function MainNavigator() {
       <Stack.Screen name="LuckyCups" component={LuckyCupsScreen} />
       <Stack.Screen name="BombSquad" component={BombSquadScreen} />
       <Stack.Screen name="VaultHeist" component={VaultHeistScreen} />
+      <Stack.Screen name="TreasureDig" component={TreasureDigScreen} />
       <Stack.Screen name="FruitMachine" component={FruitMachineScreen} />
       <Stack.Screen name="FishermansCatch" component={FishermansCatchScreen} />
       <Stack.Screen name="BookOfPharaoh" component={BookOfPharaohScreen} />

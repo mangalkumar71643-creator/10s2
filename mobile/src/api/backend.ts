@@ -628,6 +628,60 @@ export function cashOutVault(roundId: string) {
   return apiFetch<VaultRound>('/vault-heist/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
 }
 
+// ---------- Treasure Dig ----------
+
+export interface TreasureConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  mounds: number;
+  modes: { crabs: number; multipliers: number[] }[];
+}
+
+export interface TreasureRound {
+  id: string;
+  crabs: number;
+  stake: string;
+  /** Mounds dug so far, in order (0-15, row by row). */
+  digs: number[];
+  treasures: number;
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  /** Only once the round is over. */
+  crabMounds?: number[];
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export function fetchTreasureConfig() {
+  return apiFetch<TreasureConfig>('/treasure-dig/config');
+}
+
+export function fetchTreasureCurrent() {
+  return apiFetch<TreasureRound | null>('/treasure-dig/current');
+}
+
+export function fetchTreasureHistory(limit = 30) {
+  return apiFetch<TreasureRound[]>(`/treasure-dig/my-history?limit=${limit}`);
+}
+
+export function startTreasureRound(stake: number, crabs: number) {
+  return apiFetch<TreasureRound>('/treasure-dig/start', { method: 'POST', body: JSON.stringify({ stake, crabs }) });
+}
+
+export function digTreasureMound(roundId: string, mound: number) {
+  return apiFetch<{ round: TreasureRound; crab: boolean }>('/treasure-dig/dig', { method: 'POST', body: JSON.stringify({ roundId, mound }) });
+}
+
+export function cashOutTreasure(roundId: string) {
+  return apiFetch<TreasureRound>('/treasure-dig/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;
