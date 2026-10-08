@@ -394,6 +394,68 @@ export function cashOutChickenRoadRound(roundId: string) {
   });
 }
 
+// ---------- Penalty Hero ----------
+
+export type PenaltyDifficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
+
+export interface PenaltyConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  zones: number;
+  kicks: number;
+  difficulties: { difficulty: PenaltyDifficulty; cover: number; multipliers: number[] }[];
+}
+
+/** One kick: the zone shot at (row * 3 + col, top row first), the zones the keeper covered, where he dived. */
+export interface PenaltyShot {
+  zone: number;
+  covered: number[];
+  dive: number;
+  saved: boolean;
+}
+
+export interface PenaltyRound {
+  id: string;
+  difficulty: PenaltyDifficulty;
+  stake: string;
+  goals: number;
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  shots: PenaltyShot[];
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export function fetchPenaltyConfig() {
+  return apiFetch<PenaltyConfig>('/penalty/config');
+}
+
+export function fetchPenaltyCurrent() {
+  return apiFetch<PenaltyRound | null>('/penalty/current');
+}
+
+export function fetchPenaltyHistory(limit = 30) {
+  return apiFetch<PenaltyRound[]>(`/penalty/my-history?limit=${limit}`);
+}
+
+export function startPenaltyRound(stake: number, difficulty: PenaltyDifficulty) {
+  return apiFetch<PenaltyRound>('/penalty/start', { method: 'POST', body: JSON.stringify({ stake, difficulty }) });
+}
+
+export function kickPenalty(roundId: string, zone: number) {
+  return apiFetch<{ round: PenaltyRound; shot: PenaltyShot }>('/penalty/kick', { method: 'POST', body: JSON.stringify({ roundId, zone }) });
+}
+
+export function cashOutPenalty(roundId: string) {
+  return apiFetch<PenaltyRound>('/penalty/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

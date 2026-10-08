@@ -193,6 +193,7 @@ model User {
   AirshipBet         AirshipBet[]
   ZeusSpin           ZeusSpin[]
   WolfMoonSpin       WolfMoonSpin[]
+  PenaltyRound       PenaltyRound[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1923,4 +1924,32 @@ model VipBonusClaim {
   createdAt DateTime @default(now())
 
   @@unique([userId, claimKey])
+}
+
+// One private Penalty Hero round: up to 5 penalties against a keeper who
+// covers 1-4 of the goal's 6 zones (by difficulty). Every goal raises the
+// multiplier; a save loses the stake. Which zones the keeper covers on each
+// kick comes from the round's seeds, fixed before the player picks a zone.
+model PenaltyRound {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  /// EASY, MEDIUM, HARD or EXPERT: the keeper covers 1, 2, 3 or 4 zones.
+  difficulty     String
+  stake          Decimal   @db.Decimal(12, 2)
+  /// Goals scored so far.
+  goals          Int       @default(0)
+  multiplier     Decimal   @default(1) @db.Decimal(10, 2)
+  payout         Decimal   @default(0) @db.Decimal(12, 2)
+  status         BetStatus @default(PENDING)
+  /// Every kick taken: [{ zone, covered: number[], dive, saved }].
+  shots          Json      @default("[]")
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime  @default(now())
+  settledAt      DateTime?
+
+  @@index([userId, status])
 }
