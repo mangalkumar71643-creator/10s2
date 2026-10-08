@@ -198,6 +198,7 @@ model User {
   BombRound          BombRound[]
   VaultRound         VaultRound[]
   TreasureRound      TreasureRound[]
+  WheelSpin          WheelSpin[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -2067,4 +2068,26 @@ model TreasureRound {
   settledAt      DateTime?
 
   @@index([userId, status])
+}
+
+// One Lucky Wheel spin: a 30-segment wheel at LOW, MEDIUM or HIGH risk; the
+// segment it stops on comes from the player's provably-fair seeds.
+model WheelSpin {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  /// LOW, MEDIUM or HIGH.
+  risk           String
+  stake          Decimal  @db.Decimal(12, 2)
+  /// Segment the pointer stopped on (0-29, clockwise from the top).
+  segment        Int
+  multiplier     Decimal  @db.Decimal(10, 2)
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

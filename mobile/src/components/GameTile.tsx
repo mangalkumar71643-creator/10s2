@@ -35,6 +35,7 @@ import { LuckyCupsTileArt } from '../screens/LuckyCupsScreen';
 import { BombSquadTileArt } from '../screens/BombSquadScreen';
 import { VaultHeistTileArt } from '../screens/VaultHeistScreen';
 import { TreasureDigTileArt } from '../screens/TreasureDigScreen';
+import { LuckyWheelTileArt } from '../screens/LuckyWheelScreen';
 import { FruitMachineTileArt } from '../screens/FruitMachineScreen';
 import { FishermansCatchTileArt } from '../screens/FishermansCatchScreen';
 import { BookOfPharaohTileArt } from '../screens/BookOfPharaohScreen';
@@ -94,6 +95,7 @@ export type GameId =
   | 'BombSquad'
   | 'VaultHeist'
   | 'TreasureDig'
+  | 'LuckyWheel'
   | 'FruitMachine'
   | 'FishermansCatch'
   | 'BookOfPharaoh'
@@ -110,7 +112,7 @@ export type GameCategory = {
 
 export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'card-table', title: 'Card & Table', games: ['AndarBahar', 'TeenPatti', 'DragonTiger', 'Baccarat', 'Blackjack', 'Roulette', 'Hilo', 'VideoPoker', 'CasinoHoldem', 'ThreeCardPoker'], banner: require('../../assets/banners/card-table.webp'), bannerAspect: 763 / 155 },
-  { id: 'dice-instant', title: 'Dice & Instant', games: ['Dice', 'Limbo', 'Plinko', 'SevenUpDown', 'Diamonds', 'Keno'], banner: require('../../assets/banners/dice-instant.webp'), bannerAspect: 763 / 143 },
+  { id: 'dice-instant', title: 'Dice & Instant', games: ['Dice', 'Limbo', 'Plinko', 'SevenUpDown', 'Diamonds', 'Keno', 'LuckyWheel'], banner: require('../../assets/banners/dice-instant.webp'), bannerAspect: 763 / 143 },
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
   { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip', 'PenaltyHero', 'LuckyCups', 'BombSquad', 'VaultHeist', 'TreasureDig'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
   { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777', 'MoneyComing', 'FruitMachine', 'FishermansCatch', 'BookOfPharaoh', 'GatesOfZeus', 'WolfMoon'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
@@ -1171,6 +1173,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <TreasureDigTileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFD66B', fontSize: 14, fontWeight: '900', letterSpacing: 1.5, textAlign: 'center', lineHeight: 16, fontFamily: 'serif', textShadowColor: '#2A1404', textShadowRadius: 6 }}>{'TREASURE\nDIG'}</Text>
+        </Pressable>
+      );
+    case 'LuckyWheel':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('LuckyWheel')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#FFD66B',
+            backgroundColor: '#2A0A4A',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 6,
+          }}
+        >
+          <LuckyWheelTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFD66B', fontSize: 14, fontWeight: '900', letterSpacing: 2, textAlign: 'center', lineHeight: 16, textShadowColor: '#000', textShadowRadius: 6 }}>{'LUCKY WHEEL'}</Text>
         </Pressable>
       );
     case 'MoneyComing':

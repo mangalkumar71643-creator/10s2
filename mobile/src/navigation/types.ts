@@ -48,6 +48,7 @@ export type RootStackParamList = {
   BombSquad: undefined;
   VaultHeist: undefined;
   TreasureDig: undefined;
+  LuckyWheel: undefined;
   FruitMachine: undefined;
   FishermansCatch: undefined;
   BookOfPharaoh: undefined;

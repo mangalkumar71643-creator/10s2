@@ -682,6 +682,45 @@ export function cashOutTreasure(roundId: string) {
   return apiFetch<TreasureRound>('/treasure-dig/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
 }
 
+// ---------- Lucky Wheel ----------
+
+export type WheelRisk = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface WheelConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  segments: number;
+  /** Each risk level's multipliers, clockwise from the top. */
+  wheels: { risk: WheelRisk; segments: number[]; rtpPercent: number }[];
+}
+
+export interface WheelSpinRow {
+  id: string;
+  risk: WheelRisk;
+  stake: string;
+  segment: number;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export function fetchWheelConfig() {
+  return apiFetch<WheelConfig>('/lucky-wheel/config');
+}
+
+export function spinLuckyWheel(stake: number, risk: WheelRisk) {
+  return apiFetch<WheelSpinRow>('/lucky-wheel/spin', { method: 'POST', body: JSON.stringify({ stake, risk }) });
+}
+
+export function fetchWheelHistory(limit = 30) {
+  return apiFetch<WheelSpinRow[]>(`/lucky-wheel/my-history?limit=${limit}`);
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;
