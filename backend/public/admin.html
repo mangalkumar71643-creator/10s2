@@ -542,7 +542,18 @@
 
       <div class="panel" id="panel-reports">
         <h1 class="page-title">Reports</h1>
-        <div class="page-sub">House profit from all games, day by day (India time).</div>
+        <div class="page-sub">Kitna kamaya ya ghata: house profit from all games, bonus cost and cash (India time).</div>
+        <div class="card">
+          <div class="card-head"><h2>Profit &amp; Loss</h2></div>
+          <div class="item-meta" id="pnlHeadline" style="margin:-6px 0 12px;font-size:15px;"></div>
+          <div class="table-scroll" id="pnlTable"></div>
+          <div class="stat-grid" id="pnlNow" style="margin-top:14px;"></div>
+          <div class="item-meta" style="margin-top:10px;line-height:1.6;">
+            <b>Game profit</b> = everything players staked minus everything games paid back. It swings day to day and settles near the house edge as bets add up.<br />
+            <b>Net profit</b> = game profit minus bonuses given away (gift codes, deposit bonuses, VIP rewards). Admin test credits are shown apart and not counted.<br />
+            <b>Cash</b> = real deposits in minus withdrawals paid out. Players can still withdraw what is in their wallets, so the last box is what would be left if every player cashed out today.
+          </div>
+        </div>
         <div class="form-row" style="max-width:420px;">
           <button class="btn secondary small" data-report-days="7">7 days</button>
           <button class="btn secondary small" data-report-days="30">30 days</button>
@@ -1417,7 +1428,46 @@
   var reportDays = 30;
   function pct(profit, staked) { return staked > 0 ? (profit / staked * 100).toFixed(1) + '%' : '—'; }
   function profitHtml(v) { return '<span style="color:' + (v >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:700;">' + (v < 0 ? '-' : '') + fmtMoney(Math.abs(v)) + '</span>'; }
+  function pnlCell(v, money) {
+    if (v === null || v === undefined) return '—';
+    if (!money) return v.toFixed(2) + '%';
+    return profitHtml(v);
+  }
+  function loadPnl() {
+    api('/admin/reports/pnl').then(function (r) {
+      var P = r.periods, cols = [['today', 'Today'], ['d7', '7 days'], ['d30', '30 days'], ['all', 'All time']];
+      var a = P.all;
+      document.getElementById('pnlHeadline').innerHTML = a.netProfit >= 0
+        ? 'All time you are <b style="color:var(--green)">up ' + fmtMoney(a.netProfit) + '</b> after bonuses (game profit ' + fmtMoney(a.gameProfit) + (a.edgePercent !== null ? ', ' + a.edgePercent.toFixed(2) + '% of stakes' : '') + '; target edge ' + r.targetHouseEdgePercent + '%).'
+        : 'All time you are <b style="color:var(--red)">down ' + fmtMoney(-a.netProfit) + '</b> after bonuses (game profit ' + (a.gameProfit < 0 ? '-' : '') + fmtMoney(Math.abs(a.gameProfit)) + '; target edge ' + r.targetHouseEdgePercent + '%).';
+      function row(label, fn, strong) {
+        return '<tr' + (strong ? ' style="background:var(--surface-alt);"' : '') + '><td>' + (strong ? '<b>' + label + '</b>' : label) + '</td>' +
+          cols.map(function (c) { return '<td>' + fn(P[c[0]]) + '</td>'; }).join('') + '</tr>';
+      }
+      var plain = function (v) { return fmtMoney(v); };
+      document.getElementById('pnlTable').innerHTML =
+        '<table><thead><tr><th></th>' + cols.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        row('Staked by players', function (p) { return plain(p.staked); }) +
+        row('Paid back to players', function (p) { return plain(p.paid); }) +
+        row('Game profit', function (p) { return pnlCell(p.gameProfit, true); }, true) +
+        row('Profit % of stakes (edge)', function (p) { return pnlCell(p.edgePercent, false); }) +
+        row('Bonuses given', function (p) { return p.bonuses.total ? '-' + fmtMoney(p.bonuses.total) : '₹0'; }) +
+        row('&nbsp;&nbsp;gift codes · deposit bonus · VIP', function (p) { return '<span class="item-meta">' + fmtMoney(p.bonuses.giftCodes) + ' · ' + fmtMoney(p.bonuses.depositBonus) + ' · ' + fmtMoney(p.bonuses.vip) + (p.bonuses.other ? ' · other ' + fmtMoney(p.bonuses.other) : '') + '</span>'; }) +
+        row('Net profit (after bonuses)', function (p) { return pnlCell(p.netProfit, true); }, true) +
+        row('Admin test credits (not counted)', function (p) { return '<span class="item-meta">' + fmtMoney(p.testCredit) + '</span>'; }) +
+        row('Deposits in', function (p) { return plain(p.deposits); }) +
+        row('Withdrawals paid out', function (p) { return plain(p.withdrawals); }) +
+        row('Cash in (deposits - withdrawals)', function (p) { return pnlCell(p.cashIn, true); }, true) +
+        '</tbody></table>';
+      var n = r.now;
+      document.getElementById('pnlNow').innerHTML =
+        statCardHtml('wallet', 'In player wallets now', fmtMoney(n.playerBalances), n.playersWithBalance + ' players with a balance') +
+        statCardHtml('transactions', 'Withdrawals waiting', fmtMoney(n.pendingWithdrawals), n.pendingWithdrawalCount + ' requests') +
+        statCardHtml('reports', 'Left if everyone cashed out', (n.cashIfAllWithdrew < 0 ? '-' : '') + fmtMoney(Math.abs(n.cashIfAllWithdrew)), 'deposits - withdrawals - wallets - waiting');
+    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
+  }
   function loadReports() {
+    loadPnl();
     document.querySelectorAll('[data-report-days]').forEach(function (b) {
       b.classList.toggle('secondary', Number(b.getAttribute('data-report-days')) !== reportDays);
     });

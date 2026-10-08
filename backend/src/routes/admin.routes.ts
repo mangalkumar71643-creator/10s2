@@ -203,6 +203,98 @@ router.get(
   })
 );
 
+type PnlRow = { period: string; type: string; provider: string | null; total: unknown };
+
+/**
+ * Profit & loss for today, the last 7 and 30 days, and all time (India time).
+ *
+ * Game result: stakes minus winnings across every game (plus any refunds of
+ * old sports bets). Bonus cost: money handed to players without a stake
+ * (gift codes, deposit bonuses, VIP rewards, admin test credits, shown apart
+ * so test top-ups don't hide the real figure). Net = game result - bonuses.
+ *
+ * Cash: real deposits in and withdrawals paid out, plus where things stand
+ * right now: what players hold in their wallets (they may withdraw it) and
+ * withdrawals waiting for approval.
+ */
+router.get(
+  "/reports/pnl",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.$queryRaw<PnlRow[]>`
+      WITH bounds AS (
+        SELECT (date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata')) AT TIME ZONE 'Asia/Kolkata' AT TIME ZONE 'UTC' AS today,
+               (date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') - interval '6 days') AT TIME ZONE 'Asia/Kolkata' AT TIME ZONE 'UTC' AS d7,
+               (date_trunc('day', now() AT TIME ZONE 'Asia/Kolkata') - interval '29 days') AT TIME ZONE 'Asia/Kolkata' AT TIME ZONE 'UTC' AS d30
+      ), periods AS (
+        SELECT 'today' AS period, today AS since FROM bounds
+        UNION ALL SELECT 'd7', d7 FROM bounds
+        UNION ALL SELECT 'd30', d30 FROM bounds
+        UNION ALL SELECT 'all', '-infinity'::timestamp
+      )
+      SELECT p.period, t.type::text AS type,
+             CASE WHEN t.type IN ('BONUS', 'DEPOSIT_BONUS') THEN t.provider ELSE NULL END AS provider,
+             SUM(t.amount) AS total
+      FROM periods p
+      JOIN "Transaction" t ON t."createdAt" >= p.since AND t.status = 'COMPLETED'
+      GROUP BY 1, 2, 3`;
+    const [wallets, pending, players] = await Promise.all([
+      prisma.wallet.aggregate({ _sum: { balance: true } }),
+      prisma.transaction.aggregate({ where: { type: "WITHDRAWAL", status: "PENDING" }, _sum: { amount: true }, _count: true }),
+      prisma.wallet.count({ where: { balance: { gt: 0 } } }),
+    ]);
+
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    const periods = ["today", "d7", "d30", "all"] as const;
+    const out = Object.fromEntries(
+      periods.map((period) => {
+        const mine = rows.filter((r) => r.period === period);
+        const sum = (types: string[], provider?: (p: string | null) => boolean) =>
+          r2(mine.filter((r) => types.includes(r.type) && (!provider || provider(r.provider))).reduce((t, r) => t + Number(r.total), 0));
+        const staked = sum(["GAME_STAKE", "BET_STAKE"]);
+        const paid = sum(["GAME_PAYOUT", "BET_PAYOUT", "BET_REFUND"]);
+        const gameProfit = r2(staked - paid);
+        const testCredit = sum(["BONUS"], (p) => p === "admin-credit");
+        const giftCodes = sum(["BONUS"], (p) => p === "gift-code");
+        const vip = sum(["BONUS"], (p) => p === "vip-upgrade" || p === "vip-weekly");
+        const depositBonus = sum(["DEPOSIT_BONUS"]);
+        const otherBonus = r2(sum(["BONUS"]) - testCredit - giftCodes - vip);
+        const bonuses = r2(giftCodes + vip + depositBonus + otherBonus);
+        const deposits = sum(["DEPOSIT"]);
+        const withdrawals = sum(["WITHDRAWAL"]);
+        return [
+          period,
+          {
+            staked,
+            paid,
+            gameProfit,
+            edgePercent: staked > 0 ? Math.round((gameProfit / staked) * 10000) / 100 : null,
+            bonuses: { total: bonuses, giftCodes, vip, depositBonus, other: otherBonus },
+            testCredit,
+            netProfit: r2(gameProfit - bonuses),
+            deposits,
+            withdrawals,
+            cashIn: r2(deposits - withdrawals),
+          },
+        ];
+      })
+    );
+    const playerBalances = r2(Number(wallets._sum.balance ?? 0));
+    const pendingWithdrawals = r2(Number(pending._sum.amount ?? 0));
+    res.json({
+      periods: out,
+      now: {
+        playerBalances,
+        playersWithBalance: players,
+        pendingWithdrawals,
+        pendingWithdrawalCount: pending._count,
+        // Real money kept if every player withdrew everything now: deposits - paid withdrawals - what's still owed.
+        cashIfAllWithdrew: r2((out.all as { cashIn: number }).cashIn - playerBalances - pendingWithdrawals),
+      },
+      targetHouseEdgePercent: Math.round((1 - env.games.rtp) * 1000) / 10,
+    });
+  })
+);
+
 // --- Test balance: credit a player by their UID ---
 // Deposits are closed until a real payment provider is wired in; this is how
 // the admin tops up a balance for testing. Recorded as a BONUS transaction
