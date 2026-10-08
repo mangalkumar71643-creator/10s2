@@ -32,6 +32,7 @@ import { GatesOfZeusTileArt } from '../screens/GatesOfZeusScreen';
 import { WolfMoonTileArt } from '../screens/WolfMoonScreen';
 import { PenaltyHeroTileArt } from '../screens/PenaltyHeroScreen';
 import { LuckyCupsTileArt } from '../screens/LuckyCupsScreen';
+import { BombSquadTileArt } from '../screens/BombSquadScreen';
 import { FruitMachineTileArt } from '../screens/FruitMachineScreen';
 import { FishermansCatchTileArt } from '../screens/FishermansCatchScreen';
 import { BookOfPharaohTileArt } from '../screens/BookOfPharaohScreen';
@@ -88,6 +89,7 @@ export type GameId =
   | 'WolfMoon'
   | 'PenaltyHero'
   | 'LuckyCups'
+  | 'BombSquad'
   | 'FruitMachine'
   | 'FishermansCatch'
   | 'BookOfPharaoh'
@@ -106,7 +108,7 @@ export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'card-table', title: 'Card & Table', games: ['AndarBahar', 'TeenPatti', 'DragonTiger', 'Baccarat', 'Blackjack', 'Roulette', 'Hilo', 'VideoPoker', 'CasinoHoldem', 'ThreeCardPoker'], banner: require('../../assets/banners/card-table.webp'), bannerAspect: 763 / 155 },
   { id: 'dice-instant', title: 'Dice & Instant', games: ['Dice', 'Limbo', 'Plinko', 'SevenUpDown', 'Diamonds', 'Keno'], banner: require('../../assets/banners/dice-instant.webp'), bannerAspect: 763 / 143 },
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
-  { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip', 'PenaltyHero', 'LuckyCups'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
+  { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip', 'PenaltyHero', 'LuckyCups', 'BombSquad'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
   { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777', 'MoneyComing', 'FruitMachine', 'FishermansCatch', 'BookOfPharaoh', 'GatesOfZeus', 'WolfMoon'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
   { id: 'crash', title: 'Crash', games: ['Aviator', 'CricketX', 'Vortex', 'Rocket', 'GoalRush', 'BigCatch', 'Cosmonaut', 'SkyJet', 'NightRacer', 'Airship'], banner: require('../../assets/banners/crash.webp'), bannerAspect: 763 / 141 },
 ];
@@ -1102,6 +1104,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <LuckyCupsTileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFF4DC', fontSize: 14, fontWeight: '900', letterSpacing: 2, textAlign: 'center', lineHeight: 16, fontFamily: 'serif', textShadowColor: '#000', textShadowRadius: 6 }}>{'LUCKY\nCUPS'}</Text>
+        </Pressable>
+      );
+    case 'BombSquad':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('BombSquad')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#FFC21A',
+            backgroundColor: '#14171C',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 8,
+          }}
+        >
+          <BombSquadTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFC21A', fontSize: 14, fontWeight: '900', letterSpacing: 2, textAlign: 'center', lineHeight: 16, textShadowColor: '#000', textShadowRadius: 6 }}>{'BOMB\nSQUAD'}</Text>
         </Pressable>
       );
     case 'MoneyComing':

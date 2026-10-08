@@ -515,6 +515,60 @@ export function cashOutCups(roundId: string) {
   return apiFetch<CupsRound>('/lucky-cups/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
 }
 
+// ---------- Bomb Squad ----------
+
+export interface BombConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  wires: number;
+  modes: { live: number; multipliers: number[] }[];
+}
+
+export interface BombRound {
+  id: string;
+  live: number;
+  stake: string;
+  /** Wires cut so far, in order (0-7). */
+  cuts: number[];
+  safeCuts: number;
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  /** Only once the round is over. */
+  liveWires?: number[];
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export function fetchBombConfig() {
+  return apiFetch<BombConfig>('/bomb-squad/config');
+}
+
+export function fetchBombCurrent() {
+  return apiFetch<BombRound | null>('/bomb-squad/current');
+}
+
+export function fetchBombHistory(limit = 30) {
+  return apiFetch<BombRound[]>(`/bomb-squad/my-history?limit=${limit}`);
+}
+
+export function startBombRound(stake: number, live: number) {
+  return apiFetch<BombRound>('/bomb-squad/start', { method: 'POST', body: JSON.stringify({ stake, live }) });
+}
+
+export function cutBombWire(roundId: string, wire: number) {
+  return apiFetch<{ round: BombRound; boom: boolean }>('/bomb-squad/cut', { method: 'POST', body: JSON.stringify({ roundId, wire }) });
+}
+
+export function cashOutBomb(roundId: string) {
+  return apiFetch<BombRound>('/bomb-squad/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

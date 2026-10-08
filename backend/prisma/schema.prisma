@@ -195,6 +195,7 @@ model User {
   WolfMoonSpin       WolfMoonSpin[]
   PenaltyRound       PenaltyRound[]
   CupsRound          CupsRound[]
+  BombRound          BombRound[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1973,6 +1974,33 @@ model CupsRound {
   status         BetStatus @default(PENDING)
   /// Every pick: [{ cup, ballCups: number[], won }].
   picks          Json      @default("[]")
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime  @default(now())
+  settledAt      DateTime?
+
+  @@index([userId, status])
+}
+
+// One private Bomb Squad round: a bomb with 8 wires, `live` of which set it
+// off. The player cuts wires one at a time; every safe cut raises the
+// multiplier until they cash out, cut a live wire, or cut every safe wire.
+// The live wires come from the round's seeds, fixed when the round starts.
+model BombRound {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  /// How many of the 8 wires are live: 2, 3 or 5.
+  live           Int
+  stake          Decimal   @db.Decimal(12, 2)
+  /// Wires cut so far, in order (0-7).
+  cuts           Json      @default("[]")
+  safeCuts       Int       @default(0)
+  multiplier     Decimal   @default(1) @db.Decimal(10, 2)
+  payout         Decimal   @default(0) @db.Decimal(12, 2)
+  status         BetStatus @default(PENDING)
   serverSeed     String
   serverSeedHash String
   clientSeed     String
