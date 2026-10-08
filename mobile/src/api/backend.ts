@@ -2591,6 +2591,82 @@ export function fetchCandyHistory(limit = 30) {
   return apiFetch<CandySpinRow[]>(`/candy-blast/my-history?limit=${limit}`);
 }
 
+// ---------- Gates of Zeus (6x5 pay-anywhere tumbles with multiplier orbs) ----------
+
+export type ZeusSymbol = 'BLUE' | 'GREEN' | 'PURPLE' | 'RED' | 'YELLOW' | 'CHALICE' | 'RING' | 'HOURGLASS' | 'CROWN';
+export type ZeusSym = ZeusSymbol | 'SCATTER' | 'ORB';
+export interface ZeusCell {
+  s: ZeusSym;
+  /** An orb's multiplier. */
+  m?: number;
+}
+export interface ZeusStep {
+  grid: ZeusCell[][];
+  wins: { symbol: ZeusSymbol; count: number; pay: number }[];
+  win: number;
+  burst: [number, number][];
+}
+export interface ZeusRound {
+  steps: ZeusStep[];
+  final: ZeusCell[][];
+  tumbleWin: number;
+  /** Orbs on the final board, counted only if the tumbles won (0 = none). */
+  orbTotal: number;
+  /** What the tumble win was multiplied by (1 = none); in free spins, the running total. */
+  multiplier: number;
+  scatters: number;
+  scatterWin: number;
+  win: number;
+}
+export interface ZeusOutcome {
+  base: ZeusRound;
+  freeSpins: ZeusRound[];
+  finalMultiplier: number;
+  totalWin: number;
+}
+export interface ZeusSpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  tumbles: number;
+  freeSpins: number;
+  finalMultiplier: number;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface ZeusConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  cols: number;
+  rows: number;
+  minCount: number;
+  paytable: { symbol: ZeusSymbol; pays: [number, number, number] }[];
+  scatterPays: [number, number, number];
+  scattersToTrigger: number;
+  scattersToRetrigger: number;
+  freeSpins: number;
+  freeRetrigger: number;
+  orbValues: number[];
+  maxWinX: number;
+}
+
+export function fetchZeusConfig() {
+  return apiFetch<ZeusConfig>('/gates-of-zeus/config');
+}
+
+export function spinZeus(stake: number) {
+  return apiFetch<{ spin: ZeusSpinRow; outcome: ZeusOutcome }>('/gates-of-zeus/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchZeusHistory(limit = 30) {
+  return apiFetch<ZeusSpinRow[]>(`/gates-of-zeus/my-history?limit=${limit}`);
+}
+
 // ---------- Neon 777 (classic one-line slot with a Special Reel) ----------
 
 export type Neon777Symbol = 'BLANK' | 'BAR1' | 'BAR2' | 'BAR3' | 'BLUE7' | 'RED7';
