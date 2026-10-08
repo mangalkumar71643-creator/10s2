@@ -5,6 +5,7 @@ import { requireAdmin, requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { env } from "../config/env";
 import { paymentProvider } from "../services/paymentService";
+import { getGameReport } from "../services/gameReportService";
 import * as winGoService from "../services/winGoService";
 import * as aviatorService from "../services/aviatorService";
 import { getChickenRoadConfig } from "../services/chickenRoadService";
@@ -292,6 +293,14 @@ router.get(
       },
       targetHouseEdgePercent: Math.round((1 - env.games.rtp) * 1000) / 10,
     });
+  })
+);
+
+/** Per-game profit and loss: see gameReportService. */
+router.get(
+  "/reports/games",
+  asyncHandler(async (_req, res) => {
+    res.json(await getGameReport());
   })
 );
 

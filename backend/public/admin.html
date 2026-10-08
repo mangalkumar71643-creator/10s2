@@ -554,6 +554,28 @@
             <b>Cash</b> = real deposits in minus withdrawals paid out. Players can still withdraw what is in their wallets, so the last box is what would be left if every player cashed out today.
           </div>
         </div>
+        <div class="card">
+          <div class="card-head"><h2>Har game ka profit / loss</h2></div>
+          <div class="item-meta" style="margin:-6px 0 12px;">Each game's result from its own bets: what players staked, what it paid back, and the profit. Green = the house is up on that game, red = down. A game needs a few thousand bets before its % settles near its edge; until then one big win can swing it.</div>
+          <div class="form-row" style="max-width:640px;">
+            <button class="btn secondary small" data-game-period="today">Today</button>
+            <button class="btn secondary small" data-game-period="d7">7 days</button>
+            <button class="btn secondary small" data-game-period="d30">30 days</button>
+            <button class="btn small" data-game-period="all">All time</button>
+          </div>
+          <div class="form-row" style="max-width:640px;">
+            <select id="gameCategoryFilter"><option value="">All categories</option></select>
+            <select id="gameSort">
+              <option value="profit">Sort: most profit first</option>
+              <option value="loss">Sort: biggest loss first</option>
+              <option value="staked">Sort: most staked first</option>
+              <option value="name">Sort: name</option>
+            </select>
+          </div>
+          <div class="stat-grid" id="gameSummary"></div>
+          <div class="table-scroll" id="gameTable"></div>
+          <div class="item-meta" id="gameCheck" style="margin-top:10px;"></div>
+        </div>
         <div class="form-row" style="max-width:420px;">
           <button class="btn secondary small" data-report-days="7">7 days</button>
           <button class="btn secondary small" data-report-days="30">30 days</button>
@@ -1466,8 +1488,68 @@
         statCardHtml('reports', 'Left if everyone cashed out', (n.cashIfAllWithdrew < 0 ? '-' : '') + fmtMoney(Math.abs(n.cashIfAllWithdrew)), 'deposits - withdrawals - wallets - waiting');
     }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
   }
+  var gameReport = null, gamePeriod = 'all';
+  var PERIOD_NAME = { today: 'today', d7: 'last 7 days', d30: 'last 30 days', all: 'all time' };
+  function renderGames() {
+    if (!gameReport) return;
+    document.querySelectorAll('[data-game-period]').forEach(function (b) { b.classList.toggle('secondary', b.getAttribute('data-game-period') !== gamePeriod); });
+    var cat = document.getElementById('gameCategoryFilter').value;
+    var sort = document.getElementById('gameSort').value;
+    var list = gameReport.games.filter(function (g) { return (!cat || g.category === cat); });
+    var played = list.filter(function (g) { return g[gamePeriod].staked > 0; });
+    var idle = list.length - played.length;
+    played.sort(function (a, b) {
+      var A = a[gamePeriod], B = b[gamePeriod];
+      if (sort === 'loss') return A.profit - B.profit;
+      if (sort === 'staked') return B.staked - A.staked;
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      return B.profit - A.profit;
+    });
+    var up = played.filter(function (g) { return g[gamePeriod].profit > 0; }).length;
+    var down = played.filter(function (g) { return g[gamePeriod].profit < 0; }).length;
+    var tot = played.reduce(function (t, g) { var p = g[gamePeriod]; t.s += p.staked; t.p += p.paid; return t; }, { s: 0, p: 0 });
+    var best = played.slice().sort(function (a, b) { return b[gamePeriod].profit - a[gamePeriod].profit; });
+    document.getElementById('gameSummary').innerHTML =
+      statCardHtml('reports', 'Profit from these games (' + PERIOD_NAME[gamePeriod] + ')', (tot.s - tot.p < 0 ? '-' : '') + fmtMoney(Math.abs(tot.s - tot.p)), pct(tot.s - tot.p, tot.s) + ' of ' + fmtMoney(tot.s) + ' staked') +
+      statCardHtml('trendUp', 'Games in profit / in loss', up + ' / ' + down, played.length + ' played' + (idle ? ', ' + idle + ' with no bets' : '')) +
+      statCardHtml('games', 'Best game', best.length ? escapeHtml(best[0].name) : '—', best.length ? (best[0][gamePeriod].profit < 0 ? '-' : '+') + fmtMoney(Math.abs(best[0][gamePeriod].profit)) : null) +
+      statCardHtml('games', 'Worst game', best.length ? escapeHtml(best[best.length - 1].name) : '—', best.length ? (best[best.length - 1][gamePeriod].profit < 0 ? '-' : '+') + fmtMoney(Math.abs(best[best.length - 1][gamePeriod].profit)) : null);
+    var rows = played.map(function (g) {
+      var p = g[gamePeriod];
+      var few = gamePeriod === 'all' ? g.bets < 1000 : false;
+      return '<tr><td><b>' + escapeHtml(g.name) + '</b>' + (few ? ' <span class="pill" style="font-size:10px;">few bets</span>' : '') + '</td><td>' + escapeHtml(g.category) + '</td>' +
+        (gamePeriod === 'all' ? '<td>' + g.bets.toLocaleString('en-IN') + '</td><td>' + g.players + '</td>' : '') +
+        '<td>' + fmtMoney(p.staked) + '</td><td>' + fmtMoney(p.paid) + '</td><td>' + profitHtml(p.profit) + '</td><td>' +
+        (p.edgePercent === null ? '—' : '<span style="color:' + (p.edgePercent >= 0 ? 'var(--green)' : 'var(--red)') + '">' + p.edgePercent.toFixed(2) + '%</span>') + '</td></tr>';
+    }).join('');
+    document.getElementById('gameTable').innerHTML = rows
+      ? '<table><thead><tr><th>Game</th><th>Category</th>' + (gamePeriod === 'all' ? '<th>Bets</th><th>Players</th>' : '') + '<th>Staked</th><th>Paid back</th><th>Profit</th><th>Profit %</th></tr></thead><tbody>' + rows + '</tbody></table>'
+      : '<div class="empty">No bets ' + (gamePeriod === 'today' ? 'today' : 'in this period') + ' yet.</div>';
+    var c = gameReport.check;
+    document.getElementById('gameCheck').innerHTML = (Math.abs(c.unmatchedStaked) < 0.01 && Math.abs(c.unmatchedPaid) < 0.01)
+      ? 'Check: all games together match the wallet exactly (' + fmtMoney(c.walletStaked) + ' staked, ' + fmtMoney(c.walletPaid) + ' paid, all time).'
+      : '<span style="color:var(--red)">Check: ' + fmtMoney(c.unmatchedStaked) + ' staked and ' + fmtMoney(c.unmatchedPaid) + ' paid in the wallet are not matched to a game above (all time).</span>';
+  }
+  function loadGameReport() {
+    api('/admin/reports/games').then(function (r) {
+      gameReport = r;
+      var sel = document.getElementById('gameCategoryFilter');
+      if (sel.options.length <= 1) {
+        var cats = [];
+        r.games.forEach(function (g) { if (cats.indexOf(g.category) < 0) cats.push(g.category); });
+        cats.forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+      }
+      renderGames();
+    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
+  }
+  document.querySelectorAll('[data-game-period]').forEach(function (b) {
+    b.addEventListener('click', function () { gamePeriod = b.getAttribute('data-game-period'); renderGames(); });
+  });
+  document.getElementById('gameCategoryFilter').addEventListener('change', renderGames);
+  document.getElementById('gameSort').addEventListener('change', renderGames);
   function loadReports() {
     loadPnl();
+    loadGameReport();
     document.querySelectorAll('[data-report-days]').forEach(function (b) {
       b.classList.toggle('secondary', Number(b.getAttribute('data-report-days')) !== reportDays);
     });
