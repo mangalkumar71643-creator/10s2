@@ -22,6 +22,7 @@ import SkyJetScreen from '../screens/SkyJetScreen';
 import NightRacerScreen from '../screens/NightRacerScreen';
 import AirshipScreen from '../screens/AirshipScreen';
 import GatesOfZeusScreen from '../screens/GatesOfZeusScreen';
+import WolfMoonScreen from '../screens/WolfMoonScreen';
 import FruitMachineScreen from '../screens/FruitMachineScreen';
 import FishermansCatchScreen from '../screens/FishermansCatchScreen';
 import BookOfPharaohScreen from '../screens/BookOfPharaohScreen';
@@ -120,6 +121,7 @@ function MainNavigator() {
       <Stack.Screen name="NightRacer" component={NightRacerScreen} />
       <Stack.Screen name="Airship" component={AirshipScreen} />
       <Stack.Screen name="GatesOfZeus" component={GatesOfZeusScreen} />
+      <Stack.Screen name="WolfMoon" component={WolfMoonScreen} />
       <Stack.Screen name="FruitMachine" component={FruitMachineScreen} />
       <Stack.Screen name="FishermansCatch" component={FishermansCatchScreen} />
       <Stack.Screen name="BookOfPharaoh" component={BookOfPharaohScreen} />

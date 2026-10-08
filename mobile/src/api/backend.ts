@@ -2667,6 +2667,88 @@ export function fetchZeusHistory(limit = 30) {
   return apiFetch<ZeusSpinRow[]>(`/gates-of-zeus/my-history?limit=${limit}`);
 }
 
+// ---------- Wolf Moon (25-line slot with free spins and a Money Respin) ----------
+
+export type WolfPayer = 'BUFFALO' | 'EAGLE' | 'COUGAR' | 'HORSE' | 'ACE' | 'KING' | 'QUEEN' | 'JACK';
+export type WolfSym = WolfPayer | 'WILD' | 'SCATTER' | 'MOON';
+export interface WolfCell {
+  s: WolfSym;
+  /** A moon's value in total bets. */
+  v?: number;
+  j?: 'MINI' | 'MAJOR';
+}
+export interface WolfLineWin {
+  line: number;
+  symbol: WolfPayer;
+  count: number;
+  pay: number;
+}
+export interface WolfBoard {
+  grid: WolfCell[][];
+  lines: WolfLineWin[];
+  lineWin: number;
+}
+export interface WolfRespin {
+  start: (WolfCell | null)[][];
+  steps: { landed: [number, number, WolfCell][]; left: number }[];
+  final: (WolfCell | null)[][];
+  cash: number;
+  minis: number;
+  majors: number;
+  mega: boolean;
+  win: number;
+}
+export interface WolfOutcome {
+  base: WolfBoard;
+  scatters: number;
+  moons: number;
+  freeSpins: (WolfBoard & { giant: WolfSym })[];
+  respin: WolfRespin | null;
+  totalWin: number;
+}
+export interface WolfSpinRow {
+  id: string;
+  stake: string;
+  totalWin: string;
+  payout: string;
+  freeSpins: number;
+  moneyRespin: boolean;
+  jackpot: 'MINI' | 'MAJOR' | 'MEGA' | null;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+export interface WolfConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  cols: number;
+  rows: number;
+  lines: number[][];
+  paytable: { symbol: WolfPayer; pays: [number, number, number] }[];
+  freeSpins: number;
+  scatterReels: number[];
+  moonsToTrigger: number;
+  respins: number;
+  moonValues: number[];
+  jackpots: { MINI: number; MAJOR: number; MEGA: number };
+  maxWinX: number;
+}
+
+export function fetchWolfConfig() {
+  return apiFetch<WolfConfig>('/wolf-moon/config');
+}
+
+export function spinWolf(stake: number) {
+  return apiFetch<{ spin: WolfSpinRow; outcome: WolfOutcome }>('/wolf-moon/spin', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchWolfHistory(limit = 30) {
+  return apiFetch<WolfSpinRow[]>(`/wolf-moon/my-history?limit=${limit}`);
+}
+
 // ---------- Neon 777 (classic one-line slot with a Special Reel) ----------
 
 export type Neon777Symbol = 'BLANK' | 'BAR1' | 'BAR2' | 'BAR3' | 'BLUE7' | 'RED7';

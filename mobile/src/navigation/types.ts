@@ -42,6 +42,7 @@ export type RootStackParamList = {
   NightRacer: undefined;
   Airship: undefined;
   GatesOfZeus: undefined;
+  WolfMoon: undefined;
   FruitMachine: undefined;
   FishermansCatch: undefined;
   BookOfPharaoh: undefined;

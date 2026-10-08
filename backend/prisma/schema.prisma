@@ -192,6 +192,7 @@ model User {
   NightRacerBet      NightRacerBet[]
   AirshipBet         AirshipBet[]
   ZeusSpin           ZeusSpin[]
+  WolfMoonSpin       WolfMoonSpin[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1833,6 +1834,27 @@ model ZeusSpin {
   clientSeed      String
   nonce           Int
   createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model WolfMoonSpin {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// Whole spin's win in bets (lines, free spins and Money Respin), before the payout cap.
+  totalWin       Decimal  @db.Decimal(14, 4)
+  payout         Decimal  @db.Decimal(12, 2)
+  freeSpins      Int
+  moneyRespin    Boolean  @default(false)
+  /// Best jackpot won in the Money Respin: MINI, MAJOR or MEGA.
+  jackpot        String?
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
 
   @@index([userId, createdAt])
 }
