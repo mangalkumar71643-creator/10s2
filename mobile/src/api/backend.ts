@@ -569,6 +569,65 @@ export function cashOutBomb(roundId: string) {
   return apiFetch<BombRound>('/bomb-squad/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
 }
 
+// ---------- Vault Heist ----------
+
+export interface VaultConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  digits: number;
+  locks: number;
+  modes: { alarms: number; multipliers: number[] }[];
+}
+
+/** One try at a lock: the digit dialled, that lock's alarm digits, and whether it cracked. */
+export interface VaultTry {
+  digit: number;
+  alarmDigits: number[];
+  ok: boolean;
+}
+
+export interface VaultRound {
+  id: string;
+  alarms: number;
+  stake: string;
+  cracked: number;
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  tries: VaultTry[];
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export function fetchVaultConfig() {
+  return apiFetch<VaultConfig>('/vault-heist/config');
+}
+
+export function fetchVaultCurrent() {
+  return apiFetch<VaultRound | null>('/vault-heist/current');
+}
+
+export function fetchVaultHistory(limit = 30) {
+  return apiFetch<VaultRound[]>(`/vault-heist/my-history?limit=${limit}`);
+}
+
+export function startVaultRound(stake: number, alarms: number) {
+  return apiFetch<VaultRound>('/vault-heist/start', { method: 'POST', body: JSON.stringify({ stake, alarms }) });
+}
+
+export function crackVaultLock(roundId: string, digit: number) {
+  return apiFetch<{ round: VaultRound; attempt: VaultTry }>('/vault-heist/crack', { method: 'POST', body: JSON.stringify({ roundId, digit }) });
+}
+
+export function cashOutVault(roundId: string) {
+  return apiFetch<VaultRound>('/vault-heist/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

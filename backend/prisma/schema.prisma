@@ -196,6 +196,7 @@ model User {
   PenaltyRound       PenaltyRound[]
   CupsRound          CupsRound[]
   BombRound          BombRound[]
+  VaultRound         VaultRound[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -2001,6 +2002,34 @@ model BombRound {
   multiplier     Decimal   @default(1) @db.Decimal(10, 2)
   payout         Decimal   @default(0) @db.Decimal(12, 2)
   status         BetStatus @default(PENDING)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime  @default(now())
+  settledAt      DateTime?
+
+  @@index([userId, status])
+}
+
+// One private Vault Heist round: a vault with 5 locks, each on a 0-9 dial
+// where `alarms` of the 10 digits trip the alarm. Every lock cracked raises
+// the multiplier; an alarm loses the stake. Each lock's alarm digits come
+// from the round's seeds, fixed before the player picks.
+model VaultRound {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  /// How many of the 10 digits trip the alarm on each lock: 2, 4 or 6.
+  alarms         Int
+  stake          Decimal   @db.Decimal(12, 2)
+  /// Locks cracked so far.
+  cracked        Int       @default(0)
+  multiplier     Decimal   @default(1) @db.Decimal(10, 2)
+  payout         Decimal   @default(0) @db.Decimal(12, 2)
+  status         BetStatus @default(PENDING)
+  /// Every try: [{ digit, alarmDigits: number[], ok }].
+  tries          Json      @default("[]")
   serverSeed     String
   serverSeedHash String
   clientSeed     String
