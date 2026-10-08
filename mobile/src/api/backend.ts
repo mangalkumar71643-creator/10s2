@@ -456,6 +456,65 @@ export function cashOutPenalty(roundId: string) {
   return apiFetch<PenaltyRound>('/penalty/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
 }
 
+// ---------- Lucky Cups ----------
+
+export interface CupsConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  cups: number;
+  rounds: number;
+  modes: { balls: number; multipliers: number[] }[];
+}
+
+/** One pick: the cup chosen (0 left, 1 middle, 2 right) and the cups that hid the balls. */
+export interface CupPick {
+  cup: number;
+  ballCups: number[];
+  won: boolean;
+}
+
+export interface CupsRound {
+  id: string;
+  balls: number;
+  stake: string;
+  wins: number;
+  multiplier: string;
+  payout: string;
+  status: 'PENDING' | 'WON' | 'LOST' | 'VOID';
+  picks: CupPick[];
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export function fetchCupsConfig() {
+  return apiFetch<CupsConfig>('/lucky-cups/config');
+}
+
+export function fetchCupsCurrent() {
+  return apiFetch<CupsRound | null>('/lucky-cups/current');
+}
+
+export function fetchCupsHistory(limit = 30) {
+  return apiFetch<CupsRound[]>(`/lucky-cups/my-history?limit=${limit}`);
+}
+
+export function startCupsRound(stake: number, balls: number) {
+  return apiFetch<CupsRound>('/lucky-cups/start', { method: 'POST', body: JSON.stringify({ stake, balls }) });
+}
+
+export function pickCup(roundId: string, cup: number) {
+  return apiFetch<{ round: CupsRound; pick: CupPick }>('/lucky-cups/pick', { method: 'POST', body: JSON.stringify({ roundId, cup }) });
+}
+
+export function cashOutCups(roundId: string) {
+  return apiFetch<CupsRound>('/lucky-cups/cashout', { method: 'POST', body: JSON.stringify({ roundId }) });
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

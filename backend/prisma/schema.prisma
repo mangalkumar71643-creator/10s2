@@ -194,6 +194,7 @@ model User {
   ZeusSpin           ZeusSpin[]
   WolfMoonSpin       WolfMoonSpin[]
   PenaltyRound       PenaltyRound[]
+  CupsRound          CupsRound[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -1944,6 +1945,34 @@ model PenaltyRound {
   status         BetStatus @default(PENDING)
   /// Every kick taken: [{ zone, covered: number[], dive, saved }].
   shots          Json      @default("[]")
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime  @default(now())
+  settledAt      DateTime?
+
+  @@index([userId, status])
+}
+
+// One private Lucky Cups round: up to 5 rounds of "find the ball" under one
+// of 3 cups, with 1 or 2 balls. Every find raises the multiplier; a miss
+// loses the stake. The ball cups for each round come from the round's seeds,
+// fixed before the player picks.
+model CupsRound {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  /// 1 or 2 balls under the 3 cups.
+  balls          Int
+  stake          Decimal   @db.Decimal(12, 2)
+  /// Rounds won so far.
+  wins           Int       @default(0)
+  multiplier     Decimal   @default(1) @db.Decimal(10, 2)
+  payout         Decimal   @default(0) @db.Decimal(12, 2)
+  status         BetStatus @default(PENDING)
+  /// Every pick: [{ cup, ballCups: number[], won }].
+  picks          Json      @default("[]")
   serverSeed     String
   serverSeedHash String
   clientSeed     String
