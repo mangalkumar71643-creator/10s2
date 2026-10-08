@@ -493,6 +493,34 @@
         </div>
       </div>
 
+      <div class="panel" id="panel-category-slider">
+        <h1 class="page-title">Category Slider</h1>
+        <div class="page-sub">Banners that slide by themselves every 4 seconds at the top of the game category screen (the screen players reach by tapping a category on Home). #1 shows first. Add at least 2 to see them slide. Wide banners (about 2:1) look best.</div>
+        <div class="card">
+          <div class="card-head"><h2>Add banner</h2></div>
+          <div class="form-row">
+            <input id="catSliderTitle" placeholder="Name (only you see this)" maxlength="80" />
+            <input id="catSliderFile" type="file" accept="image/png,image/jpeg,image/webp" />
+          </div>
+          <label class="item-meta" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;cursor:pointer;">
+            <input type="checkbox" id="catSliderClean" style="width:auto;" />
+            Remove background and empty edges (leave off for full banners)
+          </label>
+          <img id="catSliderPreview" class="upload-preview" alt="" />
+          <div class="item-meta" style="margin-bottom:6px;">Tapping the banner (optional) — pick a game it opens. The button text is shown on the banner's corner; leave it empty for none.</div>
+          <div class="form-row">
+            <input id="catSliderButtonText" placeholder="Button text, e.g. Play now" maxlength="20" />
+            <select id="catSliderButtonTarget" data-game-select></select>
+          </div>
+          <button class="btn" id="catSliderAddBtn">Add Banner</button>
+          <div class="item-meta" id="catSliderAddStatus"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Order</h2></div>
+          <div id="catSliderList"></div>
+        </div>
+      </div>
+
       <div class="panel" id="panel-giftcodes">
         <h1 class="page-title">Gift Codes</h1>
         <div class="page-sub">Codes players enter in the app's gift box. Each code pays a fixed amount, once per player, until it has been used by as many players as you allow. The money has to be played once before it can be withdrawn.</div>
@@ -734,6 +762,7 @@
     { id: 'support', label: 'Support', icon: 'support' },
     { id: 'popups', label: 'Popups', icon: 'image' },
     { id: 'slider', label: 'Home Slider', icon: 'slider' },
+    { id: 'category-slider', label: 'Category Slider', icon: 'slider' },
     { id: 'giftcodes', label: 'Gift Codes', icon: 'gift' },
     { id: 'reports', label: 'Reports', icon: 'reports' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
@@ -784,6 +813,7 @@
     support: loadTickets,
     popups: loadPopups,
     slider: function () { loadPopups(); loadAppDownloadUrl(); },
+    'category-slider': loadPopups,
     giftcodes: loadGiftCodes,
     reports: loadReports,
     settings: loadSettings,
@@ -1444,6 +1474,7 @@
   function renderPopups() {
     renderPopupKind('POPUP', 'popupList', 'No popups yet. Players see nothing when the app opens.');
     renderPopupKind('SLIDER', 'sliderList', 'No slider images yet. The top of the Home screen stays empty.');
+    renderPopupKind('CATEGORY_SLIDER', 'catSliderList', 'No banners yet. The category screen starts straight with the games.');
   }
 
   // Games a slider button can open: app screen name → name shown here.
@@ -1483,7 +1514,7 @@
               '<div class="item-title"><span class="popup-pos">#' + (i + 1) + '</span>' + escapeHtml(p.title) + '</div>' +
               '<span class="pill ' + (p.active ? 'active' : 'banned') + '">' + (p.active ? 'Showing' : 'Hidden') + '</span>' +
             '</div>' +
-            (kind === 'SLIDER'
+            (kind !== 'POPUP'
               ? '<div class="item-meta">' + (p.buttonText
                   ? 'Button: "' + escapeHtml(p.buttonText) + '"' + (p.buttonTarget ? ' → opens ' + escapeHtml(gameName(p.buttonTarget)) : ' (opens nothing)')
                   : 'No button') + '</div>' +
@@ -1497,7 +1528,7 @@
               '<button class="btn secondary small" data-popup-move="-1" data-id="' + p.id + '"' + (i === 0 ? ' disabled' : '') + '>&uarr; Up</button>' +
               '<button class="btn secondary small" data-popup-move="1" data-id="' + p.id + '"' + (i === rows.length - 1 ? ' disabled' : '') + '>&darr; Down</button>' +
               '<button class="btn secondary small" data-popup-toggle data-id="' + p.id + '">' + (p.active ? 'Hide' : 'Show') + '</button>' +
-              (kind === 'SLIDER' ? '<button class="btn secondary small" data-button-edit data-id="' + p.id + '">Button</button>' : '') +
+              (kind !== 'POPUP' ? '<button class="btn secondary small" data-button-edit data-id="' + p.id + '">Button</button>' : '') +
               '<button class="btn danger small" data-popup-delete data-id="' + p.id + '">Delete</button>' +
             '</div>' +
           '</div>' +
@@ -1718,6 +1749,7 @@
   }
   setupImageForm('popup', 'POPUP');
   setupImageForm('slider', 'SLIDER');
+  setupImageForm('catSlider', 'CATEGORY_SLIDER');
 
   // ---------- App download link (Home slider) ----------
   function loadAppDownloadUrl() {

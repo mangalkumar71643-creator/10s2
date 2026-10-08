@@ -8,7 +8,7 @@ const router = Router();
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    // ?kind=SLIDER for the Home banner; no kind keeps older apps on app-open popups.
+    // ?kind=SLIDER for the Home banner, ?kind=CATEGORY_SLIDER for the category screen; no kind keeps older apps on app-open popups.
     const kind = POPUP_KINDS.includes(req.query.kind as PopupKind) ? (req.query.kind as PopupKind) : "POPUP";
     res.json(await listLivePopups(kind));
   })
