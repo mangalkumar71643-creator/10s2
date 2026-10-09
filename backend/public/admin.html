@@ -543,6 +543,12 @@
       <div class="panel" id="panel-reports">
         <h1 class="page-title">Reports</h1>
         <div class="page-sub">Kitna kamaya ya ghata: house profit from all games, bonus cost and cash (India time).</div>
+        <div class="form-row" style="align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap;">
+          <span id="reportsLive" class="item-meta" style="display:flex;align-items:center;gap:8px;font-size:13px;"></span>
+          <label class="item-meta" style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="reportsAuto" style="width:auto;" checked /> Auto-refresh every 30 seconds
+          </label>
+        </div>
         <div class="card">
           <div class="card-head"><h2>Profit &amp; Loss</h2></div>
           <div class="item-meta" id="pnlHeadline" style="margin:-6px 0 12px;font-size:15px;"></div>
@@ -848,7 +854,11 @@
     slider: function () { loadPopups(); loadAppDownloadUrl(); },
     'category-slider': loadPopups,
     giftcodes: loadGiftCodes,
-    reports: loadReports,
+    reports: function () {
+      loadReports();
+      reportsTicking = true;
+      activeGamePollInterval = setInterval(reportsTick, 1000);
+    },
     settings: loadSettings,
   };
 
@@ -1147,6 +1157,7 @@
 
   function stopGamePolling() {
     if (activeGamePollInterval) { clearInterval(activeGamePollInterval); activeGamePollInterval = null; }
+    reportsTicking = false;
   }
 
   async function sha256Hex(text) {
@@ -1455,8 +1466,8 @@
     if (!money) return v.toFixed(2) + '%';
     return profitHtml(v);
   }
-  function loadPnl() {
-    api('/admin/reports/pnl').then(function (r) {
+  function loadPnl(quiet) {
+    return api('/admin/reports/pnl').then(function (r) {
       var P = r.periods, cols = [['today', 'Today'], ['d7', '7 days'], ['d30', '30 days'], ['all', 'All time']];
       var a = P.all;
       document.getElementById('pnlHeadline').innerHTML = a.netProfit >= 0
@@ -1486,7 +1497,7 @@
         statCardHtml('wallet', 'In player wallets now', fmtMoney(n.playerBalances), n.playersWithBalance + ' players with a balance') +
         statCardHtml('transactions', 'Withdrawals waiting', fmtMoney(n.pendingWithdrawals), n.pendingWithdrawalCount + ' requests') +
         statCardHtml('reports', 'Left if everyone cashed out', (n.cashIfAllWithdrew < 0 ? '-' : '') + fmtMoney(Math.abs(n.cashIfAllWithdrew)), 'deposits - withdrawals - wallets - waiting');
-    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
+    }).catch(function (err) { if (err.authError) doLogout(); else if (!quiet) showAlert(err.message); throw err; });
   }
   var gameReport = null, gamePeriod = 'all';
   var PERIOD_NAME = { today: 'today', d7: 'last 7 days', d30: 'last 30 days', all: 'all time' };
@@ -1530,8 +1541,8 @@
       ? 'Check: all games together match the wallet exactly (' + fmtMoney(c.walletStaked) + ' staked, ' + fmtMoney(c.walletPaid) + ' paid, all time).'
       : '<span style="color:var(--red)">Check: ' + fmtMoney(c.unmatchedStaked) + ' staked and ' + fmtMoney(c.unmatchedPaid) + ' paid in the wallet are not matched to a game above (all time).</span>';
   }
-  function loadGameReport() {
-    api('/admin/reports/games').then(function (r) {
+  function loadGameReport(quiet) {
+    return api('/admin/reports/games').then(function (r) {
       gameReport = r;
       var sel = document.getElementById('gameCategoryFilter');
       if (sel.options.length <= 1) {
@@ -1540,20 +1551,37 @@
         cats.forEach(function (c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
       }
       renderGames();
-    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
+    }).catch(function (err) { if (err.authError) doLogout(); else if (!quiet) showAlert(err.message); throw err; });
   }
   document.querySelectorAll('[data-game-period]').forEach(function (b) {
     b.addEventListener('click', function () { gamePeriod = b.getAttribute('data-game-period'); renderGames(); });
   });
   document.getElementById('gameCategoryFilter').addEventListener('change', renderGames);
   document.getElementById('gameSort').addEventListener('change', renderGames);
-  function loadReports() {
-    loadPnl();
-    loadGameReport();
+  // quiet = an automatic refresh: no pop-up on a network hiccup, and the
+  // max-win box is left alone so a value being typed isn't overwritten.
+  function loadReports(quiet) {
+    quiet = quiet === true;
+    reportsLoading = true;
+    renderReportsLive();
+    var done = Promise.all([loadPnl(quiet), loadGameReport(quiet), loadDaily(quiet)]);
+    done.then(function () { reportsUpdatedAt = new Date(); reportsFailed = false; })
+      .catch(function () { reportsFailed = true; })
+      .then(function () { reportsLoading = false; reportsNextIn = REPORTS_EVERY; renderReportsLive(); });
+    if (!quiet) {
+      api('/admin/settings').then(function (st) {
+        var input = document.getElementById('maxPayoutInput');
+        input.value = st.maxPayout;
+        input.min = st.minMaxPayout;
+        input.max = st.maxMaxPayout;
+      }).catch(function () {});
+    }
+  }
+  function loadDaily(quiet) {
     document.querySelectorAll('[data-report-days]').forEach(function (b) {
       b.classList.toggle('secondary', Number(b.getAttribute('data-report-days')) !== reportDays);
     });
-    api('/admin/reports/daily?days=' + reportDays).then(function (r) {
+    return api('/admin/reports/daily?days=' + reportDays).then(function (r) {
       var p = r.period;
       document.getElementById('reportsStats').innerHTML =
         statCardHtml('wallet', 'Staked (' + p.days + ' days)', fmtMoney(p.staked), p.bets.toLocaleString('en-IN') + ' bets') +
@@ -1568,15 +1596,42 @@
       document.getElementById('reportsTable').innerHTML = rows
         ? '<table><thead><tr><th>Day</th><th>Bets</th><th>Players</th><th>Staked</th><th>Paid</th><th>Profit</th><th>Profit %</th></tr></thead><tbody>' + rows + '</tbody></table>'
         : '<div class="empty">No bets in this period yet.</div>';
-    }).catch(function (err) { if (err.authError) doLogout(); else showAlert(err.message); });
-    api('/admin/settings').then(function (st) {
-      var input = document.getElementById('maxPayoutInput');
-      input.value = st.maxPayout;
-      input.min = st.minMaxPayout;
-      input.max = st.maxMaxPayout;
-    }).catch(function () {});
+    }).catch(function (err) { if (err.authError) doLogout(); else if (!quiet) showAlert(err.message); throw err; });
   }
-  document.getElementById('reportsRefresh').addEventListener('click', loadReports);
+
+  // ---------- Reports auto-refresh ----------
+  // Every 30 seconds while the Reports page is open (the tab switcher stops
+  // it on leaving), skipped while the browser tab is in the background and
+  // caught up as soon as it's back. The choice is remembered on this browser.
+  var reportsTicking = false;
+  var REPORTS_EVERY = 30, reportsNextIn = REPORTS_EVERY, reportsUpdatedAt = null, reportsLoading = false, reportsFailed = false;
+  var reportsAutoBox = document.getElementById('reportsAuto');
+  try { reportsAutoBox.checked = localStorage.getItem('novaplay_reports_auto') !== 'off'; } catch (e) {}
+  function renderReportsLive() {
+    var el = document.getElementById('reportsLive');
+    var on = reportsAutoBox.checked;
+    var dot = '<span style="width:9px;height:9px;border-radius:50%;display:inline-block;background:' + (reportsFailed ? 'var(--red)' : on ? 'var(--green)' : 'var(--text-dim, #888)') + ';' + (on && !reportsFailed ? 'box-shadow:0 0 8px var(--green);' : '') + '"></span>';
+    var when = reportsUpdatedAt ? 'updated ' + reportsUpdatedAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'loading…';
+    var tail = reportsLoading ? ' · refreshing…' : reportsFailed ? ' · could not refresh, retrying' + (on ? ' in ' + reportsNextIn + 's' : '') : on ? ' · next in ' + reportsNextIn + 's' : ' · auto-refresh off';
+    el.innerHTML = dot + '<b>' + (on ? 'Live' : 'Paused') + '</b>&nbsp;· ' + when + tail;
+  }
+  function reportsTick() {
+    if (!reportsAutoBox.checked || reportsLoading) { renderReportsLive(); return; }
+    reportsNextIn = Math.max(0, reportsNextIn - 1);
+    // In a background tab the count runs down but the refresh waits for the tab to come back.
+    if (reportsNextIn <= 0 && !document.hidden) loadReports(true);
+    else renderReportsLive();
+  }
+  reportsAutoBox.addEventListener('change', function () {
+    try { localStorage.setItem('novaplay_reports_auto', reportsAutoBox.checked ? 'on' : 'off'); } catch (e) {}
+    reportsNextIn = REPORTS_EVERY;
+    renderReportsLive();
+  });
+  document.addEventListener('visibilitychange', function () {
+    // Back on the tab with Reports open and auto on: catch up straight away if a refresh was missed.
+    if (!document.hidden && reportsTicking && reportsAutoBox.checked && !reportsLoading && reportsNextIn <= 0) loadReports(true);
+  });
+  document.getElementById('reportsRefresh').addEventListener('click', function () { loadReports(); });
   document.querySelectorAll('[data-report-days]').forEach(function (b) {
     b.addEventListener('click', function () { reportDays = Number(b.getAttribute('data-report-days')); loadReports(); });
   });
