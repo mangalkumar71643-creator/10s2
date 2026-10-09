@@ -721,6 +721,45 @@ export function fetchWheelHistory(limit = 30) {
   return apiFetch<WheelSpinRow[]>(`/lucky-wheel/my-history?limit=${limit}`);
 }
 
+// ---------- Scratch Card ----------
+
+export interface ScratchConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  rtpPercent: number;
+  panels: number;
+  /** The prize table, lowest first; `chance` is the chance a ticket carries that prize. */
+  symbols: { key: string; multiplier: number; chance: number }[];
+}
+
+export interface ScratchTicketRow {
+  id: string;
+  stake: string;
+  /** The nine panels' symbols (indices into `symbols`), left to right, top to bottom. */
+  panels: number[];
+  /** The symbol shown three times, or -1 for no win. */
+  prize: number;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export function fetchScratchConfig() {
+  return apiFetch<ScratchConfig>('/scratch-card/config');
+}
+
+export function buyScratchTicket(stake: number) {
+  return apiFetch<ScratchTicketRow>('/scratch-card/buy', { method: 'POST', body: JSON.stringify({ stake }) });
+}
+
+export function fetchScratchHistory(limit = 30) {
+  return apiFetch<ScratchTicketRow[]>(`/scratch-card/my-history?limit=${limit}`);
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

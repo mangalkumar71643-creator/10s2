@@ -75,6 +75,7 @@ const SOURCES: Source[] = [
   { key: "Diamonds", name: "Diamonds", category: "Dice & Instant", table: "DiamondsBet", stake: "stake", paid: "payout" },
   { key: "Keno", name: "Keno", category: "Dice & Instant", table: "KenoBet", stake: "stake", paid: "payout" },
   { key: "LuckyWheel", name: "Lucky Wheel", category: "Dice & Instant", table: "WheelSpin", stake: "stake", paid: "payout" },
+  { key: "ScratchCard", name: "Scratch Card", category: "Dice & Instant", table: "ScratchTicket", stake: "stake", paid: "payout" },
   // Lottery
   { key: "WinGo", name: "Win Go", category: "Lottery", table: "WinGoBet", stake: "amount", paid: "payout", where: NOT_VOID },
   { key: "K3Lottery", name: "K3 Lottery", category: "Lottery", table: "K3Bet", stake: "amount", paid: "payout", where: NOT_VOID },
