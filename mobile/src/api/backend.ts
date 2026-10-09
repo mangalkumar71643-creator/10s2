@@ -839,6 +839,48 @@ export function fetchColorBallHistory(limit = 30) {
   return apiFetch<ColorBallBetRow[]>(`/color-ball/my-history?limit=${limit}`);
 }
 
+// ---------- Fortune 6 ----------
+
+export interface FortuneSixConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  numbers: number;
+  drawn: number;
+  picks: number;
+  rtpPercent: number;
+  /** What a ticket pays when its 6th number is drawn at each position, and the chance of that. */
+  pays: { position: number; multiplier: number; chance: number }[];
+}
+
+export interface FortuneSixBetRow {
+  id: string;
+  stake: string;
+  picks: number[];
+  /** The 35 balls in draw order. */
+  drawn: number[];
+  /** Position (6-35) of the ball that completed the ticket, or null. */
+  position: number | null;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export function fetchFortuneSixConfig() {
+  return apiFetch<FortuneSixConfig>('/fortune-six/config');
+}
+
+export function playFortuneSix(stake: number, picks: number[]) {
+  return apiFetch<FortuneSixBetRow>('/fortune-six/play', { method: 'POST', body: JSON.stringify({ stake, picks }) });
+}
+
+export function fetchFortuneSixHistory(limit = 30) {
+  return apiFetch<FortuneSixBetRow[]>(`/fortune-six/my-history?limit=${limit}`);
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

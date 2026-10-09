@@ -202,6 +202,7 @@ model User {
   ScratchTicket      ScratchTicket[]
   DiceDuelBet        DiceDuelBet[]
   ColorBallBet       ColorBallBet[]
+  FortuneSixBet      FortuneSixBet[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -2148,6 +2149,28 @@ model ColorBallBet {
   ball           Int
   /// The drawn ball's colour.
   color          String
+  multiplier     Decimal  @db.Decimal(10, 2)
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model FortuneSixBet {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// The player's 6 numbers (1-48), sorted.
+  picks          Int[]
+  /// The 35 balls in draw order.
+  drawn          Int[]
+  /// Position (6-35) of the ball that completed the ticket; null if it was not completed.
+  position       Int?
   multiplier     Decimal  @db.Decimal(10, 2)
   payout         Decimal  @db.Decimal(12, 2)
   serverSeed     String

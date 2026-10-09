@@ -84,6 +84,7 @@ const SOURCES: Source[] = [
   { key: "FiveDLottery", name: "5D Lottery", category: "Lottery", table: "FiveDBet", stake: "amount", paid: "payout", where: NOT_VOID },
   { key: "TrxWin", name: "Trx Win", category: "Lottery", table: "TrxBet", stake: "amount", paid: "payout", where: NOT_VOID },
   { key: "JhandiMunda", name: "Jhandi Munda", category: "Lottery", table: "JhandiMundaBet", stake: "amount", paid: "payout", where: NOT_VOID },
+  { key: "FortuneSix", name: "Fortune 6", category: "Lottery", table: "FortuneSixBet", stake: "stake", paid: "payout" },
   // Mines & Cash-out
   { key: "Mines", name: "Mines", category: "Mines & Cash-out", table: "MinesRound", stake: "stake", paid: "payout", where: NOT_VOID },
   { key: "ChickenRoad", name: "Chicken Road", category: "Mines & Cash-out", table: "ChickenRoadRound", stake: "stake", paid: "payout", where: NOT_VOID },
