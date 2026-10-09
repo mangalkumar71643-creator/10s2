@@ -51,6 +51,11 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Rounded down like the server, without float error. */
+function floor2(n: number): number {
+  return Math.floor(Number((n * 100).toPrecision(12))) / 100;
+}
+
 function money(n: number): string {
   return `₹${n.toFixed(2)}`;
 }
@@ -585,7 +590,7 @@ function Rules({ bet, config }: { bet: number; config: WheelConfig | null }) {
                   <Text style={styles.tCell}>
                     {c} of {w.segments.length}
                   </Text>
-                  <Text style={[styles.tCell, { textAlign: 'right' }]}>{m > 0 ? money(Math.min(Math.floor(bet * m * 100) / 100, config.maxPayout)) : '—'}</Text>
+                  <Text style={[styles.tCell, { textAlign: 'right' }]}>{m > 0 ? money(Math.min(floor2(bet * m), config.maxPayout)) : '—'}</Text>
                 </View>
               ))}
           </View>

@@ -760,6 +760,45 @@ export function fetchScratchHistory(limit = 30) {
   return apiFetch<ScratchTicketRow[]>(`/scratch-card/my-history?limit=${limit}`);
 }
 
+// ---------- Dice Duel ----------
+
+export type DuelPick = 'PLAYER' | 'HOUSE' | 'TIE';
+
+export interface DiceDuelConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  /** Each pick's pay (stake included), its chance and its exact return. */
+  picks: { pick: DuelPick; multiplier: number; chance: number; rtpPercent: number }[];
+}
+
+export interface DiceDuelBetRow {
+  id: string;
+  stake: string;
+  pick: DuelPick;
+  playerDice: number[];
+  houseDice: number[];
+  outcome: DuelPick;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export function fetchDiceDuelConfig() {
+  return apiFetch<DiceDuelConfig>('/dice-duel/config');
+}
+
+export function playDiceDuel(stake: number, pick: DuelPick) {
+  return apiFetch<DiceDuelBetRow>('/dice-duel/play', { method: 'POST', body: JSON.stringify({ stake, pick }) });
+}
+
+export function fetchDiceDuelHistory(limit = 30) {
+  return apiFetch<DiceDuelBetRow[]>(`/dice-duel/my-history?limit=${limit}`);
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

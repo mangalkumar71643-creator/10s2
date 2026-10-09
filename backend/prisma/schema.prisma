@@ -200,6 +200,7 @@ model User {
   TreasureRound      TreasureRound[]
   WheelSpin          WheelSpin[]
   ScratchTicket      ScratchTicket[]
+  DiceDuelBet        DiceDuelBet[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -2102,6 +2103,28 @@ model ScratchTicket {
   panels         Int[]
   /// The symbol shown three times (index into the prize table), or -1 for no win.
   prize          Int
+  multiplier     Decimal  @db.Decimal(10, 2)
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model DiceDuelBet {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// PLAYER, HOUSE or TIE: what the player backed.
+  pick           String
+  playerDice     Int[]
+  houseDice      Int[]
+  /// PLAYER, HOUSE or TIE: who had the higher total.
+  outcome        String
   multiplier     Decimal  @db.Decimal(10, 2)
   payout         Decimal  @db.Decimal(12, 2)
   serverSeed     String
