@@ -24,6 +24,7 @@ import {
   placeSkyJetBet,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#FFD66B';
 const AMBER = '#FFB23F';
@@ -829,9 +830,9 @@ export default function SkyJetScreen() {
             );
           })
         )}
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           Provably fair · RTP {config ? 100 - config.houseEdgePercent : 88}% incl. jackpot · bet ₹{minStake}–₹{maxStake} · max win ₹{config?.maxPayout ?? 10000} per bet
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {jackpotWin !== null && (
@@ -915,7 +916,6 @@ const styles = StyleSheet.create({
   betAmt: { flex: 1, color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   betMult: { flex: 1, fontSize: 13, fontWeight: '900', textAlign: 'center' },
   betWin: { flex: 1.1, fontSize: 13, fontWeight: '800', textAlign: 'right' },
-  footNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 14 },
 
   jpOverlay: { position: 'absolute', top: '28%', alignSelf: 'center' },
   jpCard: { alignItems: 'center', paddingHorizontal: 34, paddingVertical: 16, borderRadius: 20, borderWidth: 3, borderColor: '#FFF8D0' },

@@ -9,6 +9,7 @@ import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient as SvgLinearGradien
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { ZeusCell, ZeusConfig, ZeusOutcome, ZeusRound, ZeusSpinRow, ZeusStep, ZeusSym, ZeusSymbol, fetchZeusConfig, fetchZeusHistory, spinZeus } from '../api/backend';
+import GameInfoButton from '../components/GameInfoButton';
 import { useGameState } from '../state/GameStateContext';
 
 const GOLD = '#FFD66B';
@@ -1097,10 +1098,12 @@ export default function GatesOfZeusScreen() {
           </LinearGradient>
         </Pressable>
         <View style={styles.sideInfo}>
-          <Text style={styles.sideInfoLabel}>RTP</Text>
-          <Text style={styles.sideInfoValue}>{config ? `${config.rtpPercent}%` : '88%'}</Text>
-          <Text style={[styles.sideInfoLabel, { marginTop: 4 }]}>MAX WIN</Text>
+          <Text style={styles.sideInfoLabel}>MAX WIN</Text>
           <Text style={styles.sideInfoValue}>{config?.maxWinX ?? 5000}x</Text>
+          <GameInfoButton compact>
+            RTP {config ? `${config.rtpPercent}%` : '88%'} · max win {config?.maxWinX ?? 5000}x per spin{'\n'}
+            No autoplay or turbo · each paid spin takes at least 2.5 seconds · provably fair
+          </GameInfoButton>
         </View>
       </View>
 

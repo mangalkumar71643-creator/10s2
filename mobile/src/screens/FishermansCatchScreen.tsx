@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { FishFreeSpin, FishLineWin, FishSymbol, FishermanConfig, FishermanSpinRow, fetchFishermanConfig, fetchFishermanHistory, spinFisherman } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#FFD166';
 const GOLD_DEEP = '#B8860B';
@@ -1115,10 +1116,10 @@ export default function FishermansCatchScreen() {
           </Text>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config ? `${config.rtpPercent}%` : '—'} · bet {money(minStake)}–{money(maxStake)} · max win {money(config?.maxPayout ?? 10000)} per spin{'\n'}
           No autoplay or turbo · each paid spin takes at least 2.5 seconds · provably fair
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -1277,7 +1278,6 @@ const styles = StyleSheet.create({
   castText: { color: '#FFE9B0', fontSize: 13, fontWeight: '900', letterSpacing: 2, marginTop: 2, textShadowColor: '#000', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
   crate: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#5A3418', borderRadius: 6, borderWidth: 2, borderColor: '#2A1004', paddingHorizontal: 8, paddingVertical: 5, borderTopColor: '#A0612E' },
   crateText: { color: '#FFE9B0', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-  footNote: { color: '#7A8090', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '30%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 26, paddingVertical: 12, borderRadius: 18, borderWidth: 3, borderColor: '#FFF8D0', alignItems: 'center' },
   bannerText: { color: '#3A1A00', fontSize: 28, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1 },

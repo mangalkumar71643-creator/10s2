@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { ScratchConfig, ScratchTicketRow, buyScratchTicket, fetchScratchConfig, fetchScratchHistory } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#FFD66B';
 const DEEP_GOLD = '#B8860B';
@@ -843,10 +844,10 @@ export default function ScratchCardScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config?.rtpPercent ?? 88}% · ticket {money(minStake)}–{money(maxStake)} · max {money(maxPayout)} per ticket{'\n'}
           No autoplay or turbo · each ticket takes at least 2.5 seconds · provably fair
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -1006,7 +1007,6 @@ const styles = StyleSheet.create({
   mainHalo: { position: 'absolute', width: 92, height: 92, borderRadius: 46, backgroundColor: GOLD },
   mainBtn: { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   mainSmall: { color: INK, fontSize: 11, fontWeight: '900', letterSpacing: 2 },
-  footNote: { color: '#9A7A84', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '58%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 30, paddingVertical: 12, borderRadius: 16, borderWidth: 3, alignItems: 'center' },
   bannerText: { color: TEXT, fontSize: 32, fontWeight: '900', letterSpacing: 2 },

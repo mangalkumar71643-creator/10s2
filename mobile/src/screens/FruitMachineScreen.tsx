@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { FruitMachineConfig, FruitOutcome, FruitSpinRow, FruitSymbol, fetchFruitMachineConfig, fetchFruitMachineHistory, spinFruitMachine } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#FFD166';
 const GOLD_DEEP = '#B8860B';
@@ -1034,10 +1035,10 @@ export default function FruitMachineScreen() {
           </Text>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config ? `${config.rtpPercent}%` : '—'} · bet {money(minStake)}–{money(maxStake)} · max win {money(config?.maxPayout ?? 10000)} per spin{'\n'}
           No autoplay or turbo · each spin takes at least 2.5 seconds · provably fair
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -1243,7 +1244,6 @@ const styles = StyleSheet.create({
   session: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
   sessionText: { color: '#C9B6BC', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
   sessionSep: { color: '#6A5A60', fontSize: 12 },
-  footNote: { color: '#8A7A80', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '32%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 26, paddingVertical: 12, borderRadius: 18, borderWidth: 3, borderColor: '#FFF8D0' },
   bannerText: { color: '#4A0A14', fontSize: 26, fontWeight: '900', fontStyle: 'italic', letterSpacing: 2 },

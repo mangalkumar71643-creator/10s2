@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { VaultConfig, VaultRound, VaultTry, cashOutVault, crackVaultLock, fetchVaultConfig, fetchVaultCurrent, fetchVaultHistory, startVaultRound } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const STEEL = '#8A96A8';
 const CYAN = '#3CE0FF';
@@ -814,10 +815,10 @@ export default function VaultHeistScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config?.rtpPercent ?? 88}% at every cash-out point · bet {money(minStake)}–{money(maxStake)} · max {money(maxPayout)} per heist{'\n'}
           No autoplay · each lock's alarm digits are fixed by your provably-fair seeds before you dial
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -1025,7 +1026,6 @@ const styles = StyleSheet.create({
   mainBtn: { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 6 },
   mainSmall: { color: INK, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   mainBig: { color: INK, fontSize: 15, fontWeight: '900' },
-  footNote: { color: '#6A7280', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '47%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: 16, borderWidth: 3, alignItems: 'center' },
   bannerText: { color: '#FFFFFF', fontSize: 30, fontWeight: '900', letterSpacing: 2 },

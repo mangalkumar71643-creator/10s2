@@ -19,6 +19,7 @@ import {
   startPenaltyRound,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const PITCH = '#1F8A3A';
 const LIME = '#C6FF3A';
@@ -1243,11 +1244,11 @@ export default function PenaltyHeroScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config?.rtpPercent ?? 88}% at every cash-out point · bet {money(minStake)}–{money(maxStake)} · max {money(maxPayout)} per round
           {'\n'}
           No autoplay · the keeper's zones are fixed by your provably-fair seeds before you shoot
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { TreasureConfig, TreasureRound, cashOutTreasure, digTreasureMound, fetchTreasureConfig, fetchTreasureCurrent, fetchTreasureHistory, startTreasureRound } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const SAND = '#F2D49A';
 const SEA = '#1AA8C8';
@@ -811,10 +812,10 @@ export default function TreasureDigScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config?.rtpPercent ?? 88}% at every cash-out point · bet {money(minStake)}–{money(maxStake)} · max {money(maxPayout)} per dig{'\n'}
           No autoplay · the crabs are placed by your provably-fair seeds when the dig starts
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -989,7 +990,6 @@ const styles = StyleSheet.create({
   mainBtn: { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 6 },
   mainSmall: { color: INK, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   mainBig: { color: INK, fontSize: 15, fontWeight: '900' },
-  footNote: { color: '#6A8890', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '47%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 28, paddingVertical: 12, borderRadius: 16, borderWidth: 3, alignItems: 'center' },
   bannerText: { color: '#FFE0D4', fontSize: 30, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif' },

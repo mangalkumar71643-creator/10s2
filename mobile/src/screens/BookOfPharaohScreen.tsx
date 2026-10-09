@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { BookOfPharaohConfig, PharaohFreeSpin, PharaohLineWin, PharaohSpinRow, PharaohSymbol, fetchBookOfPharaohConfig, fetchBookOfPharaohHistory, spinBookOfPharaoh } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#F5C542';
 const GOLD_LIGHT = '#FFF1B0';
@@ -1095,10 +1096,10 @@ export default function BookOfPharaohScreen() {
           </Text>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config ? `${config.rtpPercent}%` : '—'} · bet {money(minStake)}–{money(maxStake)} · max win {money(config?.maxPayout ?? 10000)} per spin{'\n'}
           No autoplay or turbo · each paid spin takes at least 2.5 seconds · provably fair
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {showering && <CoinShower w={W} h={screenH} progress={coinFall} />}
@@ -1254,7 +1255,6 @@ const styles = StyleSheet.create({
   session: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 10, paddingVertical: 7, borderRadius: 4, backgroundColor: 'rgba(74,58,38,0.45)', borderWidth: 1, borderColor: 'rgba(154,106,16,0.5)' },
   sessionText: { color: '#C8B48A', fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'], fontFamily: SERIF },
   sessionSep: { color: GOLD_DEEP, fontSize: 14 },
-  footNote: { color: '#8A7A60', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   bookOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(5,2,15,0.82)', alignItems: 'center', justifyContent: 'center' },
   bookOpen: { flexDirection: 'row', borderWidth: 4, borderColor: '#7A1E10', borderRadius: 10, backgroundColor: '#7A1E10', padding: 6 },
   page: { width: 130, height: 170, borderRadius: 4, alignItems: 'center', justifyContent: 'center' },

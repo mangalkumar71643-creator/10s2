@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { CupPick, CupsConfig, CupsRound, cashOutCups, fetchCupsConfig, fetchCupsCurrent, fetchCupsHistory, pickCup, startCupsRound } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#FFD66B';
 const DEEP_GOLD = '#B8860B';
@@ -722,10 +723,10 @@ export default function LuckyCupsScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config?.rtpPercent ?? 88}% at every cash-out point · bet {money(minStake)}–{money(maxStake)} · max {money(maxPayout)} per game{'\n'}
           No autoplay · the ball's cup is drawn from your provably-fair seeds; the shuffle is just for show
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -914,7 +915,6 @@ const styles = StyleSheet.create({
   mainBtn: { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF', paddingHorizontal: 6 },
   mainSmall: { color: INK, fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   mainBig: { color: INK, fontSize: 15, fontWeight: '900' },
-  footNote: { color: '#8A7480', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '47%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 28, paddingVertical: 14, borderRadius: 16, borderWidth: 3, alignItems: 'center' },
   bannerText: { color: CREAM, fontSize: 30, fontWeight: '900', letterSpacing: 2, fontFamily: 'serif' },

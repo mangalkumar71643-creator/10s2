@@ -22,6 +22,7 @@ import {
   placeAirshipBet,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const BRASS = '#D8A84A';
 const BRASS_LIGHT = '#FFE2A0';
@@ -820,9 +821,9 @@ export default function AirshipScreen() {
             );
           })
         )}
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           Provably fair · RTP {config ? 100 - config.houseEdgePercent : 88}% · bet ₹{minStake}–₹{maxStake} · max win ₹{config?.maxPayout ?? 10000} per bet
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {toast && (
@@ -889,7 +890,6 @@ const styles = StyleSheet.create({
   betAmt: { flex: 1, color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   betMult: { flex: 1, fontSize: 13, fontWeight: '900', textAlign: 'center' },
   betWin: { flex: 1, fontSize: 13, fontWeight: '800', textAlign: 'right' },
-  footNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 14 },
 
   toast: { position: 'absolute', alignSelf: 'center', top: '40%', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12, backgroundColor: 'rgba(20,10,4,0.92)', borderWidth: 1.5, borderColor: '#C84A3A' },
   toastGood: { backgroundColor: '#8AE8B0', borderColor: '#1A7A4A' },

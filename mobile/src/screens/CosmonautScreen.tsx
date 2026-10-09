@@ -22,6 +22,7 @@ import {
   placeCosmonautBet,
 } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#FFD66B';
 const CYAN = '#5CE1FF';
@@ -859,9 +860,9 @@ export default function CosmonautScreen() {
             );
           })
         )}
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           Provably fair · RTP {config ? 100 - config.houseEdgePercent : 88}% · bet ₹{minStake}–₹{maxStake} · max win ₹{config?.maxPayout ?? 10000} per bet
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {toast && (
@@ -931,7 +932,6 @@ const styles = StyleSheet.create({
   betAmt: { flex: 1, color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
   betMult: { flex: 1.2, fontSize: 12, fontWeight: '900', textAlign: 'center' },
   betWin: { flex: 1, fontSize: 13, fontWeight: '800', textAlign: 'right' },
-  footNote: { color: 'rgba(255,255,255,0.35)', fontSize: 11, textAlign: 'center', marginTop: 14 },
 
   toast: { position: 'absolute', alignSelf: 'center', top: '40%', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.88)', borderWidth: 1, borderColor: '#FF4F6D' },
   toastGood: { backgroundColor: '#C8B8FF', borderColor: VIOLET },

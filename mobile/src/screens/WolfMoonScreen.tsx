@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { WolfCell, WolfConfig, WolfLineWin, WolfOutcome, WolfPayer, WolfSpinRow, WolfSym, fetchWolfConfig, fetchWolfHistory, spinWolf } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const SILVER = '#E8EEF8';
 const MOONLIGHT = '#FFF6D8';
@@ -863,10 +864,10 @@ export default function WolfMoonScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config ? `${config.rtpPercent}%` : '88%'} · bet {money(minStake)}–{money(maxStake)} · max win {config?.maxWinX ?? 5000}x, ₹{config?.maxPayout ?? 10000} per spin{'\n'}
           No autoplay or turbo · each paid spin takes at least 2.5 seconds · provably fair
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -1023,7 +1024,6 @@ const styles = StyleSheet.create({
   spinHalo: { position: 'absolute', width: 86, height: 86, borderRadius: 43, backgroundColor: MOONLIGHT },
   spinBtn: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   spinText: { color: NIGHT, fontSize: 11, fontWeight: '900', letterSpacing: 3, fontFamily: SERIF, marginTop: -2 },
-  footNote: { color: '#7A8090', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '28%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 26, paddingVertical: 14, borderRadius: 16, borderWidth: 3, borderColor: TURQ, alignItems: 'center' },
   bannerText: { color: MOONLIGHT, fontSize: 28, fontWeight: '900', letterSpacing: 2, fontFamily: SERIF },

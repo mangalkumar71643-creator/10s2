@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiClientError } from '../api/client';
 import { WheelConfig, WheelRisk, WheelSpinRow, fetchWheelConfig, fetchWheelHistory, spinLuckyWheel } from '../api/backend';
 import { useGameState } from '../state/GameStateContext';
+import GameInfoButton from '../components/GameInfoButton';
 
 const GOLD = '#FFD66B';
 const DEEP_GOLD = '#B8860B';
@@ -519,10 +520,10 @@ export default function LuckyWheelScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.footNote}>
+        <GameInfoButton>
           RTP {config?.rtpPercent ?? 88}% on every risk level · bet {money(minStake)}–{money(maxStake)} · max {money(maxPayout)} per spin{'\n'}
           No autoplay or turbo · each spin takes at least 2.5 seconds · provably fair
-        </Text>
+        </GameInfoButton>
       </ScrollView>
 
       {banner && (
@@ -684,7 +685,6 @@ const styles = StyleSheet.create({
   mainHalo: { position: 'absolute', width: 92, height: 92, borderRadius: 46, backgroundColor: GOLD },
   mainBtn: { width: 82, height: 82, borderRadius: 41, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
   mainSmall: { color: INK, fontSize: 11, fontWeight: '900', letterSpacing: 2 },
-  footNote: { color: '#8A7AA0', fontSize: 10, textAlign: 'center', marginTop: 14, lineHeight: 15, paddingHorizontal: 16 },
   banner: { position: 'absolute', top: '40%', alignSelf: 'center' },
   bannerInner: { paddingHorizontal: 30, paddingVertical: 12, borderRadius: 16, borderWidth: 3, alignItems: 'center' },
   bannerText: { color: TEXT, fontSize: 32, fontWeight: '900', letterSpacing: 2 },
