@@ -38,6 +38,7 @@ import { TreasureDigTileArt } from '../screens/TreasureDigScreen';
 import { LuckyWheelTileArt } from '../screens/LuckyWheelScreen';
 import { ScratchCardTileArt } from '../screens/ScratchCardScreen';
 import { DiceDuelTileArt } from '../screens/DiceDuelScreen';
+import { ColorBallTileArt } from '../screens/ColorBallScreen';
 import { FruitMachineTileArt } from '../screens/FruitMachineScreen';
 import { FishermansCatchTileArt } from '../screens/FishermansCatchScreen';
 import { BookOfPharaohTileArt } from '../screens/BookOfPharaohScreen';
@@ -100,6 +101,7 @@ export type GameId =
   | 'LuckyWheel'
   | 'ScratchCard'
   | 'DiceDuel'
+  | 'ColorBall'
   | 'FruitMachine'
   | 'FishermansCatch'
   | 'BookOfPharaoh'
@@ -116,7 +118,7 @@ export type GameCategory = {
 
 export const GAME_CATEGORIES: GameCategory[] = [
   { id: 'card-table', title: 'Card & Table', games: ['AndarBahar', 'TeenPatti', 'DragonTiger', 'Baccarat', 'Blackjack', 'Roulette', 'Hilo', 'VideoPoker', 'CasinoHoldem', 'ThreeCardPoker'], banner: require('../../assets/banners/card-table.webp'), bannerAspect: 763 / 155 },
-  { id: 'dice-instant', title: 'Dice & Instant', games: ['Dice', 'Limbo', 'Plinko', 'SevenUpDown', 'Diamonds', 'Keno', 'LuckyWheel', 'ScratchCard', 'DiceDuel'], banner: require('../../assets/banners/dice-instant.webp'), bannerAspect: 763 / 143 },
+  { id: 'dice-instant', title: 'Dice & Instant', games: ['Dice', 'Limbo', 'Plinko', 'SevenUpDown', 'Diamonds', 'Keno', 'LuckyWheel', 'ScratchCard', 'DiceDuel', 'ColorBall'], banner: require('../../assets/banners/dice-instant.webp'), bannerAspect: 763 / 143 },
   { id: 'lottery', title: 'Lottery', games: ['WinGo', 'K3Lottery', 'FiveDLottery', 'TrxWin', 'JhandiMunda'], banner: require('../../assets/banners/lottery.webp'), bannerAspect: 763 / 143 },
   { id: 'mines-cashout', title: 'Mines & Cash-out', games: ['Mines', 'ChickenRoad', 'DragonTower', 'Pump', 'CoinFlip', 'PenaltyHero', 'LuckyCups', 'BombSquad', 'VaultHeist', 'TreasureDig'], banner: require('../../assets/banners/mines-cashout.webp'), bannerAspect: 763 / 139 },
   { id: 'slots', title: 'Slots', games: ['Slot', 'Aces', 'CandyBlast', 'Neon777', 'MoneyComing', 'FruitMachine', 'FishermansCatch', 'BookOfPharaoh', 'GatesOfZeus', 'WolfMoon'], banner: require('../../assets/banners/slots.webp'), bannerAspect: 763 / 131 },
@@ -1240,6 +1242,27 @@ function builtInTile(id: GameId, navigation: ReturnType<typeof useNavigation>) {
         >
           <DiceDuelTileArt size={GAME_ICON_SIZE} />
           <Text style={{ color: '#FFD66B', fontSize: 14, fontWeight: '900', letterSpacing: 2, textAlign: 'center', lineHeight: 16, textShadowColor: '#000', textShadowRadius: 6 }}>{'DICE DUEL'}</Text>
+        </Pressable>
+      );
+    case 'ColorBall':
+      return (
+        <Pressable
+          onPress={() => (navigation as any).navigate('ColorBall')}
+          style={{
+            width: GAME_ICON_SIZE,
+            height: GAME_ICON_SIZE,
+            borderRadius: 20,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: '#FFD66B',
+            backgroundColor: '#2A0E4A',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            paddingBottom: 6,
+          }}
+        >
+          <ColorBallTileArt size={GAME_ICON_SIZE} />
+          <Text style={{ color: '#FFD66B', fontSize: 14, fontWeight: '900', letterSpacing: 2, textAlign: 'center', lineHeight: 16, textShadowColor: '#000', textShadowRadius: 6 }}>{'COLOR BALL'}</Text>
         </Pressable>
       );
     case 'MoneyComing':

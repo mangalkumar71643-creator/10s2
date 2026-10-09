@@ -799,6 +799,46 @@ export function fetchDiceDuelHistory(limit = 30) {
   return apiFetch<DiceDuelBetRow[]>(`/dice-duel/my-history?limit=${limit}`);
 }
 
+// ---------- Color Ball ----------
+
+export type BallColor = 'RED' | 'BLUE' | 'GREEN' | 'GOLD';
+
+export interface ColorBallConfig {
+  minStake: number;
+  maxStake: number;
+  maxPayout: number;
+  /** The drum: ball n (1-20) has colour balls[n - 1]. */
+  balls: BallColor[];
+  /** Each colour's ball count, pay (stake included) and exact return. */
+  colors: { color: BallColor; balls: number; multiplier: number; rtpPercent: number }[];
+}
+
+export interface ColorBallBetRow {
+  id: string;
+  stake: string;
+  pick: BallColor;
+  ball: number;
+  color: BallColor;
+  multiplier: string;
+  payout: string;
+  serverSeedHash: string;
+  clientSeed: string;
+  nonce: number;
+  createdAt: string;
+}
+
+export function fetchColorBallConfig() {
+  return apiFetch<ColorBallConfig>('/color-ball/config');
+}
+
+export function playColorBall(stake: number, pick: BallColor) {
+  return apiFetch<ColorBallBetRow>('/color-ball/play', { method: 'POST', body: JSON.stringify({ stake, pick }) });
+}
+
+export function fetchColorBallHistory(limit = 30) {
+  return apiFetch<ColorBallBetRow[]>(`/color-ball/my-history?limit=${limit}`);
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;

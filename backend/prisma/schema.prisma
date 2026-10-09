@@ -201,6 +201,7 @@ model User {
   WheelSpin          WheelSpin[]
   ScratchTicket      ScratchTicket[]
   DiceDuelBet        DiceDuelBet[]
+  ColorBallBet       ColorBallBet[]
   fruitMachineSpins  FruitMachineSpin[]
   fishermanSpins     FishermanSpin[]
   bookOfPharaohSpins BookOfPharaohSpin[]
@@ -2125,6 +2126,28 @@ model DiceDuelBet {
   houseDice      Int[]
   /// PLAYER, HOUSE or TIE: who had the higher total.
   outcome        String
+  multiplier     Decimal  @db.Decimal(10, 2)
+  payout         Decimal  @db.Decimal(12, 2)
+  serverSeed     String
+  serverSeedHash String
+  clientSeed     String
+  nonce          Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model ColorBallBet {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  stake          Decimal  @db.Decimal(12, 2)
+  /// RED, BLUE, GREEN or GOLD: the colour the player backed.
+  pick           String
+  /// The ball drawn (1-20).
+  ball           Int
+  /// The drawn ball's colour.
+  color          String
   multiplier     Decimal  @db.Decimal(10, 2)
   payout         Decimal  @db.Decimal(12, 2)
   serverSeed     String

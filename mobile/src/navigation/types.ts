@@ -51,6 +51,7 @@ export type RootStackParamList = {
   LuckyWheel: undefined;
   ScratchCard: undefined;
   DiceDuel: undefined;
+  ColorBall: undefined;
   FruitMachine: undefined;
   FishermansCatch: undefined;
   BookOfPharaoh: undefined;
