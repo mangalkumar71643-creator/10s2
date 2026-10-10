@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
@@ -110,6 +111,50 @@ export async function changeAdminCredentials(userId: string, input: { currentPas
     },
   });
   return sanitizeUser(updated);
+}
+
+/**
+ * Forgotten admin password: the owner puts a long secret in the server's
+ * ADMIN_RESET_KEY environment variable (Vercel → Settings → Environment
+ * Variables) and enters it on the admin login page with a new password. It
+ * resets the first admin account and returns its login email. Each key works
+ * once (its hash is remembered in the Setting table), wrong keys are
+ * throttled, and with no key set the reset is switched off.
+ */
+const RESET_USED_KEY = "adminResetUsedKeyHash";
+const resetFailures: number[] = [];
+
+export async function resetAdminWithKey(input: { key: string; newPassword: string; email?: string }) {
+  const expected = process.env.ADMIN_RESET_KEY ?? "";
+  if (expected.length < 24) throw new ApiError(404, "Password reset is not switched on.");
+
+  const now = Date.now();
+  while (resetFailures.length && now - resetFailures[0] > 15 * 60 * 1000) resetFailures.shift();
+  if (resetFailures.length >= 5) throw new ApiError(429, "Too many wrong keys. Try again in 15 minutes.");
+
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  if (!timingSafeEqual(digest(input.key), digest(expected))) {
+    resetFailures.push(now);
+    throw new ApiError(401, "Wrong reset key.");
+  }
+  const keyHash = digest(expected).toString("hex");
+  const used = await prisma.setting.findUnique({ where: { key: RESET_USED_KEY } });
+  if (used?.value === keyHash) throw new ApiError(410, "This reset key was already used. Set a new ADMIN_RESET_KEY to reset again.");
+
+  const admin = await prisma.user.findFirst({ where: { role: "ADMIN" }, orderBy: { createdAt: "asc" } });
+  if (!admin) throw new ApiError(404, "No admin account found.");
+  if (input.email && input.email !== admin.email?.toLowerCase()) {
+    const taken = await prisma.user.findFirst({ where: { id: { not: admin.id }, email: { equals: input.email, mode: "insensitive" } }, select: { id: true } });
+    if (taken) throw new ApiError(409, "Another account already uses that email.");
+  }
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.setting.upsert({ where: { key: RESET_USED_KEY }, create: { key: RESET_USED_KEY, value: keyHash }, update: { value: keyHash } });
+    return tx.user.update({
+      where: { id: admin.id },
+      data: { passwordHash: await hashPassword(input.newPassword), ...(input.email ? { email: input.email } : {}) },
+    });
+  });
+  return { email: updated.email };
 }
 
 export function sanitizeUser<T extends { passwordHash: string | null }>(user: T) {

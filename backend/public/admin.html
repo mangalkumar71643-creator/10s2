@@ -277,6 +277,20 @@
     <input id="password" type="password" autocomplete="current-password" />
     <button id="loginBtn" class="btn full">Log In</button>
     <div id="loginError"></div>
+    <a href="#" id="forgotLink" style="display:block;margin-top:14px;font-size:12px;color:var(--text-muted);text-align:center;">Forgot password?</a>
+    <div id="resetBox" style="display:none;margin-top:14px;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
+      <div class="page-sub" style="margin-bottom:0;">Reset with the ADMIN_RESET_KEY set on the server (Vercel → Settings → Environment Variables). Each key works once.</div>
+      <label for="resetKey">Reset key</label>
+      <input id="resetKey" type="password" autocomplete="off" />
+      <label for="resetPass">New password (8+ characters)</label>
+      <input id="resetPass" type="password" autocomplete="new-password" />
+      <label for="resetPass2">New password again</label>
+      <input id="resetPass2" type="password" autocomplete="new-password" />
+      <label for="resetEmail">New login email (optional)</label>
+      <input id="resetEmail" type="email" autocomplete="off" placeholder="Leave empty to keep the current one" />
+      <button id="resetBtn" class="btn full">Reset Password</button>
+      <div id="resetMsg" style="font-size:13px;margin-top:10px;min-height:16px;"></div>
+    </div>
   </div>
 </div>
 
@@ -777,6 +791,36 @@
         showApp();
       })
       .catch(function (err) { loginError.textContent = err.message; });
+  });
+
+  document.getElementById('forgotLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    var box = document.getElementById('resetBox');
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('resetBtn').addEventListener('click', function () {
+    var msg = document.getElementById('resetMsg');
+    var key = document.getElementById('resetKey').value.trim();
+    var pass = document.getElementById('resetPass').value;
+    var pass2 = document.getElementById('resetPass2').value;
+    var newEmail = document.getElementById('resetEmail').value.trim();
+    msg.style.color = '#ff8a8a';
+    if (!key) { msg.textContent = 'Enter the reset key.'; return; }
+    if (pass.length < 8) { msg.textContent = 'New password must be at least 8 characters.'; return; }
+    if (pass !== pass2) { msg.textContent = 'The two passwords do not match.'; return; }
+    var body = { key: key, newPassword: pass };
+    if (newEmail) body.email = newEmail;
+    fetch(API + '/auth/admin-reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.body.error || 'Reset failed');
+        msg.style.color = '#7dffb0';
+        msg.textContent = 'Password changed. Log in with ' + (res.body.email || 'your admin email') + '.';
+        document.getElementById('email').value = res.body.email || '';
+        document.getElementById('password').value = '';
+        ['resetKey', 'resetPass', 'resetPass2', 'resetEmail'].forEach(function (id) { document.getElementById(id).value = ''; });
+      })
+      .catch(function (err) { msg.textContent = err.message; });
   });
 
   function doLogout() {

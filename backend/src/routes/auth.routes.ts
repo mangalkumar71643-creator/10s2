@@ -10,7 +10,7 @@ import {
 } from "../services/authService";
 import { requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
-import { changeAdminCredentials, sanitizeUser } from "../services/authService";
+import { changeAdminCredentials, resetAdminWithKey, sanitizeUser } from "../services/authService";
 
 const router = Router();
 
@@ -61,6 +61,21 @@ router.patch(
   asyncHandler(async (req, res) => {
     const input = credentialsSchema.parse(req.body);
     res.json(await changeAdminCredentials(req.user!.userId, input));
+  })
+);
+
+const adminResetSchema = z.object({
+  key: z.string().min(1),
+  newPassword: z.string().min(8, "New password must be at least 8 characters."),
+  email: z.string().trim().toLowerCase().email().optional(),
+});
+
+/** Forgotten admin password: reset it with the server's ADMIN_RESET_KEY (see resetAdminWithKey). */
+router.post(
+  "/admin-reset",
+  asyncHandler(async (req, res) => {
+    const input = adminResetSchema.parse(req.body);
+    res.json(await resetAdminWithKey(input));
   })
 );
 
