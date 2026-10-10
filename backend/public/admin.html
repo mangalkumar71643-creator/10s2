@@ -351,6 +351,26 @@
       <div class="panel" id="panel-users">
         <h1 class="page-title">Users</h1>
         <div class="page-sub">Search, verify and manage every registered player.</div>
+        <div class="card" style="max-width:620px;">
+          <div class="card-head"><h2>Real money: deposit / withdraw</h2></div>
+          <div class="item-meta" style="margin:-6px 0 12px;">When a player pays you (UPI / bank), add it here as a deposit. When you pay a player out, withdraw it here. Always enter the payment's UTR / reference — the same reference can't be used twice. Deposits get the normal first/second deposit bonus and must be played before they can be withdrawn.</div>
+          <div class="form-row">
+            <input id="moneyUid" inputmode="numeric" placeholder="Player UID" />
+            <button class="btn secondary" id="moneyFind" style="flex:0 0 auto;">Find</button>
+          </div>
+          <div class="detail-box" id="moneyPlayer" style="display:none;margin-bottom:12px;"></div>
+          <div class="form-row">
+            <input id="moneyAmount" type="number" min="1" placeholder="Amount (₹)" />
+            <input id="moneyRef" placeholder="UTR / reference" maxlength="60" />
+          </div>
+          <div class="form-row">
+            <button class="btn" id="moneyDeposit" disabled>Add Deposit</button>
+            <button class="btn danger" id="moneyWithdraw" disabled>Withdraw (paid out)</button>
+          </div>
+          <div class="item-meta" id="moneyStatus"></div>
+          <div class="card-head" style="margin-top:16px;"><h2 style="font-size:14px;">Recent manual deposits &amp; withdrawals</h2><button class="btn secondary small" id="moneyRefresh">Refresh</button></div>
+          <div class="table-scroll" id="moneyRecent"></div>
+        </div>
         <div class="card" style="max-width:520px;">
           <div class="card-head"><h2>Add test balance</h2></div>
           <div class="item-meta" style="margin:-6px 0 12px;">Deposits are closed for now. Add balance to a player by their UID for testing. It is recorded as an admin credit, not a deposit.</div>
@@ -889,7 +909,7 @@
 
   var loaders = {
     dashboard: loadDashboard,
-    users: function () { loadUsers(1); },
+    users: function () { loadUsers(1); loadMoneyRecent(); },
     transactions: loadWithdrawals,
     'game-colorpredict': function () { loadColorPredictPanel(); activeGamePollInterval = setInterval(loadColorPredictPanel, 4000); },
     'game-aviator': function () { loadAviatorPanel(); activeGamePollInterval = setInterval(loadAviatorPanel, 2000); },
@@ -1176,11 +1196,12 @@
           var id = btn.getAttribute('data-id');
           var action = btn.getAttribute('data-action');
           if (action === 'approve') {
-            askConfirm('Confirm this payout has actually been sent to the customer’s bank account?').then(function (ok) {
-              if (!ok) return;
-              btn.disabled = true;
-              api('/admin/withdrawals/' + id + '/approve', { method: 'POST' }).then(loadWithdrawals).catch(function (err) { showAlert(err.message); loadWithdrawals(); });
-            });
+            var ref = prompt('You have sent this payout to the customer\'s bank/UPI?\nEnter the payment\'s UTR / reference to mark it paid:');
+            if (ref === null) return;
+            ref = ref.trim();
+            if (ref.length < 4) { showAlert('Enter the UTR / reference of the payment you sent (at least 4 characters).'); return; }
+            btn.disabled = true;
+            api('/admin/withdrawals/' + id + '/approve', { method: 'POST', body: JSON.stringify({ reference: ref }) }).then(loadWithdrawals).catch(function (err) { showAlert(err.message); loadWithdrawals(); });
           } else if (action === 'reject') {
             askConfirm('Reject this withdrawal and refund the customer’s balance?').then(function (ok) {
               if (!ok) return;
@@ -1451,6 +1472,88 @@
     if (!openTicketId) return;
     api('/admin/support-tickets/' + openTicketId + '/resolve', { method: 'PATCH' }).then(function () { closeThread(); loadTickets(); });
   });
+
+  // ---------- Real money: manual deposit / withdraw ----------
+  var moneyFound = null;
+  function showMoneyPlayer(u) {
+    var box = document.getElementById('moneyPlayer');
+    var w = u.wallet || {};
+    box.style.display = 'block';
+    box.innerHTML = 'Player<br/><b>' + escapeHtml([u.firstName, u.lastName].filter(Boolean).join(' ') || '—') + '</b> · UID ' + u.uid +
+      (u.phone ? ' · ' + escapeHtml(u.phone) : '') + (u.isBanned ? ' · <b style="color:#ff8a8a;">BANNED</b>' : '') +
+      '<br/>Balance <b>' + fmtMoney(w.balance) + '</b> · Can withdraw <b>' + fmtMoney(u.withdrawable) + '</b>' +
+      (Number(w.unplayedDeposit) > 0 ? '<br/><span class="item-meta">Not played yet: ' + fmtMoney(w.unplayedDeposit) + '</span>' : '') +
+      (Number(w.lockedBonus) > 0 ? '<br/><span class="item-meta">Locked bonus: ' + fmtMoney(w.lockedBonus) + '</span>' : '');
+  }
+  function setMoneyButtons() {
+    document.getElementById('moneyDeposit').disabled = !moneyFound;
+    document.getElementById('moneyWithdraw').disabled = !moneyFound;
+  }
+  function loadMoneyRecent() {
+    api('/admin/manual-transactions').then(function (rows) {
+      document.getElementById('moneyRecent').innerHTML = rows.length
+        ? '<table><thead><tr><th>Time</th><th>Player</th><th>Type</th><th>Amount</th><th>Reference</th></tr></thead><tbody>' +
+          rows.map(function (r) {
+            var u = r.user || {};
+            var dep = r.type === 'DEPOSIT';
+            return '<tr><td>' + new Date(r.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</td>' +
+              '<td>' + escapeHtml([u.firstName, u.lastName].filter(Boolean).join(' ') || '—') + '<br/><span class="item-meta">UID ' + u.uid + '</span></td>' +
+              '<td style="color:' + (dep ? '#7dffb0' : '#ff8a8a') + ';font-weight:700;">' + (dep ? 'Deposit' : 'Withdraw') + '</td>' +
+              '<td>' + fmtMoney(r.amount) + '</td><td>' + escapeHtml(r.providerReferenceId || '') + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : '<div class="empty">Nothing recorded yet.</div>';
+    }).catch(function (err) { if (err.authError) doLogout(); });
+  }
+  document.getElementById('moneyRefresh').addEventListener('click', loadMoneyRecent);
+  document.getElementById('moneyFind').addEventListener('click', function () {
+    var uid = document.getElementById('moneyUid').value.trim();
+    var status = document.getElementById('moneyStatus');
+    moneyFound = null;
+    setMoneyButtons();
+    document.getElementById('moneyPlayer').style.display = 'none';
+    status.textContent = '';
+    if (!/^\d+$/.test(uid)) { status.textContent = 'Enter the player\'s UID (numbers only).'; return; }
+    api('/admin/users/by-uid/' + uid).then(function (u) {
+      moneyFound = u;
+      showMoneyPlayer(u);
+      setMoneyButtons();
+    }).catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; });
+  });
+  document.getElementById('moneyUid').addEventListener('input', function () { moneyFound = null; setMoneyButtons(); });
+  function moneyAction(kind) {
+    var status = document.getElementById('moneyStatus');
+    var amount = Math.round(Number(document.getElementById('moneyAmount').value) * 100) / 100;
+    var ref = document.getElementById('moneyRef').value.trim();
+    if (!moneyFound) { status.textContent = 'Find the player first.'; return; }
+    if (!(amount > 0)) { status.textContent = 'Enter the amount.'; return; }
+    if (ref.length < 4) { status.textContent = 'Enter the payment\'s UTR / reference.'; return; }
+    var target = moneyFound;
+    var name = [target.firstName, target.lastName].filter(Boolean).join(' ') || 'UID ' + target.uid;
+    var question = kind === 'deposit'
+      ? 'You RECEIVED ' + fmtMoney(amount) + ' from ' + name + ' (UID ' + target.uid + ', ref ' + ref + ')? Add it to their wallet as a deposit?'
+      : 'You PAID ' + fmtMoney(amount) + ' to ' + name + ' (UID ' + target.uid + ', ref ' + ref + ')? Take it out of their wallet as a withdrawal?';
+    askConfirm(question).then(function (ok) {
+      if (!ok) return;
+      document.getElementById('moneyDeposit').disabled = true;
+      document.getElementById('moneyWithdraw').disabled = true;
+      status.textContent = 'Saving…';
+      api('/admin/users/by-uid/' + target.uid + (kind === 'deposit' ? '/manual-deposit' : '/manual-withdraw'), { method: 'POST', body: JSON.stringify({ amount: amount, reference: ref }) })
+        .then(function (r) {
+          target.wallet = Object.assign({}, target.wallet, { balance: r.balance });
+          target.withdrawable = r.withdrawable;
+          document.getElementById('moneyAmount').value = '';
+          document.getElementById('moneyRef').value = '';
+          status.textContent = kind === 'deposit'
+            ? 'Deposit of ' + fmtMoney(r.deposited) + ' added' + (Number(r.bonus) > 0 ? ' (+ ' + fmtMoney(r.bonus) + ' deposit bonus)' : '') + '. New balance ' + fmtMoney(r.balance) + '.'
+            : 'Withdrawal of ' + fmtMoney(r.withdrawn) + ' recorded. New balance ' + fmtMoney(r.balance) + '.';
+          return api('/admin/users/by-uid/' + target.uid).then(function (u) { if (moneyFound === target) { moneyFound = u; showMoneyPlayer(u); } });
+        })
+        .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
+        .finally(function () { setMoneyButtons(); loadMoneyRecent(); });
+    });
+  }
+  document.getElementById('moneyDeposit').addEventListener('click', function () { moneyAction('deposit'); });
+  document.getElementById('moneyWithdraw').addEventListener('click', function () { moneyAction('withdraw'); });
 
   // ---------- Add test balance ----------
   var creditFound = null;

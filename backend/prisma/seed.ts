@@ -65,6 +65,21 @@ async function main() {
   await backfillUids();
   await seedDepositBonusPopup();
   await ensureUnplayedDepositTrigger();
+  await ensureManualReferenceIndex();
+}
+
+/**
+ * A deposit or payout the admin records by hand carries the payment's UTR /
+ * reference; this index makes the database refuse the same reference twice
+ * (see admin.routes.ts manual-deposit / manual-withdraw), even from two
+ * clicks at once. Recreated on every deploy, like the trigger below.
+ */
+async function ensureManualReferenceIndex() {
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS novaplay_manual_reference
+    ON "Transaction" (type, lower("providerReferenceId"))
+    WHERE provider = 'admin-manual' AND status = 'COMPLETED' AND "providerReferenceId" IS NOT NULL;
+  `);
 }
 
 /**

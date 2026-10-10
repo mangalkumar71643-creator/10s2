@@ -5,6 +5,8 @@ import { requireAdmin, requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { env } from "../config/env";
 import { paymentProvider } from "../services/paymentService";
+import { completeDeposit } from "../services/depositService";
+import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { getGameReport } from "../services/gameReportService";
 import * as winGoService from "../services/winGoService";
 import * as aviatorService from "../services/aviatorService";
@@ -315,9 +317,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const uid = Number(req.params.uid);
     if (!Number.isInteger(uid)) throw new ApiError(400, "Enter a valid UID.");
-    const user = await prisma.user.findUnique({ where: { uid }, select: { id: true, ...userSummarySelect, wallet: { select: { balance: true } } } });
+    const user = await prisma.user.findUnique({
+      where: { uid },
+      select: { id: true, ...userSummarySelect, isBanned: true, isSelfExcluded: true, wallet: { select: { balance: true, lockedBonus: true, unplayedDeposit: true } } },
+    });
     if (!user) throw new ApiError(404, "No player with that UID.");
-    res.json(user);
+    res.json({ ...user, withdrawable: user.wallet ? withdrawableOf(user.wallet) : 0 });
   })
 );
 
@@ -337,6 +342,120 @@ router.post(
       return updated;
     });
     res.json({ user, credited: rounded, balance: wallet.balance });
+  })
+);
+
+// --- Real money, handled by hand: deposits received and payouts sent ---
+// Until a payment provider is live, the admin receives a player's deposit
+// (UPI / bank transfer) and records it here, and pays withdrawals out by
+// hand and records those too. Both are real DEPOSIT / WITHDRAWAL
+// transactions (provider "admin-manual", with the payment's UTR/reference),
+// so they count in the Profit & Loss report, a deposit gets the same
+// first/second deposit bonus as an app deposit and must be played before it
+// can be withdrawn, and the same reference can't be recorded twice.
+
+const MANUAL = "admin-manual";
+
+/** Only winnings can leave: deposits must be played first, and a locked bonus waits for its wagering. */
+function withdrawableOf(w: { balance: unknown; lockedBonus: unknown; unplayedDeposit: unknown }) {
+  return Math.max(0, Math.round((Number(w.balance) - Number(w.lockedBonus) - Number(w.unplayedDeposit)) * 100) / 100);
+}
+
+const manualSchema = z.object({
+  amount: z.number().positive().max(1000000),
+  reference: z.string().trim().min(4, "Enter the payment's UTR / reference (at least 4 characters).").max(60),
+});
+
+async function findPlayerByUid(uidParam: string) {
+  const uid = Number(uidParam);
+  if (!Number.isInteger(uid)) throw new ApiError(400, "Enter a valid UID.");
+  const user = await prisma.user.findUnique({ where: { uid }, select: { id: true, ...userSummarySelect, isBanned: true, role: true } });
+  if (!user) throw new ApiError(404, "No player with that UID.");
+  if (user.role === "ADMIN") throw new ApiError(400, "That is an admin account, not a player.");
+  return user;
+}
+
+/** Two requests with the same reference at once: the database index (prisma/seed.ts) lets only one through. */
+function duplicateReference(reference: string) {
+  return (err: unknown): never => {
+    if ((err as { code?: string })?.code === "P2002") throw new ApiError(409, `Reference ${reference} was already recorded.`);
+    throw err;
+  };
+}
+
+async function assertReferenceUnused(type: "DEPOSIT" | "WITHDRAWAL", reference: string) {
+  const used = await prisma.transaction.findFirst({
+    where: { type, provider: MANUAL, providerReferenceId: { equals: reference, mode: "insensitive" }, status: "COMPLETED" },
+    select: { createdAt: true, user: { select: { uid: true } } },
+  });
+  if (used) throw new ApiError(409, `Reference ${reference} was already recorded (UID ${used.user.uid}, ${used.createdAt.toISOString().slice(0, 10)}).`);
+}
+
+router.post(
+  "/users/by-uid/:uid/manual-deposit",
+  asyncHandler(async (req, res) => {
+    const { amount, reference } = manualSchema.parse(req.body);
+    const rounded = Math.round(amount * 100) / 100;
+    const user = await findPlayerByUid(req.params.uid);
+    if (user.isBanned) throw new ApiError(400, "This player is banned. Unban them before recording a deposit.");
+    // The player's own self-exclusion and deposit limits apply to money taken by hand too.
+    // (Reported as 400: the panel treats 401/403 as the admin's own session expiring.)
+    try {
+      await assertCanTransact(user.id);
+      await assertWithinDepositLimits(user.id, rounded);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) throw new ApiError(400, `Player: ${err.message}`);
+      throw err;
+    }
+    await assertReferenceUnused("DEPOSIT", reference);
+    await prisma.wallet.upsert({ where: { userId: user.id }, update: {}, create: { userId: user.id, balance: 0 } });
+    const { bonus } = await completeDeposit(user.id, rounded, MANUAL, reference).catch(duplicateReference(reference));
+    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: user.id } });
+    res.json({ user, deposited: rounded, bonus, balance: wallet.balance, withdrawable: withdrawableOf(wallet) });
+  })
+);
+
+router.post(
+  "/users/by-uid/:uid/manual-withdraw",
+  asyncHandler(async (req, res) => {
+    const { amount, reference } = manualSchema.parse(req.body);
+    const rounded = Math.round(amount * 100) / 100;
+    const user = await findPlayerByUid(req.params.uid);
+    await assertReferenceUnused("WITHDRAWAL", reference);
+    const debit = prisma.$transaction(async (tx) => {
+      // Under a lock on the wallet row, so two payouts at once can't both pass the check.
+      await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${user.id} FOR UPDATE`;
+      const w = await tx.wallet.findUnique({ where: { userId: user.id } });
+      if (!w) throw new ApiError(400, "This player has no balance.");
+      const free = withdrawableOf(w);
+      if (rounded > free) {
+        const parts = [
+          Number(w.unplayedDeposit) > 0 ? `₹${Number(w.unplayedDeposit).toFixed(2)} deposited is not played yet` : null,
+          Number(w.lockedBonus) > 0 ? `₹${Number(w.lockedBonus).toFixed(2)} bonus is still locked` : null,
+        ].filter(Boolean);
+        throw new ApiError(400, `Only ₹${free.toFixed(2)} can be withdrawn${parts.length ? ` — ${parts.join(", ")}` : ""}.`);
+      }
+      const debited = await tx.wallet.updateMany({ where: { userId: user.id, balance: { gte: rounded } }, data: { balance: { decrement: rounded } } });
+      if (debited.count === 0) throw new ApiError(400, "Insufficient balance");
+      await tx.transaction.create({ data: { userId: user.id, type: "WITHDRAWAL", amount: rounded, status: "COMPLETED", provider: MANUAL, providerReferenceId: reference } });
+      return tx.wallet.findUniqueOrThrow({ where: { userId: user.id } });
+    });
+    const wallet = await debit.catch(duplicateReference(reference));
+    res.json({ user, withdrawn: rounded, balance: wallet.balance, withdrawable: withdrawableOf(wallet) });
+  })
+);
+
+/** The latest deposits and payouts recorded by hand, newest first. */
+router.get(
+  "/manual-transactions",
+  asyncHandler(async (_req, res) => {
+    const rows = await prisma.transaction.findMany({
+      where: { provider: MANUAL, type: { in: ["DEPOSIT", "WITHDRAWAL"] } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: { id: true, type: true, amount: true, providerReferenceId: true, createdAt: true, user: { select: userSummarySelect } },
+    });
+    res.json(rows);
   })
 );
 
@@ -459,6 +578,19 @@ router.post(
   "/withdrawals/:transactionId/approve",
   asyncHandler(async (req, res) => {
     const transaction = await prisma.transaction.findUniqueOrThrow({ where: { id: req.params.transactionId } });
+    // Paid out by hand (UPI / bank transfer): the admin gives the payment's
+    // UTR/reference and the request is simply marked paid.
+    const reference = typeof req.body?.reference === "string" ? req.body.reference.trim() : "";
+    if (reference) {
+      if (reference.length < 4 || reference.length > 60) throw new ApiError(400, "The UTR / reference must be 4-60 characters.");
+      await assertReferenceUnused("WITHDRAWAL", reference);
+      const marked = await prisma.transaction.updateMany({
+        where: unclaimedPendingWithdrawal(transaction.id),
+        data: { status: "COMPLETED", provider: MANUAL, providerReferenceId: reference },
+      });
+      if (marked.count === 0) throw new ApiError(400, "This withdrawal is not pending, or is already being processed.");
+      return res.json(await prisma.transaction.findUniqueOrThrow({ where: { id: transaction.id } }));
+    }
     const claimed = await prisma.transaction.updateMany({
       where: unclaimedPendingWithdrawal(transaction.id),
       data: { provider: PROCESSING },

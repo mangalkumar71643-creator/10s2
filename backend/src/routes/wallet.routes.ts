@@ -6,6 +6,7 @@ import { requireAuth } from "../middleware/auth";
 import { prisma } from "../db/prismaClient";
 import { paymentProvider } from "../services/paymentService";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
+import { completeDeposit } from "../services/depositService";
 import { env } from "../config/env";
 
 const router = Router();
@@ -98,48 +99,7 @@ router.post(
       throw new ApiError(402, "Deposit could not be completed by the payment provider.");
     }
 
-    const bonus = await prisma.$transaction(async (tx) => {
-      // Lock the wallet so two deposits at once can't both count as the
-      // first (or second) and both take that bonus.
-      await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
-      const previousDeposits = await tx.transaction.count({ where: { userId, type: "DEPOSIT", status: "COMPLETED" } });
-      // First deposit firstDepositBonusPercent, second secondDepositBonusPercent,
-      // none after: min(amount * percent, cap), credited into balance
-      // (immediately playable) and locked from withdrawal until
-      // wageringMultiplier x the bonus has been staked in games — each game
-      // service (e.g. vortexService.ts, andarBaharService.ts) advances
-      // wageringProgress and releases the lock.
-      const percent = previousDeposits === 0 ? env.wallet.firstDepositBonusPercent : previousDeposits === 1 ? env.wallet.secondDepositBonusPercent : 0;
-      const granted = Math.round(Math.min(amount * percent, env.wallet.firstDepositBonusCap) * 100) / 100;
-
-      await tx.transaction.create({
-        data: {
-          userId,
-          type: "DEPOSIT",
-          amount,
-          status: "COMPLETED",
-          provider: result.provider,
-          providerReferenceId: result.providerReferenceId,
-        },
-      });
-      await tx.wallet.update({ where: { userId }, data: { balance: { increment: amount } } });
-
-      if (granted > 0) {
-        await tx.transaction.create({
-          data: { userId, type: "DEPOSIT_BONUS", amount: granted, status: "COMPLETED", provider: "novaplay-promo" },
-        });
-        await tx.wallet.update({
-          where: { userId },
-          data: {
-            balance: { increment: granted },
-            lockedBonus: { increment: granted },
-            wageringRequired: { increment: granted * env.wallet.wageringMultiplier },
-          },
-        });
-      }
-      if (previousDeposits === 0) await tx.user.update({ where: { id: userId }, data: { firstDepositBonusClaimed: true } });
-      return granted;
-    });
+    const { bonus } = await completeDeposit(userId, amount, result.provider, result.providerReferenceId ?? null);
     res.json({ ...(await buildWalletView(userId)), bonusGranted: bonus });
   })
 );
