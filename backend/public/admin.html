@@ -643,6 +643,15 @@
         <h1 class="page-title">Settings</h1>
         <div class="page-sub">Your account on this control panel.</div>
         <div class="card" id="settingsCard" style="max-width:420px;"></div>
+        <div class="card" style="max-width:420px;">
+          <div class="card-head"><h2>SMS / OTP</h2></div>
+          <div class="item-meta" id="smsStatus" style="margin:-6px 0 12px;">Loading…</div>
+          <div class="form-row">
+            <input id="smsTestPhone" inputmode="numeric" maxlength="10" placeholder="Your 10-digit mobile number" />
+            <button class="btn" id="smsTestBtn" style="flex:0 0 auto;">Send test SMS</button>
+          </div>
+          <div class="item-meta" id="smsTestResult"></div>
+        </div>
       </div>
 
     </div>
@@ -923,7 +932,7 @@
       reportsTicking = true;
       activeGamePollInterval = setInterval(reportsTick, 1000);
     },
-    settings: loadSettings,
+    settings: function () { loadSettings(); loadSmsStatus(); },
   };
 
   function switchTab(tabId) {
@@ -2170,6 +2179,28 @@
         loadGiftCodes();
       })
       .catch(function (err) { if (err.authError) doLogout(); else status.textContent = err.message; })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  function loadSmsStatus() {
+    api('/admin/sms/status').then(function (st) {
+      var lines = [];
+      lines.push('Mode: <b>' + (st.mode === 'live' ? 'LIVE — OTPs go by SMS' : 'TEST — OTP shown in the app, no SMS sent') + '</b>');
+      lines.push('Fast2SMS key: <b>' + (st.keySet ? 'set' : 'not set') + '</b>' + (st.keySet ? ' · route <b>' + escapeHtml(st.route || '') + '</b>' + (st.senderId ? ' · sender ' + escapeHtml(st.senderId) : '') : ''));
+      if (st.error) lines.push('<span style="color:#ff8a8a;">' + escapeHtml(st.error) + '</span>');
+      document.getElementById('smsStatus').innerHTML = lines.join('<br/>');
+    }).catch(function (err) { if (err.authError) doLogout(); else document.getElementById('smsStatus').textContent = err.message; });
+  }
+  document.getElementById('smsTestBtn').addEventListener('click', function () {
+    var btn = this;
+    var phone = document.getElementById('smsTestPhone').value.trim();
+    var out = document.getElementById('smsTestResult');
+    if (!/^[6-9]\d{9}$/.test(phone)) { out.textContent = 'Enter a 10-digit Indian mobile number.'; return; }
+    btn.disabled = true;
+    out.textContent = 'Sending…';
+    api('/admin/sms/test', { method: 'POST', body: JSON.stringify({ phone: phone }) })
+      .then(function (r) { out.innerHTML = '<span style="color:#7dffb0;">Sent. Check your phone for code <b>' + escapeHtml(r.code) + '</b>.</span>'; })
+      .catch(function (err) { if (err.authError) doLogout(); else out.innerHTML = '<span style="color:#ff8a8a;">' + escapeHtml(err.message) + '</span>'; })
       .finally(function () { btn.disabled = false; });
   });
 

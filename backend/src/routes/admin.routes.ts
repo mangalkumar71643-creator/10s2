@@ -6,6 +6,7 @@ import { prisma } from "../db/prismaClient";
 import { env } from "../config/env";
 import { paymentProvider } from "../services/paymentService";
 import { completeDeposit } from "../services/depositService";
+import { fast2SmsFromEnv } from "../services/smsService";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { getGameReport } from "../services/gameReportService";
 import * as winGoService from "../services/winGoService";
@@ -456,6 +457,34 @@ router.get(
       select: { id: true, type: true, amount: true, providerReferenceId: true, createdAt: true, user: { select: userSummarySelect } },
     });
     res.json(rows);
+  })
+);
+
+// --- SMS / OTP: what is configured, and a test send to the admin's own phone ---
+
+router.get("/sms/status", (_req, res) => {
+  const keySet = Boolean((process.env.SMS_API_KEY ?? "").trim());
+  let route: string | null = null;
+  let error: string | null = null;
+  try {
+    const p = fast2SmsFromEnv();
+    route = p ? (p.route === "q" ? "Quick SMS (q)" : "DLT template") : null;
+  } catch (err) {
+    error = (err as Error).message;
+  }
+  res.json({ mode: env.smsProviderMode, keySet, route, senderId: (process.env.SMS_SENDER_ID ?? "").trim() || null, error });
+});
+
+const smsTestSchema = z.object({ phone: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a 10-digit Indian mobile number.") });
+router.post(
+  "/sms/test",
+  asyncHandler(async (req, res) => {
+    const { phone } = smsTestSchema.parse(req.body);
+    const provider = fast2SmsFromEnv();
+    if (!provider) throw new ApiError(400, "No SMS_API_KEY is set on the server yet (Vercel → Settings → Environment Variables).");
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    await provider.sendOtp(`+91${phone}`, code);
+    res.json({ sent: true, code });
   })
 );
 
