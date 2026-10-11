@@ -79,6 +79,20 @@ app.use(express.json({ limit: "4mb" }));
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
+// Money is kept to the paisa: a stake like 10.005 would be stored rounded
+// but paid out / refunded on a different rounding, so reject it up front.
+const MONEY_KEYS = new Set(["stake", "amount", "ante", "pairPlus", "maxPayout", "depositLimitDaily", "depositLimitWeekly", "depositLimitMonthly"]);
+function hasSubPaisa(value: unknown, key?: string): boolean {
+  if (typeof value === "number") return key !== undefined && MONEY_KEYS.has(key) && Math.abs(value * 100 - Math.round(value * 100)) > 1e-6;
+  if (Array.isArray(value)) return value.some((v) => hasSubPaisa(v, key));
+  if (value && typeof value === "object") return Object.entries(value).some(([k, v]) => hasSubPaisa(v, k));
+  return false;
+}
+app.use((req, res, next) => {
+  if (req.body && hasSubPaisa(req.body)) return res.status(400).json({ error: "Amounts can have at most 2 decimal places." });
+  next();
+});
+
 // Admin-changed settings (e.g. the max win per bet) take effect within seconds on every instance.
 app.use((_req, _res, next) => {
   refreshSettingsIfStale().then(() => next(), next);

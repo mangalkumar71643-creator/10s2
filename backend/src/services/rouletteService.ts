@@ -144,11 +144,13 @@ async function getOrCreateRound(now: Date): Promise<RoundRow> {
  * claimed with a guarded PENDING -> WON/LOST update, so two requests
  * settling at once can never pay the same bet twice. */
 async function settleRound(round: RoundRow) {
+  // Wait for any bet still committing on this round (they hold FOR SHARE).
+  await prisma.$queryRaw`SELECT id FROM "RouletteRound" WHERE id = ${round.id} FOR UPDATE`;
   const pending = await prisma.rouletteBet.findMany({ where: { roundId: round.id, status: "PENDING" } });
 
   for (const bet of pending) {
     const won = spotWins(bet.area, round.result);
-    const payout = won ? Math.min(round2(Number(bet.amount) * Number(bet.multiplier)), env.games.maxPayout) : 0;
+    const payout = won ? Math.min(floor2(Number(bet.amount) * Number(bet.multiplier)), env.games.maxPayout) : 0;
     await prisma.$transaction(async (tx) => {
       const claimed = await tx.rouletteBet.updateMany({
         where: { id: bet.id, status: "PENDING" },
@@ -261,6 +263,11 @@ export async function placeRouletteBets(userId: string, bets: BetInput[]) {
     // Serialise this player's bet changes so parallel taps can't slip past
     // the per-box limits between the read below and the insert.
     await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+    // Hold the round open until this commits (settlement waits on this
+    // lock), and re-check the clock now that we have it, so a bet can
+    // never land on a round that is already being settled.
+    await tx.$queryRaw`SELECT id FROM "RouletteRound" WHERE id = ${round.id} FOR SHARE`;
+    if (Date.now() >= round.betEndTime.getTime()) throw new ApiError(400, "Betting is closed for this round — wait for the next one.");
     const mine = await tx.rouletteBet.findMany({
       where: { roundId: round.id, userId, status: "PENDING" },
       select: { area: true, amount: true },
@@ -310,6 +317,11 @@ export async function cancelRouletteBets(userId: string, betIds?: string[]) {
 
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+    // Hold the round open until this commits (settlement waits on this
+    // lock), and re-check the clock now that we have it, so a bet can
+    // never land on a round that is already being settled.
+    await tx.$queryRaw`SELECT id FROM "RouletteRound" WHERE id = ${round.id} FOR SHARE`;
+    if (Date.now() >= round.betEndTime.getTime()) throw new ApiError(400, "Betting is closed for this round — wait for the next one.");
     const targets = await tx.rouletteBet.findMany({
       where: { roundId: round.id, userId, status: "PENDING", ...(betIds ? { id: { in: betIds } } : {}) },
     });

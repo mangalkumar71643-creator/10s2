@@ -26,6 +26,10 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+function floor2(n: number): number {
+  return Math.floor(n * 100 + 1e-9) / 100;
+}
+
 function binomial(n: number, k: number): number {
   let r = 1;
   for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i;
@@ -116,7 +120,7 @@ export async function dropPlinkoBall(userId: string, stake: number, rows: number
   const path = pathFor(serverSeed, clientSeed, nonce, rows);
   const slot = path.reduce((sum, step) => sum + step, 0);
   const multiplier = multipliersFor(rows, risk)[slot];
-  const payout = Math.min(round2(stake * multiplier), env.games.maxPayout);
+  const payout = Math.min(floor2(stake * multiplier), env.games.maxPayout);
 
   const bet = await prisma.$transaction(async (tx) => {
     const wallet = await tx.wallet.findUniqueOrThrow({ where: { userId } });

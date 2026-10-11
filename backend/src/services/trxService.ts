@@ -32,6 +32,10 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+function floor2(n: number): number {
+  return Math.floor(n * 100 + 1e-9) / 100;
+}
+
 function describe(n: number) {
   return { number: n, size: sizeOf(n), colors: colorsOf(n) };
 }
@@ -100,6 +104,8 @@ async function resolveRound(round: RoundRow, now: Date, budget: { lookups: numbe
  * claimed with a guarded PENDING -> WON/LOST/VOID update, so concurrent
  * settlers can never pay the same bet twice. */
 async function settleRound(roundId: string) {
+  // Wait for any bet still committing on this round (they hold FOR SHARE).
+  await prisma.$queryRaw`SELECT id FROM "TrxRound" WHERE id = ${roundId} FOR UPDATE`;
   const round = await prisma.trxRound.findUniqueOrThrow({ where: { id: roundId } });
   if (round.result === null && !round.voided) return;
   const pending = await prisma.trxBet.findMany({ where: { roundId: round.id, status: "PENDING" } });
@@ -114,7 +120,7 @@ async function settleRound(roundId: string) {
       }
       const rate = payoutMultiplier(bet.area, round.result!);
       const won = rate > 0;
-      const payout = won ? Math.min(round2(Number(bet.amount) * rate), env.games.maxPayout) : 0;
+      const payout = won ? Math.min(floor2(Number(bet.amount) * rate), env.games.maxPayout) : 0;
       const claimed = await tx.trxBet.updateMany({
         where: { id: bet.id, status: "PENDING" },
         data: { status: won ? "WON" : "LOST", payout, paidMultiplier: rate },
@@ -203,6 +209,11 @@ export async function placeTrxBets(userId: string, durationSeconds: number, bets
   const created = await prisma.$transaction(async (tx) => {
     // Serialise this player's bets so parallel taps can't slip past limits.
     await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+    // Hold the round open until this commits (settlement waits on this
+    // lock), and re-check the clock now that we have it, so a bet can
+    // never land on a round that is already being settled.
+    await tx.$queryRaw`SELECT id FROM "TrxRound" WHERE id = ${round.id} FOR SHARE`;
+    if (round.endTime.getTime() - Date.now() <= LOCK_SECONDS * 1000) throw new ApiError(400, "Betting is closed for this round — wait for the next one.");
     const mine = await tx.trxBet.findMany({ where: { roundId: round.id, userId, status: "PENDING" }, select: { area: true, amount: true } });
     const perKey = new Map<string, number>();
     for (const b of mine) perKey.set(b.area, (perKey.get(b.area) ?? 0) + Number(b.amount));

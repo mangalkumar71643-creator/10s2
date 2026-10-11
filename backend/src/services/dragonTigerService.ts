@@ -131,11 +131,13 @@ async function getOrCreateRound(now: Date): Promise<RoundRow> {
  * claimed with a guarded PENDING -> WON/LOST update, so two requests
  * settling at once can never pay the same bet twice. */
 async function settleRound(round: RoundRow) {
+  // Wait for any bet still committing on this round (they hold FOR SHARE).
+  await prisma.$queryRaw`SELECT id FROM "DragonTigerRound" WHERE id = ${round.id} FOR UPDATE`;
   const pending = await prisma.dragonTigerBet.findMany({ where: { roundId: round.id, status: "PENDING" } });
 
   for (const bet of pending) {
     const won = areaWins(bet.area as Area, round.dragonCard, round.tigerCard);
-    const payout = won ? Math.min(round2(Number(bet.amount) * Number(bet.multiplier)), env.games.maxPayout) : 0;
+    const payout = won ? Math.min(floor2(Number(bet.amount) * Number(bet.multiplier)), env.games.maxPayout) : 0;
     await prisma.$transaction(async (tx) => {
       const claimed = await tx.dragonTigerBet.updateMany({
         where: { id: bet.id, status: "PENDING" },
@@ -248,6 +250,11 @@ export async function placeDragonTigerBets(userId: string, bets: BetInput[]) {
     // Serialise this player's bet changes so parallel taps can't slip past
     // the per-box limits between the read below and the insert.
     await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+    // Hold the round open until this commits (settlement waits on this
+    // lock), and re-check the clock now that we have it, so a bet can
+    // never land on a round that is already being settled.
+    await tx.$queryRaw`SELECT id FROM "DragonTigerRound" WHERE id = ${round.id} FOR SHARE`;
+    if (Date.now() >= round.betEndTime.getTime()) throw new ApiError(400, "Betting is closed for this round — wait for the next one.");
     const mine = await tx.dragonTigerBet.findMany({
       where: { roundId: round.id, userId, status: "PENDING" },
       select: { area: true, amount: true },
@@ -297,6 +304,11 @@ export async function cancelDragonTigerBets(userId: string, betIds?: string[]) {
 
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+    // Hold the round open until this commits (settlement waits on this
+    // lock), and re-check the clock now that we have it, so a bet can
+    // never land on a round that is already being settled.
+    await tx.$queryRaw`SELECT id FROM "DragonTigerRound" WHERE id = ${round.id} FOR SHARE`;
+    if (Date.now() >= round.betEndTime.getTime()) throw new ApiError(400, "Betting is closed for this round — wait for the next one.");
     const targets = await tx.dragonTigerBet.findMany({
       where: { roundId: round.id, userId, status: "PENDING", ...(betIds ? { id: { in: betIds } } : {}) },
     });

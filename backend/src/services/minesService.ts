@@ -95,6 +95,9 @@ export async function startMinesRound(userId: string, stake: number, mineCount: 
   const minePositions = minePositionsFor(serverSeed, clientSeed, nonce, mineCount);
 
   const round = await prisma.$transaction(async (tx) => {
+    // Serialise starts per player so two parallel taps can't both pass the
+    // "no open round" check below and open two rounds at once.
+    await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
     const existing = await tx.minesRound.findFirst({ where: { userId, status: "PENDING" } });
     if (existing) throw new ApiError(400, "Finish your current round before starting a new one.");
 

@@ -155,6 +155,8 @@ model User {
   fairnessServerSeedHash String?
   fairnessClientSeed     String?
   fairnessNonce          Int     @default(0)
+  /// When a round last took a nonce; the server seed is not rotated (revealed) right after, so a round still starting can't have its seed exposed.
+  fairnessNonceUsedAt    DateTime?
 
   // Payout bank account for withdrawals. Required before a withdrawal is
   // accepted — see the check in wallet.routes.ts POST /withdraw.

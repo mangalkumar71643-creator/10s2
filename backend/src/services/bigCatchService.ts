@@ -11,6 +11,7 @@
  * and leave the other half riding. Each half pays (1 - edge) at whatever
  * multiplier it is taken, so splitting doesn't change the RTP.
  */
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
 import { env } from "../config/env";
@@ -80,7 +81,9 @@ function periodNumberFor(bettingStartTime: Date): string {
 function crashMultiplierFromSeed(serverSeed: string, periodNumber: string): number {
   const r = fairRandomFloat(serverSeed, periodNumber, 0);
   const raw = (1 - HOUSE_EDGE) / (1 - r);
-  return round2(Math.max(1, raw));
+  // Floored, never rounded up: rounding could lift the crash point (and
+  // every auto cash-out at it) above the value the edge was proven for.
+  return Math.max(1, Math.floor(raw * 100) / 100);
 }
 
 function secondsToReach(multiplier: number): number {
@@ -104,7 +107,7 @@ function liveMultiplier(round: { flyStartTime: Date; crashTime: Date; crashMulti
   return round2(Math.exp(GROWTH_RATE * elapsed));
 }
 
-async function createNextRound(bettingStartTime: Date) {
+async function createNextRound(bettingStartTime: Date, db: Prisma.TransactionClient = prisma) {
   const periodNumber = periodNumberFor(bettingStartTime);
   const flyStartTime = new Date(bettingStartTime.getTime() + BETTING_DURATION_SECONDS * 1000);
   const serverSeed = generateServerSeed();
@@ -114,13 +117,13 @@ async function createNextRound(bettingStartTime: Date) {
   const endTime = new Date(crashTime.getTime() + RESULT_PAUSE_SECONDS * 1000);
 
   try {
-    return await prisma.bigCatchRound.create({
+    return await db.bigCatchRound.create({
       data: { periodNumber, bettingStartTime, flyStartTime, crashTime, endTime, crashMultiplier, serverSeed, serverSeedHash },
     });
   } catch {
     // periodNumber is deterministic from bettingStartTime — a unique-
     // constraint failure just means a concurrent request beat us to it.
-    return prisma.bigCatchRound.findUniqueOrThrow({ where: { periodNumber } });
+    return db.bigCatchRound.findUniqueOrThrow({ where: { periodNumber } });
   }
 }
 
@@ -202,8 +205,18 @@ export async function ensureCurrentRound() {
     // no round in that gap could have had a bet placed on it (this is
     // the only place a round ever gets created), so there's nothing to
     // settle for them and no need for their rows to exist at all.
-    const bettingStartTime = round && now.getTime() - round.endTime.getTime() < IDLE_GAP_MS ? round.endTime : now;
-    round = await createNextRound(bettingStartTime);
+    // One creator at a time: after an idle gap every concurrent caller
+    // would otherwise pick its own `now` and open a parallel round.
+    round = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('bigCatch-round'))`;
+      const latest = await tx.bigCatchRound.findFirst({ orderBy: { bettingStartTime: "desc" } });
+      if (latest && latest.endTime > now) return latest;
+      const bettingStartTime = latest && now.getTime() - latest.endTime.getTime() < IDLE_GAP_MS ? latest.endTime : now;
+      return createNextRound(bettingStartTime, tx);
+    });
+    // Settle any older round left behind (e.g. one created before this lock existed).
+    const stale = await prisma.bigCatchRound.findMany({ where: { settled: false, endTime: { lte: now } }, select: { id: true }, take: 10 });
+    for (const r of stale) await settleRound(r.id);
   }
 
   // The current round may already be past its crashTime (mid result-pause)
@@ -376,14 +389,20 @@ export async function getHistory(limit = 30) {
 }
 
 export async function getMyBets(userId: string, limit = 50) {
-  return prisma.bigCatchBet.findMany({
+  const bets = await prisma.bigCatchBet.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
-      round: { select: { periodNumber: true, crashMultiplier: true, settled: true } },
+      round: { select: { periodNumber: true, crashMultiplier: true, settled: true, crashTime: true } },
     },
   });
+  // The crash point is fixed when the round is created; never show it before the round has crashed.
+  const now = Date.now();
+  return bets.map(({ round: { crashTime, ...round }, ...bet }) => ({
+    ...bet,
+    round: { ...round, crashMultiplier: round.settled || crashTime.getTime() <= now ? round.crashMultiplier : null },
+  }));
 }
 
 /** Shows other players' activity without exposing who they are — just the

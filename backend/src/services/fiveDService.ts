@@ -141,10 +141,12 @@ async function getOrCreateRound(durationSeconds: number, now: Date): Promise<Rou
  * a guarded PENDING -> WON/LOST update, so two requests settling at once can
  * never pay the same bet twice. */
 async function settleRound(round: RoundRow) {
+  // Wait for any bet still committing on this round (they hold FOR SHARE).
+  await prisma.$queryRaw`SELECT id FROM "FiveDRound" WHERE id = ${round.id} FOR UPDATE`;
   const pending = await prisma.fiveDBet.findMany({ where: { roundId: round.id, status: "PENDING" } });
   for (const bet of pending) {
     const won = winsWith(bet.area, round.digits);
-    const payout = won ? Math.min(round2(Number(bet.amount) * Number(bet.multiplier)), env.games.maxPayout) : 0;
+    const payout = won ? Math.min(floor2(Number(bet.amount) * Number(bet.multiplier)), env.games.maxPayout) : 0;
     await prisma.$transaction(async (tx) => {
       const claimed = await tx.fiveDBet.updateMany({ where: { id: bet.id, status: "PENDING" }, data: { status: won ? "WON" : "LOST", payout } });
       if (claimed.count === 0) return;
@@ -234,6 +236,11 @@ export async function placeFiveDBets(userId: string, durationSeconds: number, be
     // Serialise this player's bets so parallel taps can't slip past the
     // per-bet limits between the read below and the insert.
     await tx.$queryRaw`SELECT id FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE`;
+    // Hold the round open until this commits (settlement waits on this
+    // lock), and re-check the clock now that we have it, so a bet can
+    // never land on a round that is already being settled.
+    await tx.$queryRaw`SELECT id FROM "FiveDRound" WHERE id = ${round.id} FOR SHARE`;
+    if (round.endTime.getTime() - Date.now() <= LOCK_SECONDS * 1000) throw new ApiError(400, "Betting is closed for this round — wait for the next one.");
     const mine = await tx.fiveDBet.findMany({ where: { roundId: round.id, userId, status: "PENDING" }, select: { area: true, amount: true } });
     const perKey = new Map<string, number>();
     for (const b of mine) perKey.set(b.area, (perKey.get(b.area) ?? 0) + Number(b.amount));
