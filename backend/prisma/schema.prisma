@@ -17,9 +17,12 @@ model PhoneOtp {
   attempts   Int       @default(0)
   expiresAt  DateTime
   verifiedAt DateTime?
+  /// Who asked for the code (first X-Forwarded-For hop), for the daily per-IP limit.
+  ip         String?
   createdAt  DateTime  @default(now())
 
   @@index([phone])
+  @@index([ip, createdAt])
 }
 
 enum Role {

@@ -171,8 +171,8 @@ function toE164(phone: string): string {
  * phone number. Same endpoint for both login and registration — which
  * one it turns into is decided in `verifyOtpAndAuth` once the code is
  * confirmed. */
-export async function sendPhoneOtp(phone: string) {
-  return requestOtpCode(toE164(phone));
+export async function sendPhoneOtp(phone: string, ip: string | null = null) {
+  return requestOtpCode(toE164(phone), ip);
 }
 
 /** Step 2: verifies the OTP. If the phone belongs to an existing user,

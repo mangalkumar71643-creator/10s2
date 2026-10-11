@@ -85,7 +85,10 @@ router.post(
   "/otp/request",
   asyncHandler(async (req, res) => {
     const { phone } = otpRequestSchema.parse(req.body);
-    const result = await sendPhoneOtp(phone);
+    // Vercel puts the caller's address first in X-Forwarded-For.
+    const forwarded = req.headers["x-forwarded-for"];
+    const ip = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
+    const result = await sendPhoneOtp(phone, ip);
     res.json(result);
   })
 );
