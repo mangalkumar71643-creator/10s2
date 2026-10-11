@@ -34,20 +34,25 @@ class UnconfiguredSmsProvider implements SmsProvider {
 
 /**
  * Fast2SMS (India, +91 numbers only), POST https://www.fast2sms.com/dev/bulkV2
- * with the account's API key in the Authorization header. Two routes:
+ * with the account's API key in the Authorization header. Three routes:
  * - "dlt": the DLT-approved OTP template (SMS_TEMPLATE_ID = its Message ID
  *   from Fast2SMS DLT Manager, SMS_SENDER_ID = the approved sender), the
  *   code filling its {#var#}. The proper route for live use.
+ * - "otp": Fast2SMS's own fixed OTP message ("Your OTP: 123456"), the code
+ *   in variables_values; no template of our own.
  * - "q" (Quick SMS): free text, no DLT setup needed — handy for a first
- *   test, but dearer per SMS.
+ *   test, but the dearest per SMS (about ₹5).
  * SMS_ROUTE picks one; by default "dlt" when a template is set, else "q".
  */
+export type Fast2SmsRoute = "dlt" | "otp" | "q";
+export const FAST2SMS_ROUTES: Fast2SmsRoute[] = ["dlt", "otp", "q"];
+
 export class Fast2SmsProvider implements SmsProvider {
   readonly name = "fast2sms";
 
   constructor(
     private readonly apiKey: string,
-    readonly route: "dlt" | "q",
+    readonly route: Fast2SmsRoute,
     private readonly senderId: string,
     private readonly templateId: string
   ) {}
@@ -65,7 +70,9 @@ export class Fast2SmsProvider implements SmsProvider {
     const body =
       this.route === "dlt"
         ? { route: "dlt", sender_id: this.senderId, message: this.templateId, variables_values: code, numbers }
-        : { route: "q", message: `Your NovaPlay OTP is ${code}. It is valid for 5 minutes. Do not share it with anyone.`, numbers };
+        : this.route === "otp"
+          ? { route: "otp", variables_values: code, numbers }
+          : { route: "q", message: `Your NovaPlay OTP is ${code}. It is valid for 5 minutes. Do not share it with anyone.`, numbers };
 
     let res: Response;
     try {
@@ -88,13 +95,14 @@ export class Fast2SmsProvider implements SmsProvider {
   }
 }
 
-/** The Fast2SMS sender built from the environment, or null if no key is set. */
-export function fast2SmsFromEnv(): Fast2SmsProvider | null {
+/** The Fast2SMS sender built from the environment (or for `routeOverride`), or null if no key is set. */
+export function fast2SmsFromEnv(routeOverride?: Fast2SmsRoute): Fast2SmsProvider | null {
   const apiKey = (process.env.SMS_API_KEY ?? "").trim();
   if (!apiKey) return null;
   const templateId = (process.env.SMS_TEMPLATE_ID ?? "").trim();
   const senderId = (process.env.SMS_SENDER_ID ?? "").trim();
-  const route = process.env.SMS_ROUTE === "q" || process.env.SMS_ROUTE === "dlt" ? process.env.SMS_ROUTE : templateId ? "dlt" : "q";
+  const configured = FAST2SMS_ROUTES.find((r) => r === process.env.SMS_ROUTE);
+  const route: Fast2SmsRoute = routeOverride ?? configured ?? (templateId ? "dlt" : "q");
   if (route === "dlt" && (!templateId || !senderId)) throw new Error("SMS_ROUTE=dlt needs SMS_SENDER_ID and SMS_TEMPLATE_ID.");
   return new Fast2SmsProvider(apiKey, route, senderId, templateId);
 }

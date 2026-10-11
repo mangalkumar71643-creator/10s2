@@ -648,6 +648,12 @@
           <div class="item-meta" id="smsStatus" style="margin:-6px 0 12px;">Loading…</div>
           <div class="form-row">
             <input id="smsTestPhone" inputmode="numeric" maxlength="10" placeholder="Your 10-digit mobile number" />
+            <select id="smsTestRoute" style="flex:0 0 auto;">
+              <option value="">Route in use</option>
+              <option value="otp">OTP route (otp)</option>
+              <option value="q">Quick SMS (q)</option>
+              <option value="dlt">DLT template (dlt)</option>
+            </select>
             <button class="btn" id="smsTestBtn" style="flex:0 0 auto;">Send test SMS</button>
           </div>
           <div class="item-meta" id="smsTestResult"></div>
@@ -2198,8 +2204,11 @@
     if (!/^[6-9]\d{9}$/.test(phone)) { out.textContent = 'Enter a 10-digit Indian mobile number.'; return; }
     btn.disabled = true;
     out.textContent = 'Sending…';
-    api('/admin/sms/test', { method: 'POST', body: JSON.stringify({ phone: phone }) })
-      .then(function (r) { out.innerHTML = '<span style="color:#7dffb0;">Sent. Check your phone for code <b>' + escapeHtml(r.code) + '</b>.</span>'; })
+    var route = document.getElementById('smsTestRoute').value;
+    var body = { phone: phone };
+    if (route) body.route = route;
+    api('/admin/sms/test', { method: 'POST', body: JSON.stringify(body) })
+      .then(function (r) { out.innerHTML = '<span style="color:#7dffb0;">Sent via <b>' + escapeHtml(r.route) + '</b> route. Check your phone for code <b>' + escapeHtml(r.code) + '</b>, then check your Fast2SMS wallet to see what it cost.</span>'; })
       .catch(function (err) { if (err.authError) doLogout(); else out.innerHTML = '<span style="color:#ff8a8a;">' + escapeHtml(err.message) + '</span>'; })
       .finally(function () { btn.disabled = false; });
   });

@@ -6,7 +6,7 @@ import { prisma } from "../db/prismaClient";
 import { env } from "../config/env";
 import { paymentProvider } from "../services/paymentService";
 import { completeDeposit } from "../services/depositService";
-import { fast2SmsFromEnv } from "../services/smsService";
+import { FAST2SMS_ROUTES, fast2SmsFromEnv } from "../services/smsService";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { getGameReport } from "../services/gameReportService";
 import * as winGoService from "../services/winGoService";
@@ -468,23 +468,31 @@ router.get("/sms/status", (_req, res) => {
   let error: string | null = null;
   try {
     const p = fast2SmsFromEnv();
-    route = p ? (p.route === "q" ? "Quick SMS (q)" : "DLT template") : null;
+    route = p ? ({ q: "Quick SMS (q)", otp: "OTP route (otp)", dlt: "DLT template (dlt)" } as const)[p.route] : null;
   } catch (err) {
     error = (err as Error).message;
   }
   res.json({ mode: env.smsProviderMode, keySet, route, senderId: (process.env.SMS_SENDER_ID ?? "").trim() || null, error });
 });
 
-const smsTestSchema = z.object({ phone: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a 10-digit Indian mobile number.") });
+const smsTestSchema = z.object({
+  phone: z.string().trim().regex(/^[6-9]\d{9}$/, "Enter a 10-digit Indian mobile number."),
+  route: z.enum(FAST2SMS_ROUTES as [string, ...string[]]).optional(),
+});
 router.post(
   "/sms/test",
   asyncHandler(async (req, res) => {
-    const { phone } = smsTestSchema.parse(req.body);
-    const provider = fast2SmsFromEnv();
+    const { phone, route } = smsTestSchema.parse(req.body);
+    let provider: ReturnType<typeof fast2SmsFromEnv>;
+    try {
+      provider = fast2SmsFromEnv(route as (typeof FAST2SMS_ROUTES)[number] | undefined);
+    } catch (err) {
+      throw new ApiError(400, (err as Error).message);
+    }
     if (!provider) throw new ApiError(400, "No SMS_API_KEY is set on the server yet (Vercel → Settings → Environment Variables).");
     const code = String(Math.floor(100000 + Math.random() * 900000));
     await provider.sendOtp(`+91${phone}`, code);
-    res.json({ sent: true, code });
+    res.json({ sent: true, code, route: provider.route });
   })
 );
 
