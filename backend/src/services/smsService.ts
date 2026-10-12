@@ -42,10 +42,18 @@ class UnconfiguredSmsProvider implements SmsProvider {
  *   in variables_values; no template of our own.
  * - "q" (Quick SMS): free text, no DLT setup needed — handy for a first
  *   test, but the dearest per SMS (about ₹5).
+ * - "whatsapp": the code goes out as a WhatsApp authentication message
+ *   (Fast2SMS WhatsApp API, GET /dev/whatsapp) instead of an SMS. No DLT
+ *   needed and the cheapest per OTP; needs the WhatsApp Business number
+ *   linked in Fast2SMS and an approved OTP template: SMS_WA_MESSAGE_ID is
+ *   the template's Fast2SMS message ID, SMS_WA_PHONE_NUMBER_ID the linked
+ *   number's Phone Number ID (both in Fast2SMS → WhatsApp Manager).
  * SMS_ROUTE picks one; by default "dlt" when a template is set, else "q".
+ * SMS_FALLBACK_ROUTE (optional) is tried when the first route fails — e.g.
+ * whatsapp first, then an SMS route for a number not on WhatsApp.
  */
-export type Fast2SmsRoute = "dlt" | "otp" | "q";
-export const FAST2SMS_ROUTES: Fast2SmsRoute[] = ["dlt", "otp", "q"];
+export type Fast2SmsRoute = "dlt" | "otp" | "q" | "whatsapp";
+export const FAST2SMS_ROUTES: Fast2SmsRoute[] = ["dlt", "otp", "q", "whatsapp"];
 
 export class Fast2SmsProvider implements SmsProvider {
   readonly name = "fast2sms";
@@ -54,7 +62,9 @@ export class Fast2SmsProvider implements SmsProvider {
     private readonly apiKey: string,
     readonly route: Fast2SmsRoute,
     private readonly senderId: string,
-    private readonly templateId: string
+    private readonly templateId: string,
+    private readonly waMessageId = "",
+    private readonly waPhoneNumberId = ""
   ) {}
 
   /** The 10-digit Indian number Fast2SMS wants. */
@@ -67,6 +77,7 @@ export class Fast2SmsProvider implements SmsProvider {
 
   async sendOtp(phone: string, code: string): Promise<void> {
     const numbers = Fast2SmsProvider.toLocal(phone);
+    if (this.route === "whatsapp") return this.sendWhatsApp(numbers, code);
     const body =
       this.route === "dlt"
         ? { route: "dlt", sender_id: this.senderId, message: this.templateId, variables_values: code, numbers }
@@ -93,6 +104,46 @@ export class Fast2SmsProvider implements SmsProvider {
       throw new ApiError(502, `Could not send the SMS (${reason}).`);
     }
   }
+
+  private async sendWhatsApp(numbers: string, code: string): Promise<void> {
+    const qs = new URLSearchParams({ message_id: this.waMessageId, phone_number_id: this.waPhoneNumberId, numbers, variables_values: code });
+    let res: Response;
+    try {
+      res = await fetch(`https://www.fast2sms.com/dev/whatsapp?${qs}`, {
+        headers: { Authorization: this.apiKey },
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch (err) {
+      console.error("[Fast2SMS] WhatsApp request failed:", err);
+      throw new ApiError(502, "Could not send the WhatsApp code. Please try again.");
+    }
+    const json = (await res.json().catch(() => ({}))) as { status?: boolean; return?: boolean; message?: unknown };
+    if (!res.ok || (json.status !== true && json.return !== true)) {
+      const reason = Array.isArray(json.message) ? json.message.join(" ") : String(json.message ?? `HTTP ${res.status}`);
+      console.error(`[Fast2SMS] whatsapp route refused: ${reason}`);
+      throw new ApiError(502, `Could not send the WhatsApp code (${reason}).`);
+    }
+  }
+}
+
+/** Tries `primary`, then `fallback` if it fails (e.g. WhatsApp, then SMS). */
+class FallbackSmsProvider implements SmsProvider {
+  readonly name: string;
+  constructor(
+    private readonly primary: Fast2SmsProvider,
+    private readonly fallback: Fast2SmsProvider
+  ) {
+    this.name = `fast2sms:${primary.route}+${fallback.route}`;
+  }
+
+  async sendOtp(phone: string, code: string): Promise<void> {
+    try {
+      await this.primary.sendOtp(phone, code);
+    } catch (err) {
+      console.error(`[sms] ${this.primary.route} failed, trying ${this.fallback.route}:`, (err as Error).message);
+      await this.fallback.sendOtp(phone, code);
+    }
+  }
 }
 
 /** The Fast2SMS sender built from the environment (or for `routeOverride`), or null if no key is set. */
@@ -104,12 +155,21 @@ export function fast2SmsFromEnv(routeOverride?: Fast2SmsRoute): Fast2SmsProvider
   const configured = FAST2SMS_ROUTES.find((r) => r === process.env.SMS_ROUTE);
   const route: Fast2SmsRoute = routeOverride ?? configured ?? (templateId ? "dlt" : "q");
   if (route === "dlt" && (!templateId || !senderId)) throw new Error("SMS_ROUTE=dlt needs SMS_SENDER_ID and SMS_TEMPLATE_ID.");
-  return new Fast2SmsProvider(apiKey, route, senderId, templateId);
+  const waMessageId = (process.env.SMS_WA_MESSAGE_ID ?? "").trim();
+  const waPhoneNumberId = (process.env.SMS_WA_PHONE_NUMBER_ID ?? "").trim();
+  if (route === "whatsapp" && (!waMessageId || !waPhoneNumberId)) {
+    throw new Error("SMS_ROUTE=whatsapp needs SMS_WA_MESSAGE_ID and SMS_WA_PHONE_NUMBER_ID.");
+  }
+  return new Fast2SmsProvider(apiKey, route, senderId, templateId, waMessageId, waPhoneNumberId);
 }
 
 function liveProvider(): SmsProvider {
   try {
-    return fast2SmsFromEnv() ?? new UnconfiguredSmsProvider();
+    const primary = fast2SmsFromEnv();
+    if (!primary) return new UnconfiguredSmsProvider();
+    const fallbackRoute = FAST2SMS_ROUTES.find((r) => r === (process.env.SMS_FALLBACK_ROUTE ?? "").trim());
+    if (fallbackRoute && fallbackRoute !== primary.route) return new FallbackSmsProvider(primary, fast2SmsFromEnv(fallbackRoute)!);
+    return primary;
   } catch (err) {
     // A half-set configuration must not take the whole server down; OTP requests report it instead.
     console.error("[sms]", (err as Error).message);

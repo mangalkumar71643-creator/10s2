@@ -468,7 +468,9 @@ router.get("/sms/status", (_req, res) => {
   let error: string | null = null;
   try {
     const p = fast2SmsFromEnv();
-    route = p ? ({ q: "Quick SMS (q)", otp: "OTP route (otp)", dlt: "DLT template (dlt)" } as const)[p.route] : null;
+    route = p ? ({ q: "Quick SMS (q)", otp: "OTP route (otp)", dlt: "DLT template (dlt)", whatsapp: "WhatsApp OTP (whatsapp)" } as const)[p.route] : null;
+    const fb = (process.env.SMS_FALLBACK_ROUTE ?? "").trim();
+    if (route && fb && fb !== p!.route) route += ` → fallback ${fb}`;
   } catch (err) {
     error = (err as Error).message;
   }
