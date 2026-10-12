@@ -717,6 +717,9 @@ function BetAutoToggle({
 
 type PanelBetState =
   | { status: 'idle' }
+  // Tapped Bet outside the betting window: placed as soon as the next
+  // round opens (real Aviator's "bet for next round"); tap again to cancel.
+  | { status: 'queued' }
   | { status: 'placing' }
   | { status: 'pending'; betId: string; amount: number; periodNumber: string; autoCashoutAt?: number }
   | { status: 'cashingOut'; betId: string; amount: number; periodNumber: string }
@@ -735,6 +738,7 @@ function BetButton({
   liveMultiplier,
   onBet,
   onCashout,
+  onCancelQueued,
 }: {
   layout: { left: number; top: number; width: number; height: number };
   panelHeight: number;
@@ -743,6 +747,7 @@ function BetButton({
   liveMultiplier: number;
   onBet: () => void;
   onCashout: () => void;
+  onCancelQueued: () => void;
 }) {
   const hotspot = {
     position: 'absolute' as const,
@@ -760,7 +765,11 @@ function BetButton({
   let bg = 'rgba(0,0,0,0.6)';
   let onPress: (() => void) | undefined;
 
-  if (state.status === 'placing') {
+  if (state.status === 'queued') {
+    label = 'CANCEL\nWaiting for next round';
+    bg = 'rgba(196,23,44,0.92)';
+    onPress = onCancelQueued;
+  } else if (state.status === 'placing') {
     label = 'Placing…';
   } else if (state.status === 'pending') {
     if (phase === 'FLYING') {
@@ -776,11 +785,13 @@ function BetButton({
     label = 'Cashing out…';
     bg = 'rgba(46,160,67,0.92)';
   } else if (state.status === 'won') {
-    label = `WON\n+₹${state.payout.toFixed(2)}`;
+    label = `WON +₹${state.payout.toFixed(2)}\nTap to bet next round`;
     bg = 'rgba(46,160,67,0.9)';
+    onPress = onBet;
   } else if (state.status === 'lost') {
-    label = 'LOST';
+    label = 'LOST\nTap to bet next round';
     bg = 'rgba(196,23,44,0.9)';
+    onPress = onBet;
   }
 
   return (
@@ -1059,12 +1070,14 @@ export default function AviatorScreen() {
   // current value without needing to be torn down and recreated.
   const bet1Ref = useRef(bet1);
   const bet2Ref = useRef(bet2);
-  useEffect(() => {
-    bet1Ref.current = bet1;
-  }, [bet1]);
-  useEffect(() => {
-    bet2Ref.current = bet2;
-  }, [bet2]);
+  // Every panel update goes through here so the refs are current at once —
+  // the poll loop decides whether to place a queued bet from them, and a
+  // ref only synced after the next render could let it place the same bet
+  // twice.
+  const setPanelBet = useCallback((panel: 1 | 2, next: PanelBetState) => {
+    (panel === 1 ? bet1Ref : bet2Ref).current = next;
+    (panel === 1 ? setBet1 : setBet2)(next);
+  }, []);
 
   // Read directly (not via an effect) inside the polling loop below, the
   // same way FlightTrail reads its own roundRef — always the latest
@@ -1078,8 +1091,14 @@ export default function AviatorScreen() {
   const placeBetForRoundRef = useRef<(panel: 1 | 2, roundView: AviatorRoundView) => Promise<void>>(async () => {});
 
   const resolveIfPending = useCallback(
-    async (bet: PanelBetState, setBet: (s: PanelBetState) => void) => {
+    async (panel: 1 | 2) => {
+      const bet = (panel === 1 ? bet1Ref : bet2Ref).current;
       if (bet.status !== 'pending') return;
+      const setBet = (next: PanelBetState) => {
+        // Only if the panel still shows this bet (not a newer one).
+        const now = (panel === 1 ? bet1Ref : bet2Ref).current;
+        if (now.status === 'pending' && now.betId === bet.betId) setPanelBet(panel, next);
+      };
       try {
         const bets = await fetchAviatorMyBets();
         const match = bets.find((b) => b.id === bet.betId);
@@ -1094,7 +1113,7 @@ export default function AviatorScreen() {
         // Transient failure — next poll tick tries again.
       }
     },
-    [refreshWallet]
+    [refreshWallet, setPanelBet]
   );
 
   useEffect(() => {
@@ -1107,31 +1126,42 @@ export default function AviatorScreen() {
         if (!mounted) return;
         setRound(view);
 
-        if (lastPeriod.current !== null && lastPeriod.current !== view.periodNumber) {
-          // A new round has started — any bet from the previous one is by
-          // now either won/lost (resolved below while it was CRASHED) or
-          // never got placed, so it's safe to reset both panels.
-          setBet1((b) => (b.status === 'idle' ? b : { status: 'idle' }));
-          setBet2((b) => (b.status === 'idle' ? b : { status: 'idle' }));
+        const newRound = lastPeriod.current !== null && lastPeriod.current !== view.periodNumber;
+        if (newRound) {
+          // A new round has started: clear each panel's finished result and
+          // any bet left over from an earlier round, but keep a bet queued
+          // for this round or one already placed on it.
+          for (const panel of [1, 2] as const) {
+            const b = (panel === 1 ? bet1Ref : bet2Ref).current;
+            const stale =
+              b.status === 'won' ||
+              b.status === 'lost' ||
+              ((b.status === 'pending' || b.status === 'cashingOut') && b.periodNumber !== view.periodNumber);
+            if (stale) setPanelBet(panel, { status: 'idle' });
+          }
           fetchAviatorHistory()
             .then((entries) => setHistory(entries.slice(0, 7).reverse().map((e) => Number(e.crashMultiplier))))
             .catch(() => {});
-
-          // Auto bet: fire once per new round's betting window for any
-          // panel that's in Auto mode with the "Auto bet" switch on. Uses
-          // the freshly fetched view (not the `round` state, which hasn't
-          // re-rendered yet) so the phase check inside is never stale.
-          if (view.phase === 'BETTING') {
-            const cfg = autoBetConfigRef.current;
-            if (cfg.mode1 === 'auto' && cfg.autoBetOn1) placeBetForRoundRef.current(1, view);
-            if (cfg.mode2 === 'auto' && cfg.autoBetOn2) placeBetForRoundRef.current(2, view);
-          }
         }
         lastPeriod.current = view.periodNumber;
 
+        // Betting window open: place each panel's queued bet, plus — once
+        // per new round — an auto bet for a panel in Auto mode with "Auto
+        // bet" on. Uses the freshly fetched view (not the `round` state,
+        // which hasn't re-rendered yet) so the phase is never stale. Both
+        // panels go out together; the server takes up to two per round.
+        if (view.phase === 'BETTING') {
+          const cfg = autoBetConfigRef.current;
+          for (const panel of [1, 2] as const) {
+            const b = (panel === 1 ? bet1Ref : bet2Ref).current;
+            const autoOn = panel === 1 ? cfg.mode1 === 'auto' && cfg.autoBetOn1 : cfg.mode2 === 'auto' && cfg.autoBetOn2;
+            if (b.status === 'queued' || (newRound && autoOn && b.status === 'idle')) placeBetForRoundRef.current(panel, view);
+          }
+        }
+
         if (view.phase === 'CRASHED') {
-          resolveIfPending(bet1Ref.current, setBet1);
-          resolveIfPending(bet2Ref.current, setBet2);
+          resolveIfPending(1);
+          resolveIfPending(2);
         }
       } catch {
         // Transient network hiccup — just try again on the next tick.
@@ -1153,7 +1183,7 @@ export default function AviatorScreen() {
       mounted = false;
       if (timer) clearTimeout(timer);
     };
-  }, [resolveIfPending]);
+  }, [resolveIfPending, setPanelBet]);
 
   // Takes the round view explicitly (rather than reading the `round`
   // state) so the auto-bet trigger in the polling effect above can pass
@@ -1169,7 +1199,7 @@ export default function AviatorScreen() {
       // Auto Cash Out is its own switch — Auto mode can auto-bet without
       // ever sending an auto cash-out target, if that switch is off.
       const autoCashoutAt = isAuto && autoCashOutOn ? (panel === 1 ? autoCashout1 : autoCashout2) : undefined;
-      const setBet = panel === 1 ? setBet1 : setBet2;
+      const setBet = (next: PanelBetState) => setPanelBet(panel, next);
       setBet({ status: 'placing' });
       try {
         const result = await placeAviatorBet(stake, autoCashoutAt);
@@ -1182,31 +1212,43 @@ export default function AviatorScreen() {
         });
         refreshWallet().catch(() => {});
       } catch (err) {
+        const message = err instanceof ApiClientError ? err.message : 'Please try again.';
+        // Missed the window by a hair (the screen's clock is a poll behind):
+        // carry the bet over to the next round instead of dropping it.
+        if (/closed/i.test(message)) {
+          setBet({ status: 'queued' });
+          return;
+        }
         setBet({ status: 'idle' });
-        Alert.alert('Bet failed', err instanceof ApiClientError ? err.message : 'Please try again.');
+        Alert.alert('Bet failed', message);
       }
     },
-    [mode1, mode2, stake1, stake2, autoStake1, autoStake2, autoCashout1, autoCashout2, autoCashOutOn1, autoCashOutOn2, refreshWallet]
+    [mode1, mode2, stake1, stake2, autoStake1, autoStake2, autoCashout1, autoCashout2, autoCashOutOn1, autoCashOutOn2, refreshWallet, setPanelBet]
   );
   placeBetForRoundRef.current = placeBetForRound;
 
   // Manual "Bet" button handler — placeBetForRound does the actual work,
   // this just supplies the current round state and its own "closed" guard.
+  // Outside the betting window the bet is queued for the next round.
   const placeBet = useCallback(
     (panel: 1 | 2) => {
-      if (!round || round.phase !== 'BETTING') {
-        Alert.alert('Betting closed', 'Wait for the next round to place a bet.');
-        return;
-      }
-      placeBetForRound(panel, round);
+      if (round && round.phase === 'BETTING') placeBetForRound(panel, round);
+      else setPanelBet(panel, { status: 'queued' });
     },
-    [round, placeBetForRound]
+    [round, placeBetForRound, setPanelBet]
+  );
+
+  const cancelQueued = useCallback(
+    (panel: 1 | 2) => {
+      if ((panel === 1 ? bet1Ref : bet2Ref).current.status === 'queued') setPanelBet(panel, { status: 'idle' });
+    },
+    [setPanelBet]
   );
 
   const cashout = useCallback(
     async (panel: 1 | 2) => {
-      const bet = panel === 1 ? bet1 : bet2;
-      const setBet = panel === 1 ? setBet1 : setBet2;
+      const bet = (panel === 1 ? bet1Ref : bet2Ref).current;
+      const setBet = (next: PanelBetState) => setPanelBet(panel, next);
       if (bet.status !== 'pending') return;
       const { betId, amount, periodNumber } = bet;
       setBet({ status: 'cashingOut', betId, amount, periodNumber });
@@ -1219,7 +1261,7 @@ export default function AviatorScreen() {
         setBet({ status: 'pending', betId, amount, periodNumber });
       }
     },
-    [bet1, bet2, refreshWallet]
+    [refreshWallet, setPanelBet]
   );
 
   const multiplierLabel = round ? `${round.multiplier.toFixed(2)}x` : '1.00x';
@@ -1355,6 +1397,7 @@ export default function AviatorScreen() {
             liveMultiplier={round?.multiplier ?? 1}
             onBet={() => placeBet(1)}
             onCashout={() => cashout(1)}
+            onCancelQueued={() => cancelQueued(1)}
           />
         </View>
         {mode1 === 'auto' && (
@@ -1401,6 +1444,7 @@ export default function AviatorScreen() {
             liveMultiplier={round?.multiplier ?? 1}
             onBet={() => placeBet(2)}
             onCashout={() => cashout(2)}
+            onCancelQueued={() => cancelQueued(2)}
           />
         </View>
         {mode2 === 'auto' && (
