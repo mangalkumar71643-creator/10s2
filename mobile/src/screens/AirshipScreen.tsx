@@ -485,7 +485,7 @@ export default function AirshipScreen() {
   const placeBet = useCallback(
     async (i: 0 | 1, fromQueue = false) => {
       const p = panelsRef.current[i];
-      if (p.busy || p.bet) return;
+      if (p.busy || (p.bet && !fromQueue)) return;
       if (p.amount > coins && !fromQueue) return showToast('Insufficient balance');
       setPanel(i, { busy: true });
       try {
@@ -532,7 +532,9 @@ export default function AirshipScreen() {
   const onMain = (i: 0 | 1) => {
     const p = panels[i];
     if (p.bet && localPhase === 'FLYING' && !p.cashedAt) return cashOut(i);
-    if (p.bet) return;
+    // A live bet in this round blocks a new one; once it is cashed out or
+    // the round has crashed, a tap queues a bet for the next round.
+    if (p.bet && !p.cashedAt && localPhase !== 'CRASHED') return;
     if (p.queued) return setPanel(i, { queued: false });
     if (localPhase === 'BETTING') return placeBet(i);
     setPanel(i, { queued: true });
@@ -726,6 +728,11 @@ export default function AirshipScreen() {
             sub = `₹${round2(Number(p.bet!.amount) * liveMult).toFixed(2)}`;
             colors = ['#4AC88A', '#1A7A4A'];
             ink = '#FFFFFF';
+          } else if (p.queued) {
+            label = 'CANCEL';
+            sub = 'bet next flight';
+            colors = ['#C84A3A', '#7A1A10'];
+            ink = '#FFFFFF';
           } else if (p.cashedAt) {
             label = 'CASHED OUT';
             sub = `@ ${p.cashedAt.toFixed(2)}x`;
@@ -741,11 +748,6 @@ export default function AirshipScreen() {
             sub = 'to cast off';
             colors = ['#4A3A2A', '#2A2016'];
             ink = BRASS_LIGHT;
-          } else if (p.queued) {
-            label = 'CANCEL';
-            sub = 'bet next flight';
-            colors = ['#C84A3A', '#7A1A10'];
-            ink = '#FFFFFF';
           }
           const locked = !!p.bet || p.queued;
           return (

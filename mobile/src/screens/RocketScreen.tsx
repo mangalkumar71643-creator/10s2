@@ -454,7 +454,7 @@ export default function RocketScreen() {
   const placeBet = useCallback(
     async (i: 0 | 1, fromQueue = false) => {
       const p = panelsRef.current[i];
-      if (p.busy || p.bet) return;
+      if (p.busy || (p.bet && !fromQueue)) return;
       if (p.amount > coins && !fromQueue) return showToast('Insufficient balance');
       setPanel(i, { busy: true });
       try {
@@ -503,7 +503,9 @@ export default function RocketScreen() {
   const onMain = (i: 0 | 1) => {
     const p = panels[i];
     if (p.bet && localPhase === 'FLYING' && !p.cashedAt) return cashOut(i);
-    if (p.bet) return;
+    // A live bet in this round blocks a new one; once it is cashed out or
+    // the round has crashed, a tap queues a bet for the next round.
+    if (p.bet && !p.cashedAt && localPhase !== 'CRASHED') return;
     if (p.queued) return setPanel(i, { queued: false });
     if (localPhase === 'BETTING') return placeBet(i);
     setPanel(i, { queued: true });
@@ -693,6 +695,10 @@ export default function RocketScreen() {
             label = 'CASH OUT';
             sub = `₹${round2(Number(p.bet!.amount) * liveMult).toFixed(2)}`;
             colors = ['#FFB23F', '#E07A10'];
+          } else if (p.queued) {
+            label = 'CANCEL';
+            sub = 'bet next launch';
+            colors = ['#FF5A6A', '#C21F31'];
           } else if (p.cashedAt) {
             label = 'CASHED OUT';
             sub = `@ ${p.cashedAt.toFixed(2)}x`;
@@ -705,10 +711,6 @@ export default function RocketScreen() {
             label = 'WAITING';
             sub = 'for liftoff';
             colors = ['#3A4A7A', '#26335C'];
-          } else if (p.queued) {
-            label = 'CANCEL';
-            sub = 'bet next launch';
-            colors = ['#FF5A6A', '#C21F31'];
           }
           const locked = !!p.bet || p.queued;
           return (
