@@ -7,6 +7,8 @@ import { env } from "../config/env";
 import { paymentProvider } from "../services/paymentService";
 import { completeDeposit } from "../services/depositService";
 import { FAST2SMS_ROUTES, fast2SmsFromEnv } from "../services/smsService";
+import { INTEGRATION_FIELDS, integration, integrationView, saveIntegrationSettings } from "../services/integrationSettings";
+import { assertAllowedStripeKey } from "../services/stripeService";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { getGameReport } from "../services/gameReportService";
 import * as winGoService from "../services/winGoService";
@@ -460,21 +462,44 @@ router.get(
   })
 );
 
+// --- Payment & SMS keys entered in the panel (integrationSettings.ts) ---
+
+router.get("/integrations", (_req, res) => {
+  res.json(integrationView());
+});
+
+const integrationSchema = z
+  .object(Object.fromEntries(Object.keys(INTEGRATION_FIELDS).map((k) => [k, z.string().max(500).optional()])) as Record<keyof typeof INTEGRATION_FIELDS, z.ZodOptional<z.ZodString>>)
+  .strict();
+router.put(
+  "/integrations",
+  asyncHandler(async (req, res) => {
+    const patch = integrationSchema.parse(req.body);
+    if (patch.stripeSecretKey) assertAllowedStripeKey(patch.stripeSecretKey.trim());
+    if (patch.stripeCurrency && !/^[a-zA-Z]{3}$/.test(patch.stripeCurrency.trim())) throw new ApiError(400, "Currency must be a 3-letter code like INR or GBP.");
+    for (const k of ["smsRoute", "smsFallbackRoute"] as const) {
+      const v = patch[k]?.trim();
+      if (v && !(FAST2SMS_ROUTES as string[]).includes(v)) throw new ApiError(400, `${k} must be one of ${FAST2SMS_ROUTES.join(", ")}.`);
+    }
+    res.json(await saveIntegrationSettings(patch));
+  })
+);
+
 // --- SMS / OTP: what is configured, and a test send to the admin's own phone ---
 
 router.get("/sms/status", (_req, res) => {
-  const keySet = Boolean((process.env.SMS_API_KEY ?? "").trim());
+  const keySet = Boolean(integration("smsApiKey"));
   let route: string | null = null;
   let error: string | null = null;
   try {
     const p = fast2SmsFromEnv();
     route = p ? ({ q: "Quick SMS (q)", otp: "OTP route (otp)", dlt: "DLT template (dlt)", whatsapp: "WhatsApp OTP (whatsapp)" } as const)[p.route] : null;
-    const fb = (process.env.SMS_FALLBACK_ROUTE ?? "").trim();
+    const fb = integration("smsFallbackRoute");
     if (route && fb && fb !== p!.route) route += ` → fallback ${fb}`;
   } catch (err) {
     error = (err as Error).message;
   }
-  res.json({ mode: env.smsProviderMode, keySet, route, senderId: (process.env.SMS_SENDER_ID ?? "").trim() || null, error });
+  res.json({ mode: env.smsProviderMode, keySet, route, senderId: integration("smsSenderId") || null, error });
 });
 
 const smsTestSchema = z.object({
@@ -491,7 +516,7 @@ router.post(
     } catch (err) {
       throw new ApiError(400, (err as Error).message);
     }
-    if (!provider) throw new ApiError(400, "No SMS_API_KEY is set on the server yet (Vercel → Settings → Environment Variables).");
+    if (!provider) throw new ApiError(400, "No Fast2SMS API key is set yet — add it in Admin → Payment & SMS keys.");
     const code = String(Math.floor(100000 + Math.random() * 900000));
     await provider.sendOtp(`+91${phone}`, code);
     res.json({ sent: true, code, route: provider.route });

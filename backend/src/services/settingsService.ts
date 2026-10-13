@@ -1,6 +1,7 @@
 import { prisma } from "../db/prismaClient";
 import { env } from "../config/env";
 import { runtimeSettings } from "../config/runtimeSettings";
+import { loadIntegrationSettings } from "./integrationSettings";
 
 /** Re-read the Setting table at most this often per server instance. */
 const REFRESH_MS = 15_000;
@@ -13,6 +14,7 @@ async function load() {
   const rows = await prisma.setting.findMany({ where: { key: { in: ["maxPayout"] } } });
   const maxPayout = Number(rows.find((r) => r.key === "maxPayout")?.value);
   runtimeSettings.maxPayout = Number.isFinite(maxPayout) && maxPayout > 0 ? maxPayout : undefined;
+  await loadIntegrationSettings();
   loadedAt = Date.now();
 }
 

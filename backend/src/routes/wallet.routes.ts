@@ -7,6 +7,7 @@ import { prisma } from "../db/prismaClient";
 import { paymentProvider } from "../services/paymentService";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { completeDeposit } from "../services/depositService";
+import { cardDepositStatus, confirmCardDeposits, createCardCheckout } from "../services/stripeService";
 import { env } from "../config/env";
 
 const router = Router();
@@ -103,6 +104,54 @@ router.post(
     res.json({ ...(await buildWalletView(userId)), bonusGranted: bonus });
   })
 );
+
+// --- Card deposits (Stripe Checkout, see stripeService.ts) ---
+
+router.get(
+  "/card/status",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    res.json(await cardDepositStatus(req.user!.userId));
+  })
+);
+
+router.post(
+  "/card/checkout",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { amount } = amountSchema.parse(req.body);
+    const userId = req.user!.userId;
+    await assertCanTransact(userId);
+    await assertWithinDepositLimits(userId, amount);
+    // Stripe sends the player back here (https on Vercel, behind its proxy).
+    const proto = req.get("x-forwarded-proto") ?? req.protocol;
+    res.json(await createCardCheckout(userId, amount, `${proto}://${req.get("host")}`));
+  })
+);
+
+const confirmSchema = z.object({ sessionId: z.string().min(1).max(200).optional() });
+router.post(
+  "/card/confirm",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { sessionId } = confirmSchema.parse(req.body ?? {});
+    const userId = req.user!.userId;
+    const { results } = await confirmCardDeposits(userId, sessionId);
+    res.json({ results, wallet: await buildWalletView(userId) });
+  })
+);
+
+/** Where Stripe's page sends the player afterwards: a plain "go back to the app" page. */
+router.get("/card/return", (req, res) => {
+  const ok = req.query.status === "success";
+  const title = ok ? "Payment received" : "Payment cancelled";
+  const text = ok ? "Go back to the NovaPlay app — your balance updates in a few seconds." : "No money was taken. Go back to the NovaPlay app to try again.";
+  res.type("html").send(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>` +
+      `<body style="margin:0;font-family:system-ui,sans-serif;background:#120a1f;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;text-align:center">` +
+      `<div style="padding:24px"><div style="font-size:56px">${ok ? "✅" : "↩️"}</div><h1 style="font-size:22px">${title}</h1><p style="opacity:.8;line-height:1.5">${text}</p></div></body></html>`
+  );
+});
 
 const payoutAccountSchema = z.object({
   accountHolderName: z.string().trim().min(2, "Enter the account holder's name").max(120),

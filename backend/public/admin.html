@@ -659,6 +659,34 @@
           </div>
           <div class="item-meta" id="smsTestResult"></div>
         </div>
+        <div class="card" style="max-width:420px;">
+          <div class="card-head"><h2>Payment &amp; SMS keys</h2></div>
+          <div class="item-meta" style="margin:-6px 0 12px;">Paste a key and press Save — it works straight away, no Vercel or redeploy. Saved keys are kept encrypted and never shown again (only the last 4 characters). Leave a box empty to keep what is saved; type <b>-</b> to remove it.</div>
+          <div class="item-title" style="margin:6px 0;">Stripe (card deposits — TEST mode only)</div>
+          <div id="intStatus_stripeSecretKey" class="item-meta"></div>
+          <div class="form-row"><input id="int_stripeSecretKey" type="password" autocomplete="off" placeholder="Stripe secret key (sk_test_...)" /></div>
+          <div id="intStatus_stripeCurrency" class="item-meta"></div>
+          <div class="form-row"><input id="int_stripeCurrency" maxlength="3" placeholder="Currency, e.g. INR (default) or GBP" /></div>
+          <div id="intStatus_stripeTestPhones" class="item-meta"></div>
+          <div class="form-row"><input id="int_stripeTestPhones" placeholder="Test-mode phone numbers allowed to deposit, comma separated" /></div>
+          <div class="item-title" style="margin:14px 0 6px;">Fast2SMS (OTP)</div>
+          <div id="intStatus_smsApiKey" class="item-meta"></div>
+          <div class="form-row"><input id="int_smsApiKey" type="password" autocomplete="off" placeholder="Fast2SMS API key" /></div>
+          <div id="intStatus_smsRoute" class="item-meta"></div>
+          <div class="form-row"><input id="int_smsRoute" placeholder="Route: q, otp, dlt or whatsapp" /></div>
+          <div id="intStatus_smsFallbackRoute" class="item-meta"></div>
+          <div class="form-row"><input id="int_smsFallbackRoute" placeholder="Fallback route if the first fails (optional)" /></div>
+          <div id="intStatus_smsSenderId" class="item-meta"></div>
+          <div class="form-row"><input id="int_smsSenderId" placeholder="DLT Sender ID (dlt route only)" /></div>
+          <div id="intStatus_smsTemplateId" class="item-meta"></div>
+          <div class="form-row"><input id="int_smsTemplateId" placeholder="DLT Template ID (dlt route only)" /></div>
+          <div id="intStatus_smsWaMessageId" class="item-meta"></div>
+          <div class="form-row"><input id="int_smsWaMessageId" placeholder="WhatsApp Message ID (whatsapp route only)" /></div>
+          <div id="intStatus_smsWaPhoneNumberId" class="item-meta"></div>
+          <div class="form-row"><input id="int_smsWaPhoneNumberId" placeholder="WhatsApp Phone Number ID (whatsapp route only)" /></div>
+          <div class="form-row"><button class="btn" id="intSaveBtn">Save keys</button></div>
+          <div class="item-meta" id="intResult"></div>
+        </div>
       </div>
 
     </div>
@@ -939,7 +967,7 @@
       reportsTicking = true;
       activeGamePollInterval = setInterval(reportsTick, 1000);
     },
-    settings: function () { loadSettings(); loadSmsStatus(); },
+    settings: function () { loadSettings(); loadSmsStatus(); loadIntegrations(); },
   };
 
   function switchTab(tabId) {
@@ -2210,6 +2238,37 @@
     if (route) body.route = route;
     api('/admin/sms/test', { method: 'POST', body: JSON.stringify(body) })
       .then(function (r) { out.innerHTML = '<span style="color:#7dffb0;">Sent via <b>' + escapeHtml(r.route) + '</b> route. Check your phone for code <b>' + escapeHtml(r.code) + '</b>, then check your Fast2SMS wallet to see what it cost.</span>'; })
+      .catch(function (err) { if (err.authError) doLogout(); else out.innerHTML = '<span style="color:#ff8a8a;">' + escapeHtml(err.message) + '</span>'; })
+      .finally(function () { btn.disabled = false; });
+  });
+
+  var INT_FIELDS = ['stripeSecretKey', 'stripeCurrency', 'stripeTestPhones', 'smsApiKey', 'smsRoute', 'smsFallbackRoute', 'smsSenderId', 'smsTemplateId', 'smsWaMessageId', 'smsWaPhoneNumberId'];
+  function showIntegrations(view) {
+    INT_FIELDS.forEach(function (name) {
+      var f = view[name] || {};
+      var from = f.source === 'panel' ? ' (saved here)' : f.source === 'env' ? ' (from Vercel)' : '';
+      var text = 'last4' in f ? (f.set ? 'Saved: ••••' + escapeHtml(f.last4) + from : 'Not set') : (f.value ? 'Now: <b>' + escapeHtml(f.value) + '</b>' + from : 'Not set');
+      document.getElementById('intStatus_' + name).innerHTML = text;
+      document.getElementById('int_' + name).value = '';
+    });
+  }
+  function loadIntegrations() {
+    api('/admin/integrations').then(showIntegrations).catch(function (err) { if (err.authError) doLogout(); else document.getElementById('intResult').textContent = err.message; });
+  }
+  document.getElementById('intSaveBtn').addEventListener('click', function () {
+    var btn = this;
+    var out = document.getElementById('intResult');
+    var body = {};
+    INT_FIELDS.forEach(function (name) {
+      var v = document.getElementById('int_' + name).value.trim();
+      if (v === '-') body[name] = '';
+      else if (v) body[name] = v;
+    });
+    if (!Object.keys(body).length) { out.textContent = 'Nothing to save — type a value in a box first.'; return; }
+    btn.disabled = true;
+    out.textContent = 'Saving…';
+    api('/admin/integrations', { method: 'PUT', body: JSON.stringify(body) })
+      .then(function (view) { showIntegrations(view); out.innerHTML = '<span style="color:#7dffb0;">Saved — working now.</span>'; loadSmsStatus(); })
       .catch(function (err) { if (err.authError) doLogout(); else out.innerHTML = '<span style="color:#ff8a8a;">' + escapeHtml(err.message) + '</span>'; })
       .finally(function () { btn.disabled = false; });
   });

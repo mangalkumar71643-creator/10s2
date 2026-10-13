@@ -1,7 +1,7 @@
 import { createHash, randomInt } from "crypto";
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
-import { smsProvider } from "./smsService";
+import { getSmsProvider } from "./smsService";
 import { env } from "../config/env";
 
 const OTP_TTL_MS = 5 * 60 * 1000;
@@ -54,7 +54,7 @@ export async function requestOtp(phone: string, ip: string | null = null): Promi
     },
   });
 
-  await smsProvider.sendOtp(phone, code);
+  await getSmsProvider().sendOtp(phone, code);
   return { devCode: env.smsProviderMode === "mock" ? code : null };
 }
 

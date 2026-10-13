@@ -1,5 +1,6 @@
 import { env } from "../config/env";
 import { ApiError } from "../middleware/errorHandler";
+import { integration } from "./integrationSettings";
 
 export interface SmsProvider {
   readonly name: string;
@@ -146,19 +147,19 @@ class FallbackSmsProvider implements SmsProvider {
   }
 }
 
-/** The Fast2SMS sender built from the environment (or for `routeOverride`), or null if no key is set. */
+/** The Fast2SMS sender built from the current settings (admin panel, else environment) or for `routeOverride`; null if no key is set. */
 export function fast2SmsFromEnv(routeOverride?: Fast2SmsRoute): Fast2SmsProvider | null {
-  const apiKey = (process.env.SMS_API_KEY ?? "").trim();
+  const apiKey = integration("smsApiKey");
   if (!apiKey) return null;
-  const templateId = (process.env.SMS_TEMPLATE_ID ?? "").trim();
-  const senderId = (process.env.SMS_SENDER_ID ?? "").trim();
-  const configured = FAST2SMS_ROUTES.find((r) => r === process.env.SMS_ROUTE);
+  const templateId = integration("smsTemplateId");
+  const senderId = integration("smsSenderId");
+  const configured = FAST2SMS_ROUTES.find((r) => r === integration("smsRoute"));
   const route: Fast2SmsRoute = routeOverride ?? configured ?? (templateId ? "dlt" : "q");
-  if (route === "dlt" && (!templateId || !senderId)) throw new Error("SMS_ROUTE=dlt needs SMS_SENDER_ID and SMS_TEMPLATE_ID.");
-  const waMessageId = (process.env.SMS_WA_MESSAGE_ID ?? "").trim();
-  const waPhoneNumberId = (process.env.SMS_WA_PHONE_NUMBER_ID ?? "").trim();
+  if (route === "dlt" && (!templateId || !senderId)) throw new Error("The DLT route needs the Sender ID and the DLT Template ID.");
+  const waMessageId = integration("smsWaMessageId");
+  const waPhoneNumberId = integration("smsWaPhoneNumberId");
   if (route === "whatsapp" && (!waMessageId || !waPhoneNumberId)) {
-    throw new Error("SMS_ROUTE=whatsapp needs SMS_WA_MESSAGE_ID and SMS_WA_PHONE_NUMBER_ID.");
+    throw new Error("The WhatsApp route needs the WhatsApp Message ID and Phone Number ID.");
   }
   return new Fast2SmsProvider(apiKey, route, senderId, templateId, waMessageId, waPhoneNumberId);
 }
@@ -167,7 +168,7 @@ function liveProvider(): SmsProvider {
   try {
     const primary = fast2SmsFromEnv();
     if (!primary) return new UnconfiguredSmsProvider();
-    const fallbackRoute = FAST2SMS_ROUTES.find((r) => r === (process.env.SMS_FALLBACK_ROUTE ?? "").trim());
+    const fallbackRoute = FAST2SMS_ROUTES.find((r) => r === integration("smsFallbackRoute"));
     if (fallbackRoute && fallbackRoute !== primary.route) return new FallbackSmsProvider(primary, fast2SmsFromEnv(fallbackRoute)!);
     return primary;
   } catch (err) {
@@ -177,4 +178,7 @@ function liveProvider(): SmsProvider {
   }
 }
 
-export const smsProvider: SmsProvider = env.smsProviderMode === "live" ? liveProvider() : new MockSmsProvider();
+/** Built per use so keys changed in the admin panel apply at once. */
+export function getSmsProvider(): SmsProvider {
+  return env.smsProviderMode === "live" ? liveProvider() : new MockSmsProvider();
+}

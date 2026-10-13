@@ -881,6 +881,31 @@ export function fetchFortuneSixHistory(limit = 30) {
   return apiFetch<FortuneSixBetRow[]>(`/fortune-six/my-history?limit=${limit}`);
 }
 
+export interface CardDepositStatus {
+  enabled: boolean;
+  testMode: boolean;
+  reason: string | null;
+  min?: number;
+  max?: number;
+  currency?: string;
+}
+export interface CardDepositResult {
+  status: 'COMPLETED' | 'FAILED' | 'PENDING';
+  amount: number;
+  bonus: number;
+  alreadyCredited: boolean;
+}
+export function fetchCardDepositStatus() {
+  return apiFetch<CardDepositStatus>('/wallet/card/status');
+}
+export function startCardCheckout(amount: number) {
+  return apiFetch<{ sessionId: string; url: string }>('/wallet/card/checkout', { method: 'POST', body: JSON.stringify({ amount }) });
+}
+/** Settles this player's open card payments (or just `sessionId`) with Stripe. */
+export function confirmCardDeposits(sessionId?: string) {
+  return apiFetch<{ results: CardDepositResult[] }>('/wallet/card/confirm', { method: 'POST', body: JSON.stringify(sessionId ? { sessionId } : {}) });
+}
+
 export interface MinesConfig {
   minStake: number;
   maxStake: number;
