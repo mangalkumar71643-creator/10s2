@@ -154,15 +154,15 @@ router.get('/dashboard', h(async () => {
   background(() => webhooks.processDue()); // admin visits also push pending webhook retries
   const start = istDayStart();
   const today = await db.get(
-    "SELECT COUNT(*) AS n, COALESCE(SUM(paid_amount), 0) AS sum FROM orders WHERE status = 'paid' AND paid_at >= ?",
+    "SELECT COUNT(*) AS n, COALESCE(SUM(paid_amount), 0) AS sum FROM orders WHERE status = 'paid' AND test = 0 AND paid_at >= ?",
     start,
   );
   const week = await db.all(
-    `SELECT paid_at FROM orders WHERE status = 'paid' AND paid_at >= ?`,
+    `SELECT paid_at FROM orders WHERE status = 'paid' AND test = 0 AND paid_at >= ?`,
     start - 6 * 86400000,
   );
   const days = Array.from({ length: 7 }, (_, i) => ({ start: start - (6 - i) * 86400000, sum: 0 }));
-  for (const row of await db.all("SELECT paid_at, paid_amount FROM orders WHERE status = 'paid' AND paid_at >= ?", days[0].start)) {
+  for (const row of await db.all("SELECT paid_at, paid_amount FROM orders WHERE status = 'paid' AND test = 0 AND paid_at >= ?", days[0].start)) {
     const d = days.find((x) => row.paid_at >= x.start && row.paid_at < x.start + 86400000);
     if (d) d.sum += row.paid_amount;
   }
@@ -171,7 +171,7 @@ router.get('/dashboard', h(async () => {
     min_order_amount: (await db.getSettings()).min_order_amount,
     today: { count: today.n, amount: rupees(today.sum) },
     week_count: week.length,
-    pending: await count("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'"),
+    pending: await count("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending' AND test = 0"),
     unmatched: await count("SELECT COUNT(*) AS n FROM transactions WHERE status = 'unmatched'"),
     failed_webhooks: await count("SELECT COUNT(*) AS n FROM webhook_deliveries WHERE status = 'failed'"),
     chart: days.map((d) => ({ date: new Date(d.start + 330 * 60000).toISOString().slice(0, 10), amount: rupees(d.sum) })),
@@ -334,6 +334,8 @@ async function siteView(s) {
     id: s.id,
     name: s.name,
     api_key_hint: s.api_key_hint,
+    live_key: s.live_key || null, // null for keys made before keys were kept: make a new one to see it
+    test_key: s.test_key || null,
     webhook_url: s.webhook_url,
     webhook_secret: s.webhook_secret,
     return_url: s.return_url,
@@ -353,19 +355,29 @@ function readSiteUrls(body, existing = {}) {
 }
 
 const newApiKey = () => 'ak_live_' + crypto.randomBytes(24).toString('base64url');
+const newTestKey = () => 'ak_test_' + crypto.randomBytes(24).toString('base64url');
+const keyHint = (key) => key.slice(0, 12) + '…' + key.slice(-4);
 const newSecret = () => 'whsec_' + crypto.randomBytes(24).toString('base64url');
 
-router.get('/sites', h(async () => mapAll(await db.all('SELECT * FROM sites ORDER BY id'), siteView)));
+router.get('/sites', h(async () => {
+  // Websites connected before test keys existed get one now (a test key cannot move real money).
+  for (const s of await db.all('SELECT id FROM sites WHERE test_key IS NULL')) {
+    const key = newTestKey();
+    await db.run('UPDATE sites SET test_key = ?, test_key_hash = ? WHERE id = ?', key, sha256(key), s.id);
+  }
+  return mapAll(await db.all('SELECT * FROM sites ORDER BY id'), siteView);
+}));
 
 router.post('/sites', h(async (req) => {
   const name = str(req.body.name, 60);
   if (!name) throw bad('Website name is required');
   const { webhook, ret } = readSiteUrls(req.body);
   const key = newApiKey();
+  const testKey = newTestKey();
   const info = await db.run(
-    `INSERT INTO sites (name, api_key_hash, api_key_hint, webhook_url, webhook_secret, return_url, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-    name, sha256(key), key.slice(0, 12) + '…' + key.slice(-4), webhook, newSecret(), ret, Date.now(),
+    `INSERT INTO sites (name, api_key_hash, api_key_hint, live_key, test_key, test_key_hash, webhook_url, webhook_secret, return_url, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    name, sha256(key), keyHint(key), key, testKey, sha256(testKey), webhook, newSecret(), ret, Date.now(),
   );
   await alert('alert', `New website connected: ${name}`);
   return { ...(await siteView(await db.get('SELECT * FROM sites WHERE id = ?', info.rows[0].id))), api_key: key };
@@ -385,9 +397,18 @@ router.post('/sites/:id/new-key', h(async (req) => {
   const s = await db.get('SELECT * FROM sites WHERE id = ?', Number(req.params.id));
   if (!s) throw new HttpError(404, 'Website not found');
   const key = newApiKey();
-  await db.run('UPDATE sites SET api_key_hash = ?, api_key_hint = ? WHERE id = ?', sha256(key), key.slice(0, 12) + '…' + key.slice(-4), s.id);
-  await alert('alert', `API key changed for ${s.name}. The old key stopped working.`);
+  await db.run('UPDATE sites SET api_key_hash = ?, api_key_hint = ?, live_key = ? WHERE id = ?', sha256(key), keyHint(key), key, s.id);
+  await alert('alert', `Live API key changed for ${s.name}. The old key stopped working.`);
   return { ...(await siteView(await db.get('SELECT * FROM sites WHERE id = ?', s.id))), api_key: key };
+}));
+
+router.post('/sites/:id/new-test-key', h(async (req) => {
+  const s = await db.get('SELECT * FROM sites WHERE id = ?', Number(req.params.id));
+  if (!s) throw new HttpError(404, 'Website not found');
+  const key = newTestKey();
+  await db.run('UPDATE sites SET test_key = ?, test_key_hash = ? WHERE id = ?', key, sha256(key), s.id);
+  await db.logActivity('info', `New test API key for ${s.name}`);
+  return siteView(await db.get('SELECT * FROM sites WHERE id = ?', s.id));
 }));
 
 router.post('/sites/:id/new-secret', h(async (req) => {

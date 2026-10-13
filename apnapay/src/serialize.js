@@ -21,6 +21,7 @@ function publicOrder(o) {
     created_at: iso(o.created_at),
     expires_at: iso(o.expires_at),
     paid_at: iso(o.paid_at),
+    test: !!o.test,
   };
 }
 

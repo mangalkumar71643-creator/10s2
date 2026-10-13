@@ -425,7 +425,7 @@
   function orderListItem(o) {
     return `<div class="list-item click" data-order="${esc(o.id)}">
       <div class="grow">
-        <div class="row" style="gap:8px"><span class="bold ellipsis">${esc(o.customer.name || o.reference || o.id)}</span></div>
+        <div class="row" style="gap:8px"><span class="bold ellipsis">${esc(o.customer.name || o.reference || o.id)}</span>${o.test ? ' <span class="badge warn plain">TEST</span>' : ''}</div>
         <div class="tiny muted ellipsis">${esc(o.site)}${o.reference ? ' · ' + esc(o.reference) : ''} · ${when(o.created_at)}</div>
       </div>
       <div style="text-align:right">
@@ -456,7 +456,7 @@
           <table class="table hide-mobile"><thead><tr><th>Customer / Ref</th><th>From</th><th>Bank</th><th>Amount</th><th>Status</th><th>Created</th></tr></thead>
           <tbody>${d.orders.map((o) => `
             <tr class="click" data-order="${esc(o.id)}">
-              <td><div class="bold">${esc(o.customer.name || '—')}</div><div class="tiny muted mono">${esc(o.reference || o.id)}</div></td>
+              <td><div class="bold">${esc(o.customer.name || '—')}${o.test ? ' <span class="badge warn plain">TEST</span>' : ''}</div><div class="tiny muted mono">${esc(o.reference || o.id)}</div></td>
               <td class="small">${esc(o.site)}</td>
               <td class="small">${esc(o.account || '—')}</td>
               <td class="amount">${inr(o.amount_paid || o.amount_payable)}</td>
@@ -493,7 +493,7 @@
     const { order: o, transaction: t, deliveries } = await api('/orders/' + encodeURIComponent(id));
     const open = ['pending', 'expired'].includes(o.status);
     const m = modal({
-      title: `Order ${statusBadge(o.status)}`,
+      title: `Order ${statusBadge(o.status)}${o.test ? ' <span class="badge warn plain">TEST</span>' : ''}`,
       wide: true,
       body: `
         <div class="stack lg">
@@ -1084,13 +1084,19 @@
               <div class="row"><div class="bank-logo" style="background:var(--brand-soft);color:var(--brand)">${icon.globe}</div>
                 <div class="grow"><div class="bold">${esc(s.name)}</div><div class="tiny muted">${s.orders} orders${s.failed_webhooks ? ` · <span style="color:var(--bad)">${s.failed_webhooks} failed notifications</span>` : ''}</div></div>
                 ${s.active ? '<span class="badge live">Active</span>' : '<span class="badge off">Disabled</span>'}</div>
-              <div class="field"><label>API key</label><div class="copy"><code>${esc(s.api_key_hint)}</code><span class="tiny muted">hidden</span></div></div>
+              <div class="field"><label><span class="badge live plain">LIVE</span> API key <span class="tiny muted">— asli paisa</span></label>
+                ${s.live_key ? copyField(s.live_key, 'Live API key') : `<div class="copy"><code>${esc(s.api_key_hint)}</code><button type="button" class="btn btn-soft btn-sm" data-skey="${s.id}">${icon.refresh} Show / new key</button></div>
+                <span class="hint">Purani key dobara nahi dikh sakti. "New" dabao to nayi key banegi aur yahan hamesha dikhegi (purani band ho jayegi).</span>`}</div>
+              <div class="field"><label><span class="badge warn plain">TEST</span> API key <span class="tiny muted">— bina paise ke testing</span></label>
+                ${s.test_key ? copyField(s.test_key, 'Test API key') : '<span class="tiny muted">—</span>'}
+                <span class="hint">Test key se bane order mein asli payment nahi hota. Payment page par "Simulate payment" button aata hai aur webhook <code>"test": true</code> ke saath jata hai.</span></div>
               <div class="field"><label>Webhook URL</label><div class="small mono" style="overflow-wrap:anywhere">${esc(s.webhook_url || '— not set —')}</div></div>
               <div class="field"><label>Webhook secret</label>${copyField(s.webhook_secret, 'Webhook secret')}</div>
               <div class="row wrap">
                 <button class="btn btn-ghost btn-sm" data-sedit="${s.id}">${icon.edit} Edit</button>
                 <button class="btn btn-ghost btn-sm" data-stest="${s.id}">${icon.send} Test webhook</button>
-                <button class="btn btn-ghost btn-sm" data-skey="${s.id}">${icon.refresh} New API key</button>
+                <button class="btn btn-ghost btn-sm" data-skey="${s.id}">${icon.refresh} New live key</button>
+                <button class="btn btn-ghost btn-sm" data-stkey="${s.id}">${icon.refresh} New test key</button>
                 ${s.active ? `<button class="btn btn-danger btn-sm" data-soff="${s.id}">Disable</button>` : `<button class="btn btn-soft btn-sm" data-son="${s.id}">Enable</button>`}
               </div>
             </div>`).join('') : `<div class="card empty">${icon.globe}<div>No website connected yet.</div></div>`}
@@ -1101,7 +1107,7 @@
             <li><div>Customer clicks <b>Buy</b>. Your website's <b>server</b> creates an order:</div></li>
           </ol>
           <div class="raw">POST ${esc(base)}/api/v1/orders
-Authorization: Bearer ak_live_…
+Authorization: Bearer ak_live_… (ya testing ke liye ak_test_…)
 { "amount": 499, "reference": "P-101",
   "customer": { "name": "Rahul", "phone": "98…" },
   "return_url": "https://myshop.in/thanks" }</div>
@@ -1121,9 +1127,16 @@ Authorization: Bearer ak_live_…
       toast(r.ok ? `Webhook OK (HTTP ${r.status}) ✅` : `Webhook failed: ${r.error || 'HTTP ' + r.status}`, r.ok ? 'ok' : 'bad');
     })));
     $$('[data-skey]', page).forEach((b) => b.addEventListener('click', async () => {
-      if (!(await confirmBox('Make a new API key?', 'The old key stops working immediately. Update it on your website right after.'))) return;
-      const s = await api(`/sites/${b.dataset.skey}/new-key`, { method: 'POST' });
-      showKey(s);
+      if (!(await confirmBox('Nayi LIVE key banaye?', 'Purani live key turant band ho jayegi. Website par nayi key lagani padegi.'))) return;
+      await api(`/sites/${b.dataset.skey}/new-key`, { method: 'POST' });
+      toast('Nayi live key ban gayi — ab Copy kar lo', 'ok');
+      route();
+    }));
+    $$('[data-stkey]', page).forEach((b) => b.addEventListener('click', async () => {
+      if (!(await confirmBox('Nayi TEST key banaye?', 'Purani test key band ho jayegi.'))) return;
+      await api(`/sites/${b.dataset.stkey}/new-test-key`, { method: 'POST' });
+      toast('Nayi test key ban gayi', 'ok');
+      route();
     }));
     $$('[data-soff]', page).forEach((b) => b.addEventListener('click', async () => {
       if (!(await confirmBox('Disable this website?', 'It will not be able to create new orders.', { ok: 'Disable', danger: true }))) return;
@@ -1138,10 +1151,11 @@ Authorization: Bearer ak_live_…
 
   function showKey(s) {
     const m = modal({
-      title: 'Save your API key',
+      title: 'Aapki API keys',
       body: `<div class="stack">
-        <div class="notice warn">${icon.alert}<div>This key is shown <b>only once</b>. Put it in your website's server settings (never in browser/JS code).</div></div>
-        <div class="field"><label>API key</label>${copyField(s.api_key, 'API key')}</div>
+        <div class="notice warn">${icon.alert}<div>Keys sirf apni website ke <b>server</b> code mein rakho (browser/JS ya app ke andar kabhi nahi). Ye yahan Websites page par hamesha copy ho sakti hain.</div></div>
+        <div class="field"><label>LIVE API key</label>${copyField(s.api_key, 'Live API key')}</div>
+        ${s.test_key ? `<div class="field"><label>TEST API key</label>${copyField(s.test_key, 'Test API key')}</div>` : ''}
         <div class="field"><label>Webhook secret</label>${copyField(s.webhook_secret, 'Webhook secret')}</div></div>`,
       foot: '<button class="btn btn-primary" data-close>I saved it</button>',
       onClose: route,

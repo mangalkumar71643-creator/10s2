@@ -9,9 +9,11 @@ const router = express.Router();
 
 router.use(async (req, res, next) => {
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '');
-  const site = m && await db.get('SELECT * FROM sites WHERE api_key_hash = ? AND active = 1', sha256(m[1]));
+  const hash = m && sha256(m[1]);
+  const site = hash && await db.get('SELECT * FROM sites WHERE (api_key_hash = ? OR test_key_hash = ?) AND active = 1', hash, hash);
   if (!site) return res.status(401).json({ error: { code: 'unauthorized', message: 'missing or invalid API key' } });
   req.site = site;
+  req.test = site.test_key_hash === hash; // test key: no real money, simulated payments only
   next();
 });
 
@@ -38,6 +40,7 @@ router.post('/orders', async (req, res) => {
       customer: body.customer || {},
       note: body.note,
       returnUrl: body.return_url || req.site.return_url,
+      test: req.test,
     });
     res.status(201).json(publicOrder(order));
   } catch (err) {
@@ -49,8 +52,9 @@ router.get('/orders', async (req, res) => {
   if (!req.query.reference) return res.status(400).json({ error: { code: 'bad_request', message: 'use ?reference=' } });
   await orders.expireStale();
   const list = await db.all(
-    'SELECT * FROM orders WHERE site_id = ? AND reference = ? ORDER BY created_at DESC LIMIT 20',
+    'SELECT * FROM orders WHERE site_id = ? AND reference = ? AND test = ? ORDER BY created_at DESC LIMIT 20',
     req.site.id,
+    req.test ? 1 : 0,
     String(req.query.reference),
   );
   res.json({ data: list.map(publicOrder) });
@@ -58,13 +62,13 @@ router.get('/orders', async (req, res) => {
 
 router.get('/orders/:id', async (req, res) => {
   const order = await orders.getOrder(req.params.id);
-  if (!order || order.site_id !== req.site.id) return res.status(404).json({ error: { code: 'not_found', message: 'order not found' } });
+  if (!order || order.site_id !== req.site.id || !!order.test !== req.test) return res.status(404).json({ error: { code: 'not_found', message: 'order not found' } });
   res.json(publicOrder(order));
 });
 
 router.post('/orders/:id/cancel', async (req, res) => {
   const order = await orders.getOrder(req.params.id);
-  if (!order || order.site_id !== req.site.id) return res.status(404).json({ error: { code: 'not_found', message: 'order not found' } });
+  if (!order || order.site_id !== req.site.id || !!order.test !== req.test) return res.status(404).json({ error: { code: 'not_found', message: 'order not found' } });
   try {
     res.json(publicOrder(await orders.cancelOrder(order.id)));
   } catch (err) {

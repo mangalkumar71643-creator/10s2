@@ -29,7 +29,7 @@ async function usageToday(accountId, now = Date.now()) {
     `SELECT
        COALESCE(SUM(CASE WHEN status = 'paid' AND paid_at >= ? THEN COALESCE(paid_amount, amount) END), 0) AS paid,
        COALESCE(SUM(CASE WHEN status = 'pending' THEN amount END), 0) AS pending
-     FROM orders WHERE account_id = ?`,
+     FROM orders WHERE account_id = ? AND test = 0`,
     istDayStart(now),
     accountId,
   );
@@ -67,7 +67,7 @@ async function uniqueAmount(base, now = Date.now()) {
   const rows = await db.all(
     `SELECT amount FROM orders
      WHERE amount BETWEEN ? AND ?
-       AND (status = 'pending' OR (status = 'expired' AND expires_at > ?))`,
+       AND test = 0 AND (status = 'pending' OR (status = 'expired' AND expires_at > ?))`,
     base + 1,
     base + MAX_EXTRA_PAISE,
     now - RESERVE_AFTER_EXPIRY_MS,
@@ -81,7 +81,7 @@ async function uniqueAmount(base, now = Date.now()) {
 
 const getById = (id) => db.get('SELECT * FROM orders WHERE id = ?', id);
 
-async function createOrder({ siteId = null, basePaise, reference = '', customer = {}, note = '', returnUrl = '' }, now = Date.now()) {
+async function createOrder({ siteId = null, basePaise, reference = '', customer = {}, note = '', returnUrl = '', test = false }, now = Date.now()) {
   if (!Number.isInteger(basePaise) || basePaise < MIN_BASE_PAISE || basePaise > MAX_BASE_PAISE) {
     throw new OrderError('amount must be between 1.00 and 99999.00');
   }
@@ -99,10 +99,11 @@ async function createOrder({ siteId = null, basePaise, reference = '', customer 
     // Same reference from the same website: hand back the open/paid order instead of making a new one.
     if (siteId && reference) {
       const existing = await db.get(
-        `SELECT * FROM orders WHERE site_id = ? AND reference = ? AND status IN ('pending', 'paid')
+        `SELECT * FROM orders WHERE site_id = ? AND reference = ? AND test = ? AND status IN ('pending', 'paid')
          ORDER BY created_at DESC LIMIT 1`,
         siteId,
         reference,
+        test ? 1 : 0,
       );
       if (existing) {
         if (existing.status === 'pending' && existing.base_amount !== basePaise) {
@@ -112,20 +113,21 @@ async function createOrder({ siteId = null, basePaise, reference = '', customer 
       }
     }
 
-    const amount = await uniqueAmount(basePaise, now);
+    // Test orders never touch real bank accounts or the unique-amount pool.
+    const amount = test ? basePaise : await uniqueAmount(basePaise, now);
     if (amount === null) throw new OrderError('too many open orders for this amount, try again shortly', 503, 'busy');
-    const account = await pickAccount(amount, now);
-    if (!account) throw new OrderError('no bank account is live right now', 503, 'no_account');
+    const account = test ? null : await pickAccount(amount, now);
+    if (!account && !test) throw new OrderError('no bank account is live right now', 503, 'no_account');
 
     const id = randomId('ord', 9);
     await db.run(
       `INSERT INTO orders (id, site_id, reference, base_amount, amount, account_id, status, customer_name,
-         customer_phone, customer_email, note, return_url, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
-      id, siteId, reference, basePaise, amount, account.id,
+         customer_phone, customer_email, note, return_url, expires_at, created_at, test)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, siteId, reference, basePaise, amount, account ? account.id : null,
       String(customer.name || '').slice(0, 100), String(customer.phone || '').slice(0, 20),
       String(customer.email || '').slice(0, 120), String(note || '').slice(0, 200), returnUrl || '',
-      now + expiryMs, now,
+      now + expiryMs, now, test ? 1 : 0,
     );
     return getById(id);
   });
@@ -147,7 +149,7 @@ async function markPaid(order, { utr = null, matchedBy, transactionId = null, pa
   if (transactionId) await db.run("UPDATE transactions SET status = 'matched', order_id = ? WHERE id = ?", order.id, transactionId);
   const updated = await getById(order.id);
   await webhooks.enqueue(updated, 'order.paid', now);
-  const msg = `Payment received ${formatINR(updated.paid_amount)} for order ${updated.reference || updated.id}` +
+  const msg = `${updated.test ? '[TEST] ' : ''}Payment received ${formatINR(updated.paid_amount)} for order ${updated.reference || updated.id}` +
     `${utr ? ` (UTR ${utr})` : ''}${late ? ' — paid after the order expired' : ''}`;
   await db.logActivity('success', msg);
   db.afterCommit(() => notify('✅ ' + msg));
@@ -180,7 +182,7 @@ async function matchTransaction(txn, now = Date.now()) {
   // 1) The customer already told us their UTR.
   if (txn.utr) {
     const claimed = await db.get(
-      `SELECT * FROM orders WHERE customer_utr = ? AND status IN ('pending', 'expired') AND created_at >= ?`,
+      `SELECT * FROM orders WHERE customer_utr = ? AND test = 0 AND status IN ('pending', 'expired') AND created_at >= ?`,
       txn.utr,
       cutoff,
     );
@@ -195,7 +197,7 @@ async function matchTransaction(txn, now = Date.now()) {
 
   // 2) Exact unique amount.
   const exact = await db.all(
-    `SELECT * FROM orders WHERE amount = ? AND status IN ('pending', 'expired')
+    `SELECT * FROM orders WHERE amount = ? AND test = 0 AND status IN ('pending', 'expired')
        AND created_at >= ? AND created_at <= ? ORDER BY created_at DESC`,
     txn.amount,
     cutoff,
@@ -213,7 +215,7 @@ async function matchTransaction(txn, now = Date.now()) {
   // 3) Customer paid the round price without the extra paise: only safe if exactly one open order has it.
   if (settings.accept_base_amount === '1') {
     const base = await db.all(
-      `SELECT * FROM orders WHERE base_amount = ? AND status = 'pending' AND created_at <= ?`,
+      `SELECT * FROM orders WHERE base_amount = ? AND test = 0 AND status = 'pending' AND created_at <= ?`,
       txn.amount,
       txn.received_at + 120000,
     );
@@ -322,6 +324,19 @@ async function manualPay(orderId, { utr = null, transactionId = null } = {}, now
   });
 }
 
+// Test mode: pretend the customer paid. Only works on orders made with a test API key.
+async function simulateTestPayment(orderId, now = Date.now()) {
+  return db.tx(async () => {
+    const order = await getById(orderId);
+    if (!order) throw new OrderError('order not found', 404, 'not_found');
+    if (!order.test) throw new OrderError('only test orders can be paid this way', 400, 'not_test');
+    if (order.status === 'paid') return order;
+    if (order.status !== 'pending') throw new OrderError(`order is ${order.status}`, 409, 'conflict');
+    const utr = 'TEST' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
+    return markPaid(order, { utr, matchedBy: 'test', paidAmount: order.amount }, now);
+  });
+}
+
 async function cancelOrder(orderId) {
   const rows = await db.all(
     "UPDATE orders SET status = 'cancelled' WHERE id = ? AND status IN ('pending', 'expired') RETURNING *",
@@ -344,5 +359,6 @@ module.exports = {
   claimUtr,
   manualPay,
   cancelOrder,
+  simulateTestPayment,
   identifyAccount,
 };

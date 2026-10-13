@@ -168,6 +168,43 @@
       ${footer()}`;
   }
 
+  // Order made with a TEST API key: no real payment, just a button that pretends the customer paid.
+  function renderTest() {
+    app.innerHTML = `
+      ${header()}
+      <div class="notice warn" style="margin-bottom:14px">${icon.upi}<div><b>TEST MODE</b> — ye asli payment nahi hai. Website ne test API key use ki hai.</div></div>
+      <section class="pay-card">
+        <div class="amount-box">
+          <div class="amount-label">Test payment</div>
+          <div class="big-amount">${amountHtml()}</div>
+          ${data.order.note || data.order.reference ? `<p class="small muted" style="margin-top:10px">${esc(data.order.note || 'Order ' + data.order.reference)}</p>` : ''}
+        </div>
+        <div class="qr-zone">
+          <button class="btn btn-primary btn-lg btn-block" id="testPay">${icon.check} Simulate successful payment</button>
+          <p class="tiny muted" style="margin:0;text-align:center">Dabate hi order PAID hoga aur aapki website ko webhook (<code>"test": true</code>) jayega.</p>
+        </div>
+        <div class="status-bar"><span class="pulse"></span><div><div class="bold small">Waiting for test payment…</div></div>
+          <span class="timer" id="timer">${mmss(secondsLeft)}</span></div>
+      </section>
+      ${footer()}`;
+    document.getElementById('testPay').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+      try {
+        const r = await fetch(`/pay/${orderId}/test-pay`, { method: 'POST' });
+        const out = await r.json();
+        if (!r.ok) throw new Error(out.error || 'Test payment failed');
+        Object.assign(data, out);
+        render();
+      } catch (err) {
+        toast(err.message, 'bad');
+        btn.disabled = false;
+        btn.textContent = 'Simulate successful payment';
+      }
+    });
+  }
+
   function renderPaid() {
     stopTimers();
     app.innerHTML = `
@@ -175,6 +212,7 @@
       <section class="pay-card result">
         <div class="check">${icon.check}</div>
         <h1 style="margin-top:8px">Payment received</h1>
+        ${data.test ? '<span class="badge warn">TEST — no real money</span>' : ''}
         <p class="muted">Thank you! Your order is confirmed.<span class="hi">Dhanyavaad! Aapka payment mil gaya hai.</span></p>
         <div class="receipt">
           <div><span>Amount</span><b>₹${fmt(data.order.amount)}</b></div>
@@ -225,6 +263,12 @@
   function render() {
     if (data.status === 'paid') return renderPaid();
     if (data.status === 'expired' || data.status === 'cancelled') return renderClosed(data.status);
+    if (data.test) {
+      renderTest();
+      startPolling(3000);
+      startTick();
+      return;
+    }
     if (!data.payee) return renderError('No payment method is available right now. Please contact the store.');
     renderPending();
     startPolling(3000);

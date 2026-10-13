@@ -192,3 +192,70 @@ test('add money direct link goes straight to the payment page', async (t) => {
   assert.equal(bad.status, 400);
   assert.match(await bad.text(), /mobile number/);
 });
+
+test('live and test API keys: test orders never touch real money', async (t) => {
+  const db = require('../src/db');
+  const server = http.createServer(createApp());
+  const base = await listen(server);
+  const received = [];
+  const hook = http.createServer((req, res) => {
+    let b = '';
+    req.on('data', (c) => (b += c));
+    req.on('end', () => { received.push(JSON.parse(b)); res.end('ok'); });
+  });
+  const hookUrl = await listen(hook);
+  t.after(() => { server.close(); hook.close(); });
+
+  let cookie = '';
+  const admin = async (path, method = 'GET', body) => {
+    const r = await fetch(base + '/admin/api' + path, { method, headers: { 'content-type': 'application/json', 'x-requested-with': 'apnapay', cookie }, body: body ? JSON.stringify(body) : undefined });
+    const sc = r.headers.get('set-cookie');
+    if (sc) cookie = sc.split(';')[0];
+    return { status: r.status, data: await r.json() };
+  };
+  assert.equal((await admin('/login', 'POST', { username: 'owner', password: 'supersecret1' })).status, 200);
+  await db.run('UPDATE accounts SET live = 1');
+  const site = (await admin('/sites', 'POST', { name: 'Keys Shop', webhook_url: hookUrl + '/h' })).data;
+  assert.match(site.api_key, /^ak_live_/);
+  assert.match(site.test_key, /^ak_test_/);
+  // Both keys can be copied later from the Websites page.
+  const listed = (await admin('/sites')).data.find((s) => s.id === site.id);
+  assert.equal(listed.live_key, site.api_key);
+  assert.equal(listed.test_key, site.test_key);
+
+  const call = (key, path, method = 'GET', body) =>
+    fetch(base + '/api/v1' + path, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` }, body: body && JSON.stringify(body) });
+  const testOrder = await (await call(site.test_key, '/orders', 'POST', { amount: 250, reference: 'K-1' })).json();
+  assert.equal(testOrder.test, true);
+  assert.equal(testOrder.amount_payable, '250.00'); // no unique paise, no bank account
+  const liveOrder = await (await call(site.api_key, '/orders', 'POST', { amount: 250, reference: 'K-1' })).json();
+  assert.equal(liveOrder.test, false);
+  assert.notEqual(liveOrder.id, testOrder.id);
+  // A key only sees its own mode.
+  assert.equal((await call(site.api_key, '/orders/' + testOrder.id)).status, 404);
+
+  // Payment page offers the simulate button; live orders cannot be "test paid".
+  const page = await (await fetch(`${base}/pay/${testOrder.id}/data`)).json();
+  assert.equal(page.test, true);
+  assert.equal(page.payee, null);
+  assert.equal((await fetch(`${base}/pay/${liveOrder.id}/test-pay`, { method: 'POST' })).status, 400);
+  const paid = await (await fetch(`${base}/pay/${testOrder.id}/test-pay`, { method: 'POST' })).json();
+  assert.equal(paid.status, 'paid');
+  await webhooks.processDue();
+  for (let i = 0; i < 50 && !received.length; i++) await new Promise((r) => setTimeout(r, 20));
+  assert.equal(received[0].event, 'order.paid');
+  assert.equal(received[0].order.test, true);
+
+  // Test money never shows in the dashboard totals.
+  const before = (await admin('/dashboard')).data.today.count;
+  const orders = require('../src/orders');
+  const t2 = await (await call(site.test_key, '/orders', 'POST', { amount: 300 })).json();
+  await orders.simulateTestPayment(t2.id);
+  assert.equal((await admin('/dashboard')).data.today.count, before);
+
+  // New test key replaces the old one.
+  const fresh = (await admin(`/sites/${site.id}/new-test-key`, 'POST')).data;
+  assert.notEqual(fresh.test_key, site.test_key);
+  assert.equal((await call(site.test_key, '/orders', 'POST', { amount: 100 })).status, 401);
+  assert.equal((await call(fresh.test_key, '/orders', 'POST', { amount: 100 })).status, 201);
+});

@@ -50,9 +50,10 @@ router.get('/:id/data', async (req, res) => {
       extra_paise: order.amount - order.base_amount,
     },
     ...statusPayload(order),
+    test: !!order.test,
     payee: null,
   };
-  if (account && order.status === 'pending') {
+  if (account && order.status === 'pending' && !order.test) {
     const upiUri = buildUpiUri(account, order);
     // UPI apps block amount-filled QRs/links to personal UPI IDs, but always accept the owner's own QR.
     // So personal accounts with an uploaded QR show that QR; the customer types the exact amount.
@@ -75,6 +76,18 @@ router.get('/:id/status', async (req, res) => {
   const order = await orders.getOrder(req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   res.set('Cache-Control', 'no-store').json(statusPayload(order));
+});
+
+// Test mode only: the "Simulate payment" button on the payment page of a test-key order.
+router.post('/:id/test-pay', async (req, res) => {
+  try {
+    const order = await orders.simulateTestPayment(req.params.id);
+    res.json(statusPayload(order));
+  } catch (err) {
+    if (err instanceof orders.OrderError) return res.status(err.status).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong' });
+  }
 });
 
 router.post('/:id/utr', async (req, res) => {
