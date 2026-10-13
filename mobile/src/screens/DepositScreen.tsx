@@ -88,6 +88,12 @@ export default function DepositScreen() {
       return;
     }
     if (!isValidAmount) return;
+    // A payment company is set up but not open to this account: say why,
+    // rather than falling through to the old (closed) deposit.
+    if (card && !card.enabled && card.gateway) {
+      Alert.alert('Card payment not available', card.reason ?? 'Please try again later.');
+      return;
+    }
     setBusy(true);
     if (card?.enabled) {
       try {

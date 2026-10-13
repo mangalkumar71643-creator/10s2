@@ -227,7 +227,9 @@ export async function cardDepositStatus(userId: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { phone: true } });
   const phone = (user.phone ?? "").replace(/\D/g, "").slice(-10);
   const base = { testMode: true, gateway, gatewayName: GATEWAY_NAMES[gateway] };
-  if (!testPhones().includes(phone)) return { ...base, enabled: false, reason: "Card payments are in test mode and not open to this account." };
+  if (!testPhones().includes(phone)) {
+    return { ...base, enabled: false, reason: `Card payments are in test mode. This account's number (…${phone.slice(-4) || "none"}) is not in the admin's allowed test numbers.` };
+  }
   return { ...base, enabled: true, reason: null, min: MIN_CARD_DEPOSIT, max: MAX_CARD_DEPOSIT, currency: currencyFor(gateway) };
 }
 
