@@ -63,7 +63,7 @@ test('full payment flow', async (t) => {
   assert.equal(acc.status, 200, JSON.stringify(acc.data));
 
   const site = (await admin('/sites', 'POST', { name: 'Shop', webhook_url: shopUrl + '/hook', return_url: 'https://shop.example/thanks' })).data;
-  assert.match(site.api_key, /^ak_live_/);
+  assert.match(site.api_key, /^sk_live_/);
 
   // Product website creates an order.
   const api = (path, method = 'GET', body, key = site.api_key) =>
@@ -216,8 +216,8 @@ test('live and test API keys: test orders never touch real money', async (t) => 
   assert.equal((await admin('/login', 'POST', { username: 'owner', password: 'supersecret1' })).status, 200);
   await db.run('UPDATE accounts SET live = 1');
   const site = (await admin('/sites', 'POST', { name: 'Keys Shop', webhook_url: hookUrl + '/h' })).data;
-  assert.match(site.api_key, /^ak_live_/);
-  assert.match(site.test_key, /^ak_test_/);
+  assert.match(site.api_key, /^sk_live_/);
+  assert.match(site.test_key, /^sk_test_/);
   // Both keys can be copied later from the Websites page.
   const listed = (await admin('/sites')).data.find((s) => s.id === site.id);
   assert.equal(listed.live_key, site.api_key);

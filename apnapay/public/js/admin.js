@@ -1107,7 +1107,7 @@
             <li><div>Customer clicks <b>Buy</b>. Your website's <b>server</b> creates an order:</div></li>
           </ol>
           <div class="raw">POST ${esc(base)}/api/v1/orders
-Authorization: Bearer ak_live_… (ya testing ke liye ak_test_…)
+Authorization: Bearer sk_live_… (ya testing ke liye sk_test_…)
 { "amount": 499, "reference": "P-101",
   "customer": { "name": "Rahul", "phone": "98…" },
   "return_url": "https://myshop.in/thanks" }</div>

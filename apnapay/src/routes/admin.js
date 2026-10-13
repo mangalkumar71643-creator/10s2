@@ -354,8 +354,8 @@ function readSiteUrls(body, existing = {}) {
   return { webhook, ret };
 }
 
-const newApiKey = () => 'ak_live_' + crypto.randomBytes(24).toString('base64url');
-const newTestKey = () => 'ak_test_' + crypto.randomBytes(24).toString('base64url');
+const newApiKey = () => 'sk_live_' + crypto.randomBytes(24).toString('base64url');
+const newTestKey = () => 'sk_test_' + crypto.randomBytes(24).toString('base64url');
 const keyHint = (key) => key.slice(0, 12) + '…' + key.slice(-4);
 const newSecret = () => 'whsec_' + crypto.randomBytes(24).toString('base64url');
 

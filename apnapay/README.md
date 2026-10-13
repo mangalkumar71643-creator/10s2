@@ -196,7 +196,7 @@ Nakli email se bachav: sirf wahi email maane jaate hain jinke headers mein bank 
 
 ```http
 POST https://pay.yourdomain.in/api/v1/orders
-Authorization: Bearer ak_live_xxx
+Authorization: Bearer sk_live_xxx
 Content-Type: application/json
 
 {
@@ -276,7 +276,7 @@ http_response_code(200);
 **Poora chalta hua example:** `examples/shop-demo/server.js`. Ye ek chhoti dukaan hai jo order banati hai, webhook verify karti hai, aur product SOLD karke stock kam karti hai.
 
 ```bash
-APNAPAY_URL=http://localhost:3000 APNAPAY_API_KEY=ak_live_… APNAPAY_WEBHOOK_SECRET=whsec_… npm run demo-shop
+APNAPAY_URL=http://localhost:3000 APNAPAY_API_KEY=sk_live_… APNAPAY_WEBHOOK_SECRET=whsec_… npm run demo-shop
 # phir http://localhost:4000 kholo
 ```
 

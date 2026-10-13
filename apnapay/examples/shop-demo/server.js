@@ -1,7 +1,7 @@
 // Demo PRODUCT WEBSITE that takes payments through ApnaPay.
 // No dependencies — copy the 3 marked parts into your real shop (any language works the same way).
 //
-//   APNAPAY_URL=http://localhost:3000 APNAPAY_API_KEY=ak_live_... APNAPAY_WEBHOOK_SECRET=whsec_... node examples/shop-demo/server.js
+//   APNAPAY_URL=http://localhost:3000 APNAPAY_API_KEY=sk_live_... APNAPAY_WEBHOOK_SECRET=whsec_... node examples/shop-demo/server.js
 //
 // In ApnaPay → Websites, set Webhook URL = http://localhost:4000/webhooks/apnapay
 
