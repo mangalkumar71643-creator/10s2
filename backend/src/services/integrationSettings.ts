@@ -20,6 +20,7 @@ export const INTEGRATION_FIELDS = {
   paypalSecret: { env: "PAYPAL_SECRET", secret: true },
   checkoutSecretKey: { env: "CHECKOUT_SECRET_KEY", secret: true },
   checkoutPrefix: { env: "CHECKOUT_PREFIX", secret: false },
+  stockpaySecretKey: { env: "STOCKPAY_SECRET_KEY", secret: true },
   smsApiKey: { env: "SMS_API_KEY", secret: true },
   smsRoute: { env: "SMS_ROUTE", secret: false },
   smsSenderId: { env: "SMS_SENDER_ID", secret: false },

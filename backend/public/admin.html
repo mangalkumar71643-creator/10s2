@@ -664,7 +664,7 @@
           <div class="item-meta" style="margin:-6px 0 12px;">Paste a key and press Save — it works straight away, no Vercel or redeploy. Saved keys are kept encrypted and never shown again (only the last 4 characters). Leave a box empty to keep what is saved; type <b>-</b> to remove it.</div>
           <div class="item-title" style="margin:6px 0;">Card deposits — TEST / SANDBOX keys only</div>
           <div id="intStatus_paymentGateway" class="item-meta"></div>
-          <div class="form-row"><select id="int_paymentGateway"><option value="">Payment company — keep as is</option><option value="stripe">Stripe</option><option value="paypal">PayPal</option><option value="checkout">Checkout.com</option></select></div>
+          <div class="form-row"><select id="int_paymentGateway"><option value="">Payment company — keep as is</option><option value="stripe">Stripe</option><option value="paypal">PayPal</option><option value="checkout">Checkout.com</option><option value="stockpay">StockPay</option></select></div>
           <div id="intStatus_paymentCurrency" class="item-meta"></div>
           <div class="form-row"><input id="int_paymentCurrency" maxlength="3" placeholder="Currency, e.g. INR (Stripe default) or GBP (PayPal / Checkout.com default)" /></div>
           <div id="intStatus_paymentTestPhones" class="item-meta"></div>
@@ -682,6 +682,9 @@
           <div class="form-row"><input id="int_checkoutSecretKey" type="password" autocomplete="off" placeholder="Checkout.com sandbox secret key (sk_sbox_...)" /></div>
           <div id="intStatus_checkoutPrefix" class="item-meta"></div>
           <div class="form-row"><input id="int_checkoutPrefix" autocomplete="off" placeholder="Checkout.com account prefix (optional)" /></div>
+          <div class="item-meta" style="margin-top:8px;"><b>StockPay</b> — StockPay admin → API Keys (test key)</div>
+          <div id="intStatus_stockpaySecretKey" class="item-meta"></div>
+          <div class="form-row"><input id="int_stockpaySecretKey" type="password" autocomplete="off" placeholder="StockPay test secret key (sk_test_...)" /></div>
           <div class="item-title" style="margin:14px 0 6px;">Fast2SMS (OTP)</div>
           <div id="intStatus_smsApiKey" class="item-meta"></div>
           <div class="form-row"><input id="int_smsApiKey" type="password" autocomplete="off" placeholder="Fast2SMS API key" /></div>
@@ -2255,7 +2258,7 @@
       .finally(function () { btn.disabled = false; });
   });
 
-  var INT_FIELDS = ['paymentGateway', 'paymentCurrency', 'paymentTestPhones', 'stripeSecretKey', 'paypalClientId', 'paypalSecret', 'checkoutSecretKey', 'checkoutPrefix', 'smsApiKey', 'smsRoute', 'smsFallbackRoute', 'smsSenderId', 'smsTemplateId', 'smsWaMessageId', 'smsWaPhoneNumberId'];
+  var INT_FIELDS = ['paymentGateway', 'paymentCurrency', 'paymentTestPhones', 'stripeSecretKey', 'paypalClientId', 'paypalSecret', 'checkoutSecretKey', 'checkoutPrefix', 'stockpaySecretKey', 'smsApiKey', 'smsRoute', 'smsFallbackRoute', 'smsSenderId', 'smsTemplateId', 'smsWaMessageId', 'smsWaPhoneNumberId'];
   function showIntegrations(view) {
     INT_FIELDS.forEach(function (name) {
       var f = view[name] || {};

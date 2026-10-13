@@ -258,7 +258,7 @@ export default function DepositScreen() {
       <View style={styles.payBar}>
         {card?.enabled ? (
           <Text style={{ color: colors.gold, textAlign: 'center', fontSize: 12, marginBottom: 6 }}>
-            Pay with {card.gatewayName}{card.testMode ? (card.gateway === 'paypal' ? ' · TEST MODE (log in with a PayPal sandbox buyer account)' : ' · TEST MODE (use card 4242 4242 4242 4242)') : ''}
+            Pay with {card.gatewayName}{card.testMode ? (card.gateway === 'paypal' ? ' · TEST MODE (log in with a PayPal sandbox buyer account)' : card.gateway === 'stockpay' ? ' · TEST MODE (no real money)' : ' · TEST MODE (use card 4242 4242 4242 4242)') : ''}
           </Text>
         ) : null}
         <Pressable

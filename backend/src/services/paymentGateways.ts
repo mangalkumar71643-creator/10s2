@@ -25,9 +25,9 @@ import { completeDeposit } from "./depositService";
 export const MIN_CARD_DEPOSIT = 100;
 export const MAX_CARD_DEPOSIT = 5000;
 
-export const GATEWAYS = ["stripe", "paypal", "checkout"] as const;
+export const GATEWAYS = ["stripe", "paypal", "checkout", "stockpay"] as const;
 export type Gateway = (typeof GATEWAYS)[number];
-const GATEWAY_NAMES: Record<Gateway, string> = { stripe: "Stripe", paypal: "PayPal", checkout: "Checkout.com" };
+const GATEWAY_NAMES: Record<Gateway, string> = { stripe: "Stripe", paypal: "PayPal", checkout: "Checkout.com", stockpay: "StockPay" };
 
 type Check = { state: "paid" | "pending" | "failed"; amountMinor?: number; currency?: string };
 interface GatewayClient {
@@ -190,10 +190,45 @@ const checkout: GatewayClient = {
   },
 };
 
-const CLIENTS: Record<Gateway, GatewayClient> = { stripe, paypal, checkout };
+// --- StockPay hosted checkout (stockpay-in.vercel.app/docs/gbp), test key sk_test_... only ---
+const STOCKPAY = "https://stockpay-in.vercel.app/api/v1";
+const stockpayKey = () => {
+  const k = integration("stockpaySecretKey");
+  return k.startsWith("sk_test_") ? k : "";
+};
+type StockpayOrder = { id: string; status: string; amount_paid: string | null; currency: string; payment_url?: string; test?: boolean };
+const stockpay: GatewayClient = {
+  configured: () => Boolean(stockpayKey()),
+  async create(amount, currency, base, userId) {
+    const order = await callJson<StockpayOrder>("stockpay", `${STOCKPAY}/orders`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${stockpayKey()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: amount.toFixed(2),
+        currency: currency.toUpperCase(),
+        reference: `np-${userId.slice(0, 8)}-${Date.now()}`,
+        note: "NovaPlay wallet deposit",
+        return_url: returnUrls(base).success,
+      }),
+    });
+    if (!order.payment_url) throw new ApiError(502, "The payment service did not return a payment page.");
+    return { id: order.id, url: order.payment_url };
+  },
+  async check(id) {
+    const o = await callJson<StockpayOrder>("stockpay", `${STOCKPAY}/orders/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${stockpayKey()}` } });
+    // Test keys only: a live (real-money) payment is never credited here.
+    if (o.test !== true) throw new ApiError(400, "Only StockPay test payments are accepted.");
+    if (o.status === "paid") return { state: "paid", amountMinor: Math.round(Number(o.amount_paid) * 100), currency: (o.currency ?? "").toLowerCase() };
+    return { state: o.status === "expired" || o.status === "cancelled" ? "failed" : "pending" };
+  },
+};
+
+const CLIENTS: Record<Gateway, GatewayClient> = { stripe, paypal, checkout, stockpay };
 
 /** Refuses live keys when the admin saves them. */
-export function assertSandboxKeys(patch: { stripeSecretKey?: string; checkoutSecretKey?: string }) {
+export function assertSandboxKeys(patch: { stripeSecretKey?: string; checkoutSecretKey?: string; stockpaySecretKey?: string }) {
+  const sp = patch.stockpaySecretKey?.trim();
+  if (sp && !sp.startsWith("sk_test_")) throw new ApiError(400, "Only StockPay TEST keys (sk_test_...) are allowed for now.");
   const s = patch.stripeSecretKey?.trim();
   if (s) {
     if (!/^(sk|rk)_/.test(s)) throw new ApiError(400, "That doesn't look like a Stripe secret key (it should start with sk_test_).");
