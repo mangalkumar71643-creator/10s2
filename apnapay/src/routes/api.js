@@ -27,9 +27,10 @@ const fail = (res, err) => {
 
 router.post('/orders', async (req, res) => {
   const body = req.body || {};
-  // INR is paid by UPI; other currencies (e.g. GBP) go through Razorpay when it is connected.
-  const currency = body.currency === undefined ? 'INR' : String(body.currency).toUpperCase();
-  if (!/^[A-Z]{3}$/.test(currency)) return res.status(400).json({ error: { code: 'unsupported_currency', message: 'currency must be a 3-letter code like INR or GBP' } });
+  // Payments are UPI transfers into an Indian bank account, so only INR exists.
+  if (body.currency !== undefined && String(body.currency).toUpperCase() !== 'INR') {
+    return res.status(400).json({ error: { code: 'unsupported_currency', message: 'only INR is supported' } });
+  }
   const basePaise = toPaise(body.amount);
   if (basePaise === null) return res.status(400).json({ error: { code: 'bad_request', message: 'amount is required, e.g. 499 or "499.00"' } });
   if (body.return_url && !isHttpUrl(body.return_url)) {
@@ -44,7 +45,6 @@ router.post('/orders', async (req, res) => {
       note: body.note,
       returnUrl: body.return_url || req.site.return_url,
       test: req.test,
-      currency,
     });
     res.status(201).json(publicOrder(order));
   } catch (err) {
@@ -65,7 +65,7 @@ router.get('/orders', async (req, res) => {
 });
 
 router.get('/orders/:id', async (req, res) => {
-  const order = await orders.refreshProvider(await orders.getOrder(req.params.id));
+  const order = await orders.getOrder(req.params.id);
   if (!order || order.site_id !== req.site.id || !!order.test !== req.test) return res.status(404).json({ error: { code: 'not_found', message: 'order not found' } });
   res.json(publicOrder(order));
 });

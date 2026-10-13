@@ -160,12 +160,6 @@ ALTER TABLE devices ADD COLUMN IF NOT EXISTS app_version TEXT;
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS live_key TEXT;
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS test_key TEXT;
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS test_key_hash TEXT;
--- Non-INR orders (e.g. GBP) are paid through Razorpay instead of UPI.
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency TEXT NOT NULL DEFAULT 'INR';
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider TEXT;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_ref TEXT;
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_url TEXT;
-CREATE INDEX IF NOT EXISTS idx_orders_provider_ref ON orders(provider_ref);
 -- Orders made with a test key: no real money, never matched against bank SMS.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS test INTEGER NOT NULL DEFAULT 0;
 
@@ -321,13 +315,6 @@ const DEFAULT_SETTINGS = {
   topup_max: '10000',
   topup_site_id: '',
   topup_return_url: '',
-  // Razorpay (international cards). Secrets are never sent back to the browser.
-  razorpay_key_id: '',
-  razorpay_key_secret: '',
-  razorpay_test_key_id: '',
-  razorpay_test_key_secret: '',
-  razorpay_webhook_secret: '',
-  razorpay_currencies: 'GBP',
 };
 
 async function getSettings() {

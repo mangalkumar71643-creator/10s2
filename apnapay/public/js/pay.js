@@ -69,17 +69,14 @@
         <div class="avatar">${esc(name.trim()[0] || 'S').toUpperCase()}</div>
         <div class="grow">
           <div class="bold" style="font-size:17px">${esc(name)}</div>
-          <div class="secure">${icon.lock} ${data.order && data.order.currency && data.order.currency !== 'INR' ? 'Secure card payment' : 'Secure UPI payment · 0 extra fee'}</div>
+          <div class="secure">${icon.lock} Secure UPI payment · 0 extra fee</div>
         </div>
       </div>`;
   }
 
-  const SYM = { INR: '₹', GBP: '£', USD: '$', EUR: '€' };
-  const sym = () => SYM[(data.order && data.order.currency) || 'INR'] || data.order.currency + ' ';
-
   function amountHtml() {
     const [rs, ps] = data.order.amount.split('.');
-    return `${sym()}${Number(rs).toLocaleString('en-IN')}<span class="paise">.${ps}</span>`;
+    return `₹${Number(rs).toLocaleString('en-IN')}<span class="paise">.${ps}</span>`;
   }
 
   function appLinks(uri, extra = '') {
@@ -218,7 +215,7 @@
         ${data.test ? '<span class="badge warn">TEST — no real money</span>' : ''}
         <p class="muted">Thank you! Your order is confirmed.<span class="hi">Dhanyavaad! Aapka payment mil gaya hai.</span></p>
         <div class="receipt">
-          <div><span>Amount</span><b>${sym()}${fmt(data.order.amount)}</b></div>
+          <div><span>Amount</span><b>₹${fmt(data.order.amount)}</b></div>
           ${data.order.reference ? `<div><span>Order</span><b>${esc(data.order.reference)}</b></div>` : ''}
           ${data.utr ? `<div><span>UPI Ref / UTR</span><b class="mono">${esc(data.utr)}</b></div>` : ''}
           ${data.paid_at ? `<div><span>Paid at</span><b>${new Date(data.paid_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</b></div>` : ''}
@@ -261,7 +258,7 @@
     app.innerHTML = `<section class="pay-card result"><div class="clock">${icon.x}</div><h1>Payment not found</h1><p class="muted">${esc(msg)}</p></section>`;
   }
 
-  const footer = () => `<div class="foot">${icon.lock} ${data.order && data.order.currency && data.order.currency !== 'INR' ? 'Card payment processed by Razorpay' : "Paid directly to the merchant's bank via UPI"}${data.business.support_phone ? ` · Help: ${esc(data.business.support_phone)}` : ''}</div>`;
+  const footer = () => `<div class="foot">${icon.lock} Paid directly to the merchant's bank via UPI${data.business.support_phone ? ` · Help: ${esc(data.business.support_phone)}` : ''}</div>`;
 
   function render() {
     if (data.status === 'paid') return renderPaid();
@@ -361,7 +358,7 @@
       if (!r.ok) return renderError(out.error || 'This payment link is invalid.');
       data = out;
       secondsLeft = data.seconds_left;
-      document.title = `Pay ${sym()}${fmt(data.order.amount)} · ${data.business.name}`;
+      document.title = `Pay ₹${fmt(data.order.amount)} · ${data.business.name}`;
       render();
     } catch {
       renderError('Could not load the payment. Check your internet and refresh.');

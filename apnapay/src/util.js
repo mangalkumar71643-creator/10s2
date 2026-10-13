@@ -36,12 +36,6 @@ function formatINR(paise) {
   return '₹' + (paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const SYMBOLS = { INR: '₹', GBP: '£', USD: '$', EUR: '€' };
-function formatMoney(minor, currency = 'INR') {
-  if (!currency || currency === 'INR') return formatINR(minor);
-  return (SYMBOLS[currency] || currency + ' ') + (minor / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 function timingSafeEqual(a, b) {
   const ba = Buffer.from(String(a));
   const bb = Buffer.from(String(b));
@@ -58,4 +52,4 @@ function isHttpUrl(value) {
   }
 }
 
-module.exports = { randomId, sha256, istDayStart, toPaise, rupees, formatINR, formatMoney, timingSafeEqual, isHttpUrl };
+module.exports = { randomId, sha256, istDayStart, toPaise, rupees, formatINR, timingSafeEqual, isHttpUrl };

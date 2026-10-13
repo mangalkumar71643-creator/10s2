@@ -4,7 +4,6 @@ const path = require('node:path');
 const db = require('../db');
 const orders = require('../orders');
 const auth = require('../auth');
-const razorpay = require('../razorpay');
 const { buildUpiUri, buildPlainUpiUri, qrPng, isMerchant } = require('../upi');
 const { rupees } = require('../util');
 
@@ -32,29 +31,7 @@ function statusPayload(order) {
   };
 }
 
-router.get('/:id', async (req, res) => {
-  // Card payments (e.g. GBP) happen on Razorpay's page: send the customer straight there.
-  const order = await orders.refreshProvider(await orders.getOrder(req.params.id));
-  if (order && order.provider === 'razorpay' && order.status === 'pending' && order.provider_url) {
-    return res.redirect(302, order.provider_url);
-  }
-  res.sendFile(path.join(PUBLIC, 'pay.html'));
-});
-
-// Razorpay sends the customer back here after paying.
-router.get('/:id/razorpay-return', async (req, res) => {
-  const order = await orders.getOrder(req.params.id);
-  if (!order) return res.status(404).send('Order not found');
-  const q = req.query;
-  if (order.provider === 'razorpay' && q.razorpay_payment_link_id === order.provider_ref && q.razorpay_payment_link_status === 'paid') {
-    const creds = await razorpay.credentials(!!order.test);
-    if (creds && razorpay.verifyCallback(q, creds.secret)) {
-      await orders.markProviderPaid(order.id, { paymentId: String(q.razorpay_payment_id || '').slice(0, 40) || null });
-    }
-  }
-  await orders.refreshProvider(await orders.getOrder(order.id));
-  res.redirect(302, `/pay/${order.id}`);
-});
+router.get('/:id', (req, res) => res.sendFile(path.join(PUBLIC, 'pay.html')));
 
 router.get('/:id/data', async (req, res) => {
   const order = await orders.getOrder(req.params.id);
@@ -68,7 +45,6 @@ router.get('/:id/data', async (req, res) => {
       reference: order.reference,
       note: order.note,
       customer_name: order.customer_name,
-      currency: order.currency || 'INR',
       base_amount: rupees(order.base_amount),
       amount: rupees(order.amount),
       extra_paise: order.amount - order.base_amount,
@@ -97,7 +73,7 @@ router.get('/:id/data', async (req, res) => {
 });
 
 router.get('/:id/status', async (req, res) => {
-  const order = await orders.refreshProvider(await orders.getOrder(req.params.id));
+  const order = await orders.getOrder(req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
   res.set('Cache-Control', 'no-store').json(statusPayload(order));
 });

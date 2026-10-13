@@ -1,7 +1,5 @@
 const db = require('./db');
-const config = require('./config');
-const razorpay = require('./razorpay');
-const { randomId, istDayStart, formatINR, formatMoney } = require('./util');
+const { randomId, istDayStart, formatINR } = require('./util');
 const { parseBankMessage } = require('./parser');
 const webhooks = require('./webhooks');
 const { alert, notify } = require('./notify');
@@ -31,7 +29,7 @@ async function usageToday(accountId, now = Date.now()) {
     `SELECT
        COALESCE(SUM(CASE WHEN status = 'paid' AND paid_at >= ? THEN COALESCE(paid_amount, amount) END), 0) AS paid,
        COALESCE(SUM(CASE WHEN status = 'pending' THEN amount END), 0) AS pending
-     FROM orders WHERE account_id = ? AND test = 0 AND currency = 'INR'`,
+     FROM orders WHERE account_id = ? AND test = 0`,
     istDayStart(now),
     accountId,
   );
@@ -69,7 +67,7 @@ async function uniqueAmount(base, now = Date.now()) {
   const rows = await db.all(
     `SELECT amount FROM orders
      WHERE amount BETWEEN ? AND ?
-       AND test = 0 AND currency = 'INR' AND (status = 'pending' OR (status = 'expired' AND expires_at > ?))`,
+       AND test = 0 AND (status = 'pending' OR (status = 'expired' AND expires_at > ?))`,
     base + 1,
     base + MAX_EXTRA_PAISE,
     now - RESERVE_AFTER_EXPIRY_MS,
@@ -83,13 +81,11 @@ async function uniqueAmount(base, now = Date.now()) {
 
 const getById = (id) => db.get('SELECT * FROM orders WHERE id = ?', id);
 
-async function createOrder({ siteId = null, basePaise, reference = '', customer = {}, note = '', returnUrl = '', test = false, currency = 'INR' }, now = Date.now()) {
+async function createOrder({ siteId = null, basePaise, reference = '', customer = {}, note = '', returnUrl = '', test = false }, now = Date.now()) {
   if (!Number.isInteger(basePaise) || basePaise < MIN_BASE_PAISE || basePaise > MAX_BASE_PAISE) {
     throw new OrderError('amount must be between 1.00 and 99999.00');
   }
   reference = String(reference || '').slice(0, 80);
-  currency = String(currency || 'INR').toUpperCase();
-  if (currency !== 'INR') return createForeignOrder({ siteId, basePaise, reference, customer, note, returnUrl, test, currency }, now);
   const settings = await db.getSettings();
   const minPaise = Math.max(MIN_BASE_PAISE, Math.round(Number(settings.min_order_amount || 0) * 100) || MIN_BASE_PAISE);
   if (basePaise < minPaise) {
@@ -142,96 +138,6 @@ async function getOrder(id) {
   return (await getById(id)) || null;
 }
 
-// Orders in another currency (e.g. GBP) are paid by card through a Razorpay Payment Link.
-// With a test key and no Razorpay test keys, the order uses our own "Simulate payment" page instead.
-async function createForeignOrder({ siteId, basePaise, reference, customer, note, returnUrl, test, currency }, now) {
-  const settings = await db.getSettings();
-  if (!razorpay.currencies(settings).includes(currency)) {
-    throw new OrderError(`${currency} is not supported (connect Razorpay and enable ${currency} in the admin panel)`, 400, 'unsupported_currency');
-  }
-  const creds = await razorpay.credentials(test);
-  if (!creds && !test) throw new OrderError(`connect Razorpay in the admin panel to accept ${currency}`, 400, 'unsupported_currency');
-  const expiresAt = now + 30 * 60000; // Razorpay links need at least ~15 minutes
-
-  const created = await db.tx(async () => {
-    if (siteId && reference) {
-      const existing = await db.get(
-        `SELECT * FROM orders WHERE site_id = ? AND reference = ? AND test = ? AND status IN ('pending', 'paid')
-         ORDER BY created_at DESC LIMIT 1`,
-        siteId, reference, test ? 1 : 0,
-      );
-      if (existing) {
-        if (existing.status === 'pending' && (existing.base_amount !== basePaise || existing.currency !== currency)) {
-          throw new OrderError('an open order with this reference has a different amount', 409, 'reference_conflict');
-        }
-        return { order: existing, existing: true };
-      }
-    }
-    const id = randomId('ord', 9);
-    await db.run(
-      `INSERT INTO orders (id, site_id, reference, base_amount, amount, account_id, status, customer_name, customer_phone,
-         customer_email, note, return_url, expires_at, created_at, test, currency, provider)
-       VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      id, siteId, reference, basePaise, basePaise,
-      String(customer.name || '').slice(0, 100), String(customer.phone || '').slice(0, 20),
-      String(customer.email || '').slice(0, 120), String(note || '').slice(0, 200), returnUrl || '',
-      expiresAt, now, test ? 1 : 0, currency, creds ? 'razorpay' : null,
-    );
-    return { order: await getById(id), existing: false };
-  });
-  if (created.existing || !creds) return created.order;
-
-  const order = created.order;
-  try {
-    const link = await razorpay.createPaymentLink(creds, {
-      amountMinor: basePaise,
-      currency,
-      referenceId: order.id,
-      description: note || (reference ? 'Order ' + reference : ''),
-      customer: { name: order.customer_name, email: order.customer_email, phone: order.customer_phone },
-      callbackUrl: `${config.baseUrl}/pay/${order.id}/razorpay-return`,
-      expireBy: expiresAt,
-    });
-    await db.run('UPDATE orders SET provider_ref = ?, provider_url = ? WHERE id = ?', link.id, link.short_url, order.id);
-    return getById(order.id);
-  } catch (err) {
-    await db.run("UPDATE orders SET status = 'cancelled' WHERE id = ?", order.id);
-    throw new OrderError('Razorpay could not create the payment: ' + err.message, 502, 'provider_error');
-  }
-}
-
-// Razorpay says the link was paid: confirm our order (safe to call twice).
-async function markProviderPaid(orderId, { paymentId = null, amountPaid = null } = {}, now = Date.now()) {
-  return db.tx(async () => {
-    const order = await getById(orderId);
-    if (!order) return null;
-    if (!['pending', 'expired'].includes(order.status)) return order;
-    return markPaid(order, { utr: paymentId, matchedBy: 'razorpay', paidAmount: amountPaid ?? order.amount }, now);
-  });
-}
-
-// Ask Razorpay directly (used when the customer comes back, and when anyone checks the status),
-// so payments confirm even if Razorpay's webhook is late or not set up. At most once per 5 s per order.
-const lastCheck = new Map();
-async function refreshProvider(order) {
-  if (!order || order.provider !== 'razorpay' || !order.provider_ref || !['pending', 'expired'].includes(order.status)) return order;
-  const last = lastCheck.get(order.id) || 0;
-  if (Date.now() - last < 5000) return order;
-  lastCheck.set(order.id, Date.now());
-  try {
-    const creds = await razorpay.credentials(!!order.test);
-    if (!creds) return order;
-    const link = await razorpay.fetchPaymentLink(creds, order.provider_ref);
-    if (link.status === 'paid') {
-      const pay = (link.payments || []).find((p) => p.status === 'captured') || (link.payments || [])[0] || {};
-      return await markProviderPaid(order.id, { paymentId: pay.payment_id || null, amountPaid: link.amount_paid || order.amount });
-    }
-  } catch (err) {
-    console.error('razorpay status check failed:', err.message);
-  }
-  return order;
-}
-
 // Must be called inside db.tx. Returns the updated order.
 async function markPaid(order, { utr = null, matchedBy, transactionId = null, paidAmount = null }, now = Date.now()) {
   const late = order.status === 'expired';
@@ -243,7 +149,7 @@ async function markPaid(order, { utr = null, matchedBy, transactionId = null, pa
   if (transactionId) await db.run("UPDATE transactions SET status = 'matched', order_id = ? WHERE id = ?", order.id, transactionId);
   const updated = await getById(order.id);
   await webhooks.enqueue(updated, 'order.paid', now);
-  const msg = `${updated.test ? '[TEST] ' : ''}Payment received ${formatMoney(updated.paid_amount, updated.currency)} for order ${updated.reference || updated.id}` +
+  const msg = `${updated.test ? '[TEST] ' : ''}Payment received ${formatINR(updated.paid_amount)} for order ${updated.reference || updated.id}` +
     `${utr ? ` (UTR ${utr})` : ''}${late ? ' — paid after the order expired' : ''}`;
   await db.logActivity('success', msg);
   db.afterCommit(() => notify('✅ ' + msg));
@@ -276,7 +182,7 @@ async function matchTransaction(txn, now = Date.now()) {
   // 1) The customer already told us their UTR.
   if (txn.utr) {
     const claimed = await db.get(
-      `SELECT * FROM orders WHERE customer_utr = ? AND test = 0 AND currency = 'INR' AND status IN ('pending', 'expired') AND created_at >= ?`,
+      `SELECT * FROM orders WHERE customer_utr = ? AND test = 0 AND status IN ('pending', 'expired') AND created_at >= ?`,
       txn.utr,
       cutoff,
     );
@@ -291,7 +197,7 @@ async function matchTransaction(txn, now = Date.now()) {
 
   // 2) Exact unique amount.
   const exact = await db.all(
-    `SELECT * FROM orders WHERE amount = ? AND test = 0 AND currency = 'INR' AND status IN ('pending', 'expired')
+    `SELECT * FROM orders WHERE amount = ? AND test = 0 AND status IN ('pending', 'expired')
        AND created_at >= ? AND created_at <= ? ORDER BY created_at DESC`,
     txn.amount,
     cutoff,
@@ -309,7 +215,7 @@ async function matchTransaction(txn, now = Date.now()) {
   // 3) Customer paid the round price without the extra paise: only safe if exactly one open order has it.
   if (settings.accept_base_amount === '1') {
     const base = await db.all(
-      `SELECT * FROM orders WHERE base_amount = ? AND test = 0 AND currency = 'INR' AND status = 'pending' AND created_at <= ?`,
+      `SELECT * FROM orders WHERE base_amount = ? AND test = 0 AND status = 'pending' AND created_at <= ?`,
       txn.amount,
       txn.received_at + 120000,
     );
@@ -454,7 +360,5 @@ module.exports = {
   manualPay,
   cancelOrder,
   simulateTestPayment,
-  markProviderPaid,
-  refreshProvider,
   identifyAccount,
 };

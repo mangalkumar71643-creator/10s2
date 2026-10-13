@@ -12,7 +12,7 @@ function publicOrder(o) {
     amount: rupees(o.base_amount),
     amount_payable: rupees(o.amount),
     amount_paid: o.paid_amount != null ? rupees(o.paid_amount) : null,
-    currency: o.currency || 'INR',
+    currency: 'INR',
     utr: o.utr || null,
     matched_by: o.matched_by || null,
     customer: { name: o.customer_name, phone: o.customer_phone, email: o.customer_email },
