@@ -4,7 +4,7 @@ import { env } from "../config/env";
 import { ApiError } from "../middleware/errorHandler";
 
 /**
- * Payment and SMS keys the admin enters in the panel (Integrations card),
+ * SMS keys the admin enters in the panel (Integrations card),
  * so they take effect without touching Vercel or redeploying. Stored in the
  * Setting table under "int:<name>"; secret ones are encrypted at rest with a
  * key derived from JWT_SECRET and are never sent back to the panel (only
@@ -12,15 +12,6 @@ import { ApiError } from "../middleware/errorHandler";
  * over the matching environment variable; clearing it falls back to that.
  */
 export const INTEGRATION_FIELDS = {
-  paymentGateway: { env: "PAYMENT_GATEWAY", secret: false },
-  paymentCurrency: { env: "PAYMENT_CURRENCY", secret: false },
-  paymentTestPhones: { env: "PAYMENT_TEST_PHONES", secret: false },
-  stripeSecretKey: { env: "STRIPE_SECRET_KEY", secret: true },
-  paypalClientId: { env: "PAYPAL_CLIENT_ID", secret: false },
-  paypalSecret: { env: "PAYPAL_SECRET", secret: true },
-  checkoutSecretKey: { env: "CHECKOUT_SECRET_KEY", secret: true },
-  checkoutPrefix: { env: "CHECKOUT_PREFIX", secret: false },
-  stockpaySecretKey: { env: "STOCKPAY_SECRET_KEY", secret: true },
   smsApiKey: { env: "SMS_API_KEY", secret: true },
   smsRoute: { env: "SMS_ROUTE", secret: false },
   smsSenderId: { env: "SMS_SENDER_ID", secret: false },

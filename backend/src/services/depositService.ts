@@ -8,13 +8,8 @@ import { env } from "../config/env";
  * deposit (after the admin has received the money). The DEPOSIT row also
  * marks the money as unplayed (database trigger, see prisma/seed.ts) so it
  * must be played before it can be withdrawn.
- *
- * With `pendingTransactionId` (a card deposit recorded as PENDING when its
- * payment page was opened), that row is claimed PENDING -> COMPLETED instead
- * of a new row being written; if it was already claimed, nothing is credited
- * again (alreadyCompleted).
  */
-export async function completeDeposit(userId: string, amount: number, provider: string, providerReferenceId: string | null, pendingTransactionId?: string) {
+export async function completeDeposit(userId: string, amount: number, provider: string, providerReferenceId: string | null) {
   return prisma.$transaction(async (tx) => {
     // Lock the wallet so two deposits at once can't both count as the
     // first (or second) and both take that bonus.
@@ -29,14 +24,7 @@ export async function completeDeposit(userId: string, amount: number, provider: 
     const percent = previousDeposits === 0 ? env.wallet.firstDepositBonusPercent : previousDeposits === 1 ? env.wallet.secondDepositBonusPercent : 0;
     const granted = Math.round(Math.min(amount * percent, env.wallet.firstDepositBonusCap) * 100) / 100;
 
-    let depositId: string;
-    if (pendingTransactionId) {
-      const claimed = await tx.transaction.updateMany({ where: { id: pendingTransactionId, userId, status: "PENDING" }, data: { status: "COMPLETED" } });
-      if (claimed.count === 0) return { depositId: pendingTransactionId, bonus: 0, alreadyCompleted: true };
-      depositId = pendingTransactionId;
-    } else {
-      depositId = (await tx.transaction.create({ data: { userId, type: "DEPOSIT", amount, status: "COMPLETED", provider, providerReferenceId } })).id;
-    }
+    const deposit = await tx.transaction.create({ data: { userId, type: "DEPOSIT", amount, status: "COMPLETED", provider, providerReferenceId } });
     await tx.wallet.update({ where: { userId }, data: { balance: { increment: amount } } });
 
     if (granted > 0) {
@@ -53,6 +41,6 @@ export async function completeDeposit(userId: string, amount: number, provider: 
       });
     }
     if (previousDeposits === 0) await tx.user.update({ where: { id: userId }, data: { firstDepositBonusClaimed: true } });
-    return { depositId, bonus: granted, alreadyCompleted: false };
+    return { depositId: deposit.id, bonus: granted };
   });
 }
