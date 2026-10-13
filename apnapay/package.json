@@ -1,5 +1,5 @@
 {
-  "name": "apnapay",
+  "name": "stockpay",
   "version": "1.0.0",
   "description": "Zero-fee UPI payment desk with automatic confirmation from bank SMS / email alerts",
   "main": "src/server.js",

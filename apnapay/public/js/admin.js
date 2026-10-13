@@ -54,7 +54,7 @@
   async function api(path, { method = 'GET', body } = {}) {
     const res = await fetch('/admin/api' + path, {
       method,
-      headers: { 'content-type': 'application/json', 'x-requested-with': 'apnapay' },
+      headers: { 'content-type': 'application/json', 'x-requested-with': 'stockpay' },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       credentials: 'same-origin',
     });
@@ -180,7 +180,7 @@
   // ---------------------------------------------------------------- auth screens
   function authScreen(inner) {
     root.innerHTML = `<div class="auth"><div class="card">
-      <div class="logo" style="justify-content:center;padding-bottom:6px"><span class="logo-mark">${icon.bolt}</span>ApnaPay</div>
+      <div class="logo" style="justify-content:center;padding-bottom:6px"><span class="logo-mark">${icon.bolt}</span>StockPay</div>
       ${inner}</div></div>`;
   }
 
@@ -245,7 +245,7 @@
     root.innerHTML = `
       <div class="shell">
         <aside class="side">
-          <div class="logo"><span class="logo-mark">${icon.bolt}</span>ApnaPay</div>
+          <div class="logo"><span class="logo-mark">${icon.bolt}</span>StockPay</div>
           <nav class="nav">${NAV.map((n) => `<a href="#/${n.id}" data-nav="${n.id}">${icon[n.icon]}${n.label}<span class="count" data-badge="${n.id}" hidden></span></a>`).join('')}</nav>
           <div class="side-foot">
             <div class="bold" id="bizName">…</div>
@@ -843,7 +843,7 @@
         </div>
         <div class="card">
           <h2>Set up a phone (2 minutes)</h2>
-          <div class="notice ok" style="margin:10px 0 16px">${icon.check}<div class="small"><b>Easiest: ApnaPay Admin app.</b> Install the app on the phone that gets bank SMS → open <b>Phones</b> → tap <b>"Use THIS phone as SMS reader"</b> → allow SMS → done.</div></div>
+          <div class="notice ok" style="margin:10px 0 16px">${icon.check}<div class="small"><b>Easiest: StockPay Admin app.</b> Install the app on the phone that gets bank SMS → open <b>Phones</b> → tap <b>"Use THIS phone as SMS reader"</b> → allow SMS → done.</div></div>
           <p class="small muted" style="margin:0 0 12px">Or use any SMS-to-URL forwarder app:</p>
           <ol class="steps-list">
             <li><div>Install <b>"SMS to URL Forwarder"</b> from F-Droid or Play Store (or any app that can POST SMS to a URL).</div></li>
@@ -906,9 +906,9 @@
     const yesNo = (v, yes, no) => (v === 1 ? `<span class="badge live">${yes}</span>` : v === 0 ? `<span class="badge bad">${no}</span>` : '');
     const phones = act.phones.map((p) => {
       const warn = [];
-      if (p.sms_permission === 0) warn.push(`<b>SMS permission OFF.</b> Phone par app → More → SMS reader → <b>Allow SMS permission</b>. Android 13+: Settings → Apps → ApnaPay Admin → ⋮ → <b>Allow restricted settings</b>, phir permission do.`);
+      if (p.sms_permission === 0) warn.push(`<b>SMS permission OFF.</b> Phone par app → More → SMS reader → <b>Allow SMS permission</b>. Android 13+: Settings → Apps → StockPay Admin → ⋮ → <b>Allow restricted settings</b>, phir permission do.`);
       if (p.reader_enabled === 0) warn.push('SMS reader is turned <b>OFF</b> on this phone.');
-      if (!p.app_version) warn.push('Status unknown — install the latest ApnaPay Admin app (v1.3+) on this phone and open SMS reader once.');
+      if (!p.app_version) warn.push('Status unknown — install the latest StockPay Admin app (v1.3+) on this phone and open SMS reader once.');
       else if (!p.today.read && !p.last_sms_at) warn.push('Phone ne abhi tak koi SMS nahi padha. Ek ₹1 payment karke dekho, ya SMS reader mein <b>Sync last 24h SMS</b> dabao.');
       return `
         <div class="card stack" style="gap:12px">

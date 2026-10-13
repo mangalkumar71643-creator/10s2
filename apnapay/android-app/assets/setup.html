@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ApnaPay Admin</title>
+  <title>StockPay Admin</title>
   <style>
     :root { --brand:#5b4cf0; --brand2:#8b5cf6; --bg:#f4f5fb; --surface:#fff; --text:#0f172a; --muted:#64748b; --border:#e5e7f0; --bad:#dc2f45; --badsoft:#ffe8eb; --ok:#14a35a; }
     @media (prefers-color-scheme: dark) { :root { --bg:#0b0d16; --surface:#141724; --text:#e8eaf3; --muted:#9aa3b8; --border:#262b3d; --badsoft:#3a1820; --bad:#ff6b7d; } }
@@ -32,8 +32,8 @@
 </head>
 <body>
   <div class="card">
-    <div class="logo"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span>ApnaPay Admin</div>
-    <p class="sub">Apne ApnaPay server ka address daalein</p>
+    <div class="logo"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 14h6l-1 7 8-11h-6z"/></svg></span>StockPay Admin</div>
+    <p class="sub">Apne StockPay server ka address daalein</p>
     <div class="err" id="err" hidden></div>
     <form id="f">
       <label for="url">Server address</label>
@@ -52,7 +52,7 @@
     const err = document.getElementById('err');
     const btn = document.getElementById('go');
     const saved = params.get('server') || (window.ApnaPayApp ? ApnaPayApp.getServer() : '');
-    input.value = saved || 'https://apnapay.vercel.app'; // your live ApnaPay server
+    input.value = saved || 'https://apnapay.vercel.app'; // your live StockPay server
     if (params.get('error')) { err.textContent = params.get('error'); err.hidden = false; btn.textContent = 'Try again'; }
 
     function normalise(v) {
@@ -73,10 +73,10 @@
         const r = await fetch(url + '/health', { signal: ctrl.signal, cache: 'no-store' });
         clearTimeout(t);
         const data = await r.json();
-        if (!data.ok) throw new Error('not ApnaPay');
+        if (!data.ok) throw new Error('not StockPay');
         window.ApnaPayApp.saveServer(url);
       } catch (ex) {
-        err.textContent = 'Is address par ApnaPay server nahi mila. Check karo: server chalu hai, phone aur computer ek hi WiFi par hain, aur address sahi hai.';
+        err.textContent = 'Is address par StockPay server nahi mila. Check karo: server chalu hai, phone aur computer ek hi WiFi par hain, aur address sahi hai.';
         err.hidden = false;
         btn.disabled = false;
         btn.textContent = 'Connect';

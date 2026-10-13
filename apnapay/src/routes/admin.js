@@ -44,7 +44,7 @@ const mapAll = (rows, fn) => Promise.all(rows.map(fn));
 
 // Custom header blocks cross-site form posts (CSRF); the session cookie is also SameSite=Strict.
 router.use((req, res, next) => {
-  if (req.method !== 'GET' && req.headers['x-requested-with'] !== 'apnapay') {
+  if (req.method !== 'GET' && !['stockpay', 'apnapay'].includes(req.headers['x-requested-with'])) {
     return res.status(403).json({ error: 'Missing X-Requested-With header' });
   }
   next();
@@ -421,16 +421,14 @@ router.post('/sites/:id/new-secret', h(async (req) => {
 router.post('/sites/:id/test-webhook', h(async (req) => {
   const s = await db.get('SELECT * FROM sites WHERE id = ?', Number(req.params.id));
   if (!s || !s.webhook_url) throw bad('Add a webhook URL first');
-  const payload = JSON.stringify({ event: 'test', created_at: new Date().toISOString(), message: 'Hello from ApnaPay' });
+  const payload = JSON.stringify({ event: 'test', created_at: new Date().toISOString(), message: 'Hello from StockPay' });
   const ts = Math.floor(Date.now() / 1000).toString();
   try {
     const r = await fetch(s.webhook_url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-apnapay-event': 'test',
-        'x-apnapay-timestamp': ts,
-        'x-apnapay-signature': webhooks.sign(s.webhook_secret, ts, payload),
+        ...webhooks.signedHeaders('test', ts, webhooks.sign(s.webhook_secret, ts, payload)),
       },
       body: payload,
       signal: AbortSignal.timeout(10000),
@@ -625,7 +623,7 @@ router.put('/settings', h(async (req) => {
 }));
 
 router.post('/settings/telegram-test', h(async () => {
-  const ok = await notify('👋 ApnaPay test message — alerts are working!');
+  const ok = await notify('👋 StockPay test message — alerts are working!');
   if (!ok) throw bad('Could not send. Check the bot token and chat id, and send /start to your bot once.');
 }));
 
@@ -649,7 +647,7 @@ router.post('/security/2fa/start', h(async () => {
   if (a.totp_enabled) throw bad('2FA is already on');
   const secret = auth.generateTotpSecret();
   await db.run('UPDATE admin SET totp_secret = ? WHERE id = 1', secret);
-  const uri = auth.totpUri(secret, a.username, 'ApnaPay');
+  const uri = auth.totpUri(secret, a.username, 'StockPay');
   return { secret, qr: 'data:image/svg+xml;base64,' + Buffer.from(await qrSvg(uri)).toString('base64') };
 }));
 

@@ -12,10 +12,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** Sends queued bank SMS to the ApnaPay server. Anything that fails stays queued for the next try. */
+/** Sends queued bank SMS to the StockPay server. Anything that fails stays queued for the next try. */
 final class SmsSender {
     private static final Object LOCK = new Object();
-    static final String VERSION = "1.3";
+    static final String VERSION = "1.4";
 
     private SmsSender() {}
 

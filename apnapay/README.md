@@ -1,4 +1,4 @@
-# ApnaPay ⚡ — Zero-fee UPI payment desk
+# StockPay ⚡ — Zero-fee UPI payment desk
 
 Apni website par **seedha apne bank account mein UPI payment lo (0% fee)**, aur payment **apne aap confirm** ho jaye.
 Bank ka SMS ya email padhkar system order ko "Paid" karta hai, aur aapki product website ko turant khabar deta hai.
@@ -11,7 +11,7 @@ Bank ka SMS ya email padhkar system order ko "Paid" karta hai, aur aapki product
 ## Ye kaise kaam karta hai
 
 ```
-Product website ──(1) order banao (API)──▶ ApnaPay ──(2) QR / UPI link──▶ Customer pays (PhonePe/GPay/Paytm)
+Product website ──(1) order banao (API)──▶ StockPay ──(2) QR / UPI link──▶ Customer pays (PhonePe/GPay/Paytm)
                                               ▲                                       │
                                               │(3) bank SMS / email                    ▼
                                          Phone listener / Email worker ◀────── Aapka bank account
@@ -70,9 +70,9 @@ Browser mein `http://localhost:3000/admin` kholo. Pehli baar admin username/pass
 
 Tests chalane ke liye: `npm test`
 
-## 📱 Admin panel Android app (ApnaPay-Admin.apk)
+## 📱 Admin panel Android app (StockPay-Admin.apk)
 
-1. `ApnaPay-Admin.apk` ko phone mein copy karke install karo. Phone **"Unknown apps install karne ki permission"** maangega, use allow karo.
+1. `StockPay-Admin.apk` ko phone mein copy karke install karo. Phone **"Unknown apps install karne ki permission"** maangega, use allow karo.
 2. App kholo aur server ka address daalo:
    - **Test (same WiFi):** computer par server chalao. Terminal mein **"Phone se kholo: http://192.168.x.x:3000"** dikhega, wahi daalo. Windows Firewall poochhe to **Allow** karo.
    - **Online:** apna domain daalo, jaise `https://pay.yourdomain.in`
@@ -114,7 +114,7 @@ ANDROID_HOME=/path/to/android-sdk sh android-app/build-apk.sh
 1. **Vercel par project banao:** is code ko Vercel par deploy karo. GitHub se import karo, ya Claude ki madad se seedha deploy karo. `vercel.json` pehle se bana hua hai, kuch set nahi karna.
 2. **Neon database jodo:** Vercel dashboard → project → **Storage** → **Create Database** → **Neon** → apne project se **Connect** karo. Vercel `DATABASE_URL` apne aap daal deta hai.
 3. **Redeploy** karo (Deployments → ⋯ → Redeploy).
-4. `https://<aapka-project>.vercel.app/admin` kholo. Ye address **ApnaPay Admin app** mein bhi daalo.
+4. `https://<aapka-project>.vercel.app/admin` kholo. Ye address **StockPay Admin app** mein bhi daalo.
 5. (Optional) Settings → Environment Variables:
    - `CRON_SECRET` = koi bhi random text (daily cron ko surakshit karta hai)
    - `BASE_URL` = apna domain, agar custom domain lagaya hai
@@ -125,16 +125,16 @@ ANDROID_HOME=/path/to/android-sdk sh android-app/build-apk.sh
 
 ### Apna server (VPS / Termux)
 
-Bina `DATABASE_URL` ke ApnaPay apna andar wala database (PGlite) `data/` folder mein chalata hai, jo computer, Termux aur VPS par kaam karta hai. Kisi bhi Postgres ka `DATABASE_URL` doge to wo use hoga.
+Bina `DATABASE_URL` ke StockPay apna andar wala database (PGlite) `data/` folder mein chalata hai, jo computer, Termux aur VPS par kaam karta hai. Kisi bhi Postgres ka `DATABASE_URL` doge to wo use hoga.
 
 **VPS par (Ubuntu) example:**
 
 ```bash
 # Node 22 install karke
-git clone <this repo> apnapay && cd apnapay
+git clone <this repo> stockpay && cd stockpay
 npm ci --omit=dev
 cp .env.example .env      # BASE_URL=https://pay.yourdomain.in, TRUST_PROXY=1
-npm install -g pm2 && pm2 start npm --name apnapay -- start && pm2 save && pm2 startup
+npm install -g pm2 && pm2 start npm --name stockpay -- start && pm2 save && pm2 startup
 ```
 
 HTTPS ke liye **Caddy** sabse aasaan hai. `/etc/caddy/Caddyfile` mein:
@@ -148,9 +148,9 @@ pay.yourdomain.in {
 **Docker se:**
 
 ```bash
-docker build -t apnapay .
-docker run -d --name apnapay -p 3000:3000 -v apnapay-data:/app/data \
-  -e BASE_URL=https://pay.yourdomain.in -e TRUST_PROXY=1 apnapay
+docker build -t stockpay .
+docker run -d --name stockpay -p 3000:3000 -v stockpay-data:/app/data \
+  -e BASE_URL=https://pay.yourdomain.in -e TRUST_PROXY=1 stockpay
 ```
 
 **Backup:** `data/` folder (ya Docker volume) ka roz backup lo. Saare orders usi mein hain.
@@ -165,7 +165,7 @@ docker run -d --name apnapay -p 3000:3000 -v apnapay-data:/app/data \
    - QR ka screenshot upload karo. UPI ID apne aap bhar jayegi.
    - Bank, last 4 digits, SMS sender ID (jaise `KOTAKB`) aur phone chuno.
    - Share aur daily limit set karo (Fino ke liye ₹2 lakh se kam rakhna).
-4. **Phone mein SMS reader lagao:** sabse aasaan tareeka **ApnaPay Admin app** hai (upar dekho: "SMS Reader"). Ya koi bhi SMS forwarder app:
+4. **Phone mein SMS reader lagao:** sabse aasaan tareeka **StockPay Admin app** hai (upar dekho: "SMS Reader"). Ya koi bhi SMS forwarder app:
    - Android par **"SMS to URL Forwarder"** app install karo (F-Droid/Play Store, free, open-source).
    - Rule banao: Sender = `KOTAKB` (aapke bank ka ID), URL = admin ke **Phones** page se copy kiya hua URL.
    - App ko SMS permission do, aur **battery optimisation OFF** karo.
@@ -179,7 +179,7 @@ docker run -d --name apnapay -p 3000:3000 -v apnapay-data:/app/data \
 ### Email alerts (phone band ho tab bhi chalega)
 
 1. Apne domain ko Cloudflare par lagao, aur **Email Routing** ON karo.
-2. `examples/cloudflare-email-worker.js` ko ek Worker banao. Variable `APNAPAY_EMAIL_URL` mein **Settings → Bank email alerts** wala URL daalo.
+2. `examples/cloudflare-email-worker.js` ko ek Worker banao. Variable `STOCKPAY_EMAIL_URL` mein **Settings → Bank email alerts** wala URL daalo.
 3. Ek address banao jaise `alerts-x7k2@yourdomain.in` (thoda random naam rakho) aur use Worker par bhejo.
 4. Gmail filter se bank ke credit emails us address par forward karo, ya bank mein seedha wahi email register karo.
 5. **Settings → Trusted bank email domains** mein apne bank ka domain hona chahiye.
@@ -240,10 +240,10 @@ Payment confirm hote hi aapke webhook URL par ye `POST` aata hai:
 }
 ```
 
-Headers ye honge: `X-ApnaPay-Signature: sha256=<hex>`, `X-ApnaPay-Timestamp`, `X-ApnaPay-Event`, `X-ApnaPay-Delivery`.
+Headers ye honge: `X-StockPay-Signature: sha256=<hex>`, `X-StockPay-Timestamp`, `X-StockPay-Event`, `X-StockPay-Delivery`.
 
 - **Signature zaroor check karo.** `HMAC_SHA256(webhook_secret, timestamp + "." + raw_body)` banao aur header se milao.
-- **2xx** jawab do. Agar aapki site down ho, to ApnaPay 1 min, 5 min, 30 min, 2 ghante… tak dobara bhejta rahega.
+- **2xx** jawab do. Agar aapki site down ho, to StockPay 1 min, 5 min, 30 min, 2 ghante… tak dobara bhejta rahega.
 - Ek hi order ka webhook do baar aa sakta hai. Isliye "already paid hai to kuch mat karo" wala check rakho.
 - `return_url` par aaye `?status=paid` par **bharosa mat karo**. Webhook ya API se confirm karo.
 
@@ -262,9 +262,9 @@ function verify(rawBody, timestamp, signature, secret) {
 
 ```php
 $raw = file_get_contents('php://input');
-$ts  = $_SERVER['HTTP_X_APNAPAY_TIMESTAMP'] ?? '';
-$sig = $_SERVER['HTTP_X_APNAPAY_SIGNATURE'] ?? '';
-$expected = 'sha256=' . hash_hmac('sha256', $ts . '.' . $raw, getenv('APNAPAY_WEBHOOK_SECRET'));
+$ts  = $_SERVER['HTTP_X_STOCKPAY_TIMESTAMP'] ?? '';
+$sig = $_SERVER['HTTP_X_STOCKPAY_SIGNATURE'] ?? '';
+$expected = 'sha256=' . hash_hmac('sha256', $ts . '.' . $raw, getenv('STOCKPAY_WEBHOOK_SECRET'));
 if (abs(time() - (int)$ts) > 300 || !hash_equals($expected, $sig)) { http_response_code(401); exit; }
 $event = json_decode($raw, true);
 if ($event['event'] === 'order.paid') {
@@ -276,7 +276,7 @@ http_response_code(200);
 **Poora chalta hua example:** `examples/shop-demo/server.js`. Ye ek chhoti dukaan hai jo order banati hai, webhook verify karti hai, aur product SOLD karke stock kam karti hai.
 
 ```bash
-APNAPAY_URL=http://localhost:3000 APNAPAY_API_KEY=sk_live_… APNAPAY_WEBHOOK_SECRET=whsec_… npm run demo-shop
+STOCKPAY_URL=http://localhost:3000 STOCKPAY_API_KEY=sk_live_… STOCKPAY_WEBHOOK_SECRET=whsec_… npm run demo-shop
 # phir http://localhost:4000 kholo
 ```
 

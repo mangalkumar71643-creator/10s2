@@ -48,7 +48,7 @@ function logSms(device, { sender = '', text = '', status, reason = '', amount = 
 }
 
 // Heartbeat, so the admin panel can show whether the phone is online (call it from MacroDroid/Tasker).
-// The ApnaPay app also reports its SMS permission and queue here (?perm=1&read=1&on=1&queue=0&v=1.3).
+// The StockPay app also reports its SMS permission and queue here (?perm=1&read=1&on=1&queue=0&v=1.3).
 router.all('/ping/:token', async (req, res) => {
   const device = await findDevice(req.params.token);
   if (!device) return res.status(404).json({ ok: false });

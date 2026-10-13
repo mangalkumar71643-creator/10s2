@@ -1,16 +1,16 @@
-// Demo PRODUCT WEBSITE that takes payments through ApnaPay.
+// Demo PRODUCT WEBSITE that takes payments through StockPay.
 // No dependencies — copy the 3 marked parts into your real shop (any language works the same way).
 //
-//   APNAPAY_URL=http://localhost:3000 APNAPAY_API_KEY=sk_live_... APNAPAY_WEBHOOK_SECRET=whsec_... node examples/shop-demo/server.js
+//   STOCKPAY_URL=http://localhost:3000 STOCKPAY_API_KEY=sk_live_... STOCKPAY_WEBHOOK_SECRET=whsec_... node examples/shop-demo/server.js
 //
-// In ApnaPay → Websites, set Webhook URL = http://localhost:4000/webhooks/apnapay
+// In StockPay → Websites, set Webhook URL = http://localhost:4000/webhooks/stockpay
 
 const http = require('node:http');
 const crypto = require('node:crypto');
 
-const APNAPAY_URL = (process.env.APNAPAY_URL || 'http://localhost:3000').replace(/\/$/, '');
-const API_KEY = process.env.APNAPAY_API_KEY || '';
-const WEBHOOK_SECRET = process.env.APNAPAY_WEBHOOK_SECRET || '';
+const STOCKPAY_URL = (process.env.STOCKPAY_URL || 'http://localhost:3000').replace(/\/$/, '');
+const API_KEY = process.env.STOCKPAY_API_KEY || '';
+const WEBHOOK_SECRET = process.env.STOCKPAY_WEBHOOK_SECRET || '';
 const PORT = Number(process.env.SHOP_PORT || 4000);
 const SHOP_URL = process.env.SHOP_URL || `http://localhost:${PORT}`;
 
@@ -20,11 +20,11 @@ const products = new Map([
   ['earbuds', { id: 'earbuds', name: 'Wireless Earbuds', price: 1299, stock: 2 }],
   ['mug', { id: 'mug', name: 'Coffee Mug', price: 149, stock: 10 }],
 ]);
-const shopOrders = new Map(); // reference -> { productId, status, apnapayId }
+const shopOrders = new Map(); // reference -> { productId, status, stockpayId }
 
-// ---- PART 1: create the payment on ApnaPay (server side, keeps the API key secret) -------------
+// ---- PART 1: create the payment on StockPay (server side, keeps the API key secret) -------------
 async function createPayment(product, reference, customerName) {
-  const res = await fetch(`${APNAPAY_URL}/api/v1/orders`, {
+  const res = await fetch(`${STOCKPAY_URL}/api/v1/orders`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${API_KEY}` },
     body: JSON.stringify({
@@ -40,7 +40,7 @@ async function createPayment(product, reference, customerName) {
   return data; // { id, payment_url, amount_payable, ... }
 }
 
-// ---- PART 2: verify the webhook really came from ApnaPay ------------------------------------
+// ---- PART 2: verify the webhook really came from StockPay ------------------------------------
 function verifySignature(rawBody, timestamp, signature) {
   if (!timestamp || !signature) return false;
   if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false; // older than 5 min = replay
@@ -94,28 +94,28 @@ http
         const reference = 'SHOP-' + Date.now().toString(36).toUpperCase();
         shopOrders.set(reference, { productId: product.id, status: 'pending' });
         const payment = await createPayment(product, reference, 'Demo customer');
-        shopOrders.get(reference).apnapayId = payment.id;
+        shopOrders.get(reference).stockpayId = payment.id;
         res.writeHead(303, { location: payment.payment_url }); // send the customer to pay
         return res.end();
       }
 
-      if (req.method === 'POST' && url.pathname === '/webhooks/apnapay') {
+      if (req.method === 'POST' && url.pathname === '/webhooks/stockpay') {
         const raw = await readBody(req);
-        if (!verifySignature(raw, req.headers['x-apnapay-timestamp'], req.headers['x-apnapay-signature'])) {
+        if (!verifySignature(raw, req.headers['x-stockpay-timestamp'], req.headers['x-stockpay-signature'])) {
           console.warn('❌ Rejected webhook with bad signature');
           return res.writeHead(401).end('bad signature');
         }
         const event = JSON.parse(raw);
         if (event.event === 'order.paid') fulfil(event.order.reference, event.order);
-        return res.writeHead(200).end('ok'); // any 2xx = received; otherwise ApnaPay retries
+        return res.writeHead(200).end('ok'); // any 2xx = received; otherwise StockPay retries
       }
 
       if (req.method === 'GET' && url.pathname === '/thanks') {
-        // Never trust ?status= in the URL — ask ApnaPay (or rely on the webhook).
+        // Never trust ?status= in the URL — ask StockPay (or rely on the webhook).
         const reference = url.searchParams.get('reference');
         const order = shopOrders.get(reference);
-        if (order && order.apnapayId && order.status !== 'paid') {
-          const r = await fetch(`${APNAPAY_URL}/api/v1/orders/${order.apnapayId}`, { headers: { authorization: `Bearer ${API_KEY}` } });
+        if (order && order.stockpayId && order.status !== 'paid') {
+          const r = await fetch(`${STOCKPAY_URL}/api/v1/orders/${order.stockpayId}`, { headers: { authorization: `Bearer ${API_KEY}` } });
           const data = await r.json();
           if (data.status === 'paid') fulfil(reference, data);
         }
@@ -131,4 +131,4 @@ http
       res.writeHead(500).end('Error: ' + err.message);
     }
   })
-  .listen(PORT, () => console.log(`Demo shop on ${SHOP_URL} (talking to ${APNAPAY_URL})`));
+  .listen(PORT, () => console.log(`Demo shop on ${SHOP_URL} (talking to ${STOCKPAY_URL})`));

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Builds ApnaPay-Admin.apk without Gradle. Needs: JDK 17+, Android SDK with
+# Builds StockPay-Admin.apk without Gradle. Needs: JDK 17+, Android SDK with
 #   platforms;android-35 and build-tools;35.0.0   (ANDROID_HOME points to the SDK)
 #
 #   ANDROID_HOME=/path/to/android-sdk sh build-apk.sh
@@ -34,10 +34,10 @@ echo "4/6 Align"
 echo "5/6 Sign"
 if [ ! -f "$KEYSTORE" ]; then
   keytool -genkeypair -keystore "$KEYSTORE" -alias apnapay -keyalg RSA -keysize 2048 -validity 10000 \
-    -storepass "$KEYPASS" -keypass "$KEYPASS" -dname "CN=ApnaPay Admin, O=ApnaPay, C=IN" >/dev/null 2>&1
+    -storepass "$KEYPASS" -keypass "$KEYPASS" -dname "CN=StockPay Admin, O=StockPay, C=IN" >/dev/null 2>&1
 fi
-"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass "pass:$KEYPASS" --ks-key-alias apnapay --out ApnaPay-Admin.apk "$OUT/aligned.apk"
+"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass "pass:$KEYPASS" --ks-key-alias apnapay --out StockPay-Admin.apk "$OUT/aligned.apk"
 
 echo "6/6 Verify"
-"$BT/apksigner" verify ApnaPay-Admin.apk
-echo "Done: $(pwd)/ApnaPay-Admin.apk"
+"$BT/apksigner" verify StockPay-Admin.apk
+echo "Done: $(pwd)/StockPay-Admin.apk"

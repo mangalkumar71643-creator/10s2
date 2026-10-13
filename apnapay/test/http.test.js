@@ -35,7 +35,7 @@ test('full payment flow', async (t) => {
   const admin = async (path, method = 'GET', body) => {
     const r = await fetch(base + '/admin/api' + path, {
       method,
-      headers: { 'content-type': 'application/json', 'x-requested-with': 'apnapay', cookie },
+      headers: { 'content-type': 'application/json', 'x-requested-with': 'stockpay', cookie },
       body: body ? JSON.stringify(body) : undefined,
     });
     const sc = r.headers.get('set-cookie');
@@ -104,8 +104,8 @@ test('full payment flow', async (t) => {
   await webhooks.processDue();
   assert.equal(received.length, 1);
   const { headers, body } = received[0];
-  const expected = 'sha256=' + crypto.createHmac('sha256', site.webhook_secret).update(`${headers['x-apnapay-timestamp']}.${body}`).digest('hex');
-  assert.equal(headers['x-apnapay-signature'], expected);
+  const expected = 'sha256=' + crypto.createHmac('sha256', site.webhook_secret).update(`${headers['x-stockpay-timestamp']}.${body}`).digest('hex');
+  assert.equal(headers['x-stockpay-signature'], expected);
   const event = JSON.parse(body);
   assert.equal(event.event, 'order.paid');
   assert.equal(event.order.reference, 'P-101');
@@ -208,7 +208,7 @@ test('live and test API keys: test orders never touch real money', async (t) => 
 
   let cookie = '';
   const admin = async (path, method = 'GET', body) => {
-    const r = await fetch(base + '/admin/api' + path, { method, headers: { 'content-type': 'application/json', 'x-requested-with': 'apnapay', cookie }, body: body ? JSON.stringify(body) : undefined });
+    const r = await fetch(base + '/admin/api' + path, { method, headers: { 'content-type': 'application/json', 'x-requested-with': 'stockpay', cookie }, body: body ? JSON.stringify(body) : undefined });
     const sc = r.headers.get('set-cookie');
     if (sc) cookie = sc.split(';')[0];
     return { status: r.status, data: await r.json() };

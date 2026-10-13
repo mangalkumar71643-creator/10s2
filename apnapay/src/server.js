@@ -31,7 +31,7 @@ function createApp() {
   app.use(express.text({ type: ['text/*', 'message/rfc822'], limit: '1mb' }));
 
   // CORS so the Android admin app's setup screen can check the address.
-  app.get('/health', (req, res) => res.set('Access-Control-Allow-Origin', '*').json({ ok: true, app: 'apnapay' }));
+  app.get('/health', (req, res) => res.set('Access-Control-Allow-Origin', '*').json({ ok: true, app: 'stockpay' }));
   // Vercel Cron (daily) safety net for webhook retries. Vercel sends "Authorization: Bearer $CRON_SECRET".
   app.get('/cron/webhooks', async (req, res) => {
     if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -79,9 +79,9 @@ if (require.main === module) {
   webhooks.startWorker(config.webhookWorkerIntervalMs);
   setInterval(() => orders.expireStale().catch(() => {}), 60000).unref();
   app.listen(config.port, () => {
-    console.log(`ApnaPay running on ${config.baseUrl}`);
+    console.log(`StockPay running on ${config.baseUrl}`);
     console.log(`Admin panel (computer): http://localhost:${config.port}/admin`);
-    if (config.lanUrl) console.log(`Phone se kholo (same WiFi): ${config.lanUrl}  <- ApnaPay Admin app mein ye daalein`);
+    if (config.lanUrl) console.log(`Phone se kholo (same WiFi): ${config.lanUrl}  <- StockPay Admin app mein ye daalein`);
   });
 }
 

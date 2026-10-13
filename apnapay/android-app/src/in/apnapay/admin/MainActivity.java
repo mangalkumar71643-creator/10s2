@@ -29,7 +29,7 @@ import android.widget.Toast;
 import org.json.JSONObject;
 
 /**
- * ApnaPay Admin: opens the admin panel of your ApnaPay server in a full-screen app.
+ * StockPay Admin: opens the admin panel of your StockPay server in a full-screen app.
  * First launch shows a setup screen (assets/setup.html) where you enter the server address.
  */
 public class MainActivity extends Activity {

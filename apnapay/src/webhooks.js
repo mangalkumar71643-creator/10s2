@@ -7,6 +7,19 @@ const { publicOrder } = require('./serialize');
 // (phone heartbeats every 15 min, bank SMS, admin panel), plus the daily cron as a safety net.
 const RETRY_DELAYS_MS = [0, 60e3, 5 * 60e3, 30 * 60e3, 2 * 3600e3, 6 * 3600e3, 12 * 3600e3, 24 * 3600e3];
 
+// X-StockPay-* headers, plus the same values under the old X-ApnaPay-* names so shops that were
+// connected before the rename keep verifying webhooks without any change.
+function signedHeaders(event, timestamp, signature, deliveryId) {
+  const out = {};
+  for (const brand of ['stockpay', 'apnapay']) {
+    out[`x-${brand}-event`] = event;
+    out[`x-${brand}-timestamp`] = timestamp;
+    out[`x-${brand}-signature`] = signature;
+    if (deliveryId != null) out[`x-${brand}-delivery`] = String(deliveryId);
+  }
+  return out;
+}
+
 function sign(secret, timestamp, body) {
   return 'sha256=' + crypto.createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
 }
@@ -40,11 +53,8 @@ async function deliver(delivery) {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'user-agent': 'ApnaPay-Webhook/1.0',
-          'x-apnapay-event': delivery.event,
-          'x-apnapay-delivery': String(delivery.id),
-          'x-apnapay-timestamp': timestamp,
-          'x-apnapay-signature': sign(site.webhook_secret, timestamp, delivery.payload),
+          'user-agent': 'StockPay-Webhook/1.0',
+          ...signedHeaders(delivery.event, timestamp, sign(site.webhook_secret, timestamp, delivery.payload), delivery.id),
         },
         body: delivery.payload,
         redirect: 'manual',
@@ -115,4 +125,4 @@ function startWorker(intervalMs) {
   return timer;
 }
 
-module.exports = { sign, enqueue, processDue, retryNow, startWorker, RETRY_DELAYS_MS };
+module.exports = { signedHeaders, sign, enqueue, processDue, retryNow, startWorker, RETRY_DELAYS_MS };
