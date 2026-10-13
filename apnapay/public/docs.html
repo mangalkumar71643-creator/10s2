@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#5b4cf0">
+  <title>StockPay API Reference</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <style>
+    body { background: var(--bg); }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: clamp(26px, 5vw, 36px); letter-spacing: -.02em; margin: 0 0 6px; }
+    h2 { font-size: 21px; margin: 40px 0 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+    h3 { font-size: 16px; margin: 22px 0 8px; }
+    p, li { color: var(--text); line-height: 1.6; font-size: 15px; }
+    .muted { color: var(--muted); }
+    pre { background: #0f172a; color: #e2e8f0; padding: 14px 16px; border-radius: 12px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+    p code, li code, td code { background: var(--surface-2); padding: 1px 6px; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; }
+    .tbl { overflow-x: auto; }
+    .m { display: inline-block; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 6px; margin-right: 6px; }
+    .post { background: #dcfce7; color: #166534; } .get { background: #dbeafe; color: #1e40af; }
+    .box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; }
+    .toc a { display: inline-block; margin: 0 12px 6px 0; font-size: 14px; }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <h1>StockPay API Reference</h1>
+  <p class="muted">Accept UPI payments in INR through a hosted payment page. REST + JSON, server-to-server.</p>
+  <div class="toc">
+    <a href="#base">Base URL</a><a href="#auth">Authentication</a><a href="#create">Create payment</a><a href="#get">Get payment</a>
+    <a href="#statuses">Statuses</a><a href="#test">Test mode</a><a href="#currency">Currencies</a><a href="#webhooks">Webhooks</a><a href="#errors">Errors</a><a href="#node">Node.js example</a>
+  </div>
+
+  <h2 id="base">Base URL</h2>
+  <pre>https://<span id="host">stockpay-in.vercel.app</span>/api/v1</pre>
+  <p>The <b>same base URL</b> is used for test (sandbox) and live. The API key decides the mode: <code>sk_test_…</code> creates test payments, <code>sk_live_…</code> creates real ones. Test and live payments are kept apart — a key can only see payments made in its own mode.</p>
+
+  <h2 id="auth">Authentication</h2>
+  <p>Send your secret key as a Bearer token on every request. There is no separate merchant ID or client ID — the key identifies your account.</p>
+  <pre>Authorization: Bearer sk_test_xxxxxxxxxxxxxxxx
+Content-Type: application/json</pre>
+  <p>Keys are in the StockPay admin panel → <b>API Keys</b>. Keep them on your server only (never in a mobile app or browser code). Missing/invalid key → <code>401 unauthorized</code>.</p>
+
+  <h2 id="create">Create a payment (hosted payment page)</h2>
+  <p><span class="m post">POST</span><code>/orders</code></p>
+  <div class="tbl"><table>
+    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+    <tr><td><code>amount</code> <b>required</b></td><td>number | string</td><td>Amount in rupees, e.g. <code>499</code> or <code>"499.00"</code>. Minimum is set by the merchant (currently ₹100). Max ₹99,999.</td></tr>
+    <tr><td><code>currency</code></td><td>string</td><td>Optional. Only <code>"INR"</code> is accepted; anything else → <code>400 unsupported_currency</code>.</td></tr>
+    <tr><td><code>reference</code></td><td>string ≤ 80</td><td>Your order ID. Idempotent: sending the same reference again returns the existing pending/paid payment instead of a new one.</td></tr>
+    <tr><td><code>customer</code></td><td>object</td><td>Optional <code>{ "name", "phone", "email" }</code>.</td></tr>
+    <tr><td><code>note</code></td><td>string ≤ 200</td><td>Optional, shown on the payment page.</td></tr>
+    <tr><td><code>return_url</code></td><td>https URL</td><td>Where the customer is sent after paying. We append <code>?order_id=…&amp;reference=…&amp;status=…</code> — do not trust these values, confirm with <a href="#get">Get payment</a> or the webhook.</td></tr>
+  </table></div>
+  <h3>Request</h3>
+  <pre>curl -X POST https://stockpay-in.vercel.app/api/v1/orders \
+  -H "Authorization: Bearer sk_test_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{ "amount": 499, "currency": "INR", "reference": "ORD-1001",
+        "customer": { "name": "Rahul", "email": "rahul@example.com" },
+        "return_url": "https://yourapp.com/payment/return" }'</pre>
+  <h3>Response <code>201 Created</code></h3>
+  <pre>{
+  "id": "ord_Ab12Cd34Ef56",
+  "reference": "ORD-1001",
+  "status": "pending",
+  "amount": "499.00",
+  "amount_payable": "499.37",
+  "amount_paid": null,
+  "currency": "INR",
+  "utr": null,
+  "matched_by": null,
+  "customer": { "name": "Rahul", "phone": "", "email": "rahul@example.com" },
+  "note": "",
+  "payment_url": "https://stockpay-in.vercel.app/pay/ord_Ab12Cd34Ef56",
+  "created_at": "2026-10-13T10:00:00.000Z",
+  "expires_at": "2026-10-13T10:15:00.000Z",
+  "paid_at": null,
+  "test": true
+}</pre>
+  <p>Redirect the customer to <code>payment_url</code>. The page expires at <code>expires_at</code> (15 minutes by default). In live mode <code>amount_payable</code> includes up to ₹0.99 extra so each payment can be identified; the customer pays that exact amount.</p>
+
+  <h2 id="get">Get a payment's status</h2>
+  <p><span class="m get">GET</span><code>/orders/{id}</code> — returns the same object as above.</p>
+  <p><span class="m get">GET</span><code>/orders?reference=ORD-1001</code> — <code>{ "data": [ … ] }</code>, newest first.</p>
+  <p><span class="m post">POST</span><code>/orders/{id}/cancel</code> — cancels a pending or expired payment.</p>
+  <p>Fields to read: <code>status</code>, <code>amount_paid</code>, <code>currency</code>, <code>paid_at</code>, <code>utr</code> (12-digit UPI reference from the bank).</p>
+
+  <h2 id="statuses">Statuses</h2>
+  <div class="tbl"><table>
+    <tr><th>status</th><th>Meaning</th></tr>
+    <tr><td><code>pending</code></td><td>Waiting for the customer to pay.</td></tr>
+    <tr><td><code>paid</code></td><td>Money received and confirmed. Final.</td></tr>
+    <tr><td><code>expired</code></td><td>Not paid in time. A late payment may still turn it <code>paid</code> (within 24 h).</td></tr>
+    <tr><td><code>cancelled</code></td><td>Cancelled by you or the merchant. Final.</td></tr>
+  </table></div>
+  <p>There is no <code>failed</code> status: a UPI attempt that fails never reaches the merchant's bank, so the payment simply stays <code>pending</code> until it is paid or expires. Treat <code>expired</code> and <code>cancelled</code> as "not paid".</p>
+
+  <h2 id="test">Test mode (sandbox)</h2>
+  <ul>
+    <li>Use your <code>sk_test_…</code> key with the same base URL.</li>
+    <li>Payments are created with <code>"test": true</code> and never touch a bank account.</li>
+    <li>Open the <code>payment_url</code> — instead of a UPI QR it shows a <b>Simulate successful payment</b> button. Pressing it marks the payment <code>paid</code> and sends the <code>order.paid</code> webhook with <code>"test": true</code>.</li>
+    <li>There are <b>no test card numbers</b>: StockPay does not process cards. Payments are UPI only.</li>
+  </ul>
+
+  <h2 id="currency">Supported currencies and methods</h2>
+  <p><b>INR only</b>, paid by <b>UPI</b> (any UPI app or QR scan). GBP, other currencies, cards, net banking and wallets are <b>not supported</b>.</p>
+
+  <h2 id="webhooks">Webhooks</h2>
+  <p>Set your webhook URL in the admin panel → <b>API Keys</b>. When a payment is confirmed we send:</p>
+  <pre>POST https://yourapp.com/webhooks/stockpay
+Content-Type: application/json
+X-StockPay-Event: order.paid
+X-StockPay-Delivery: 42
+X-StockPay-Timestamp: 1791890000
+X-StockPay-Signature: sha256=5d1c…
+
+{ "event": "order.paid", "created_at": "…", "order": { …same object as Get payment… } }</pre>
+  <h3>Verify the signature</h3>
+  <p><code>signature = "sha256=" + HMAC_SHA256(webhook_secret, timestamp + "." + raw_body)</code>, hex. Use the <b>raw</b> request body, compare in constant time, and reject timestamps older than 5 minutes.</p>
+  <pre>const crypto = require('crypto');
+function verifyStockPay(rawBody, headers, secret) {
+  const ts = headers['x-stockpay-timestamp'];
+  const sig = headers['x-stockpay-signature'] || '';
+  if (!ts || Math.abs(Date.now() / 1000 - Number(ts)) &gt; 300) return false;
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(ts + '.' + rawBody).digest('hex');
+  return sig.length === expected.length &amp;&amp; crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+}</pre>
+  <p>Reply with any <b>2xx within 10 seconds</b>. Otherwise we retry after 1 min, 5 min, 30 min, 2 h, 6 h, 12 h and 24 h. The same event can arrive more than once — make your handler idempotent (e.g. by <code>order.id</code>).</p>
+
+  <h2 id="errors">Errors</h2>
+  <pre>{ "error": { "code": "amount_too_low", "message": "minimum amount is ₹100" } }</pre>
+  <div class="tbl"><table>
+    <tr><th>HTTP</th><th>code</th><th>Meaning</th></tr>
+    <tr><td>400</td><td><code>bad_request</code></td><td>Missing/invalid field.</td></tr>
+    <tr><td>400</td><td><code>amount_too_low</code></td><td>Below the merchant's minimum.</td></tr>
+    <tr><td>400</td><td><code>unsupported_currency</code></td><td>Currency other than INR.</td></tr>
+    <tr><td>401</td><td><code>unauthorized</code></td><td>Missing or invalid API key.</td></tr>
+    <tr><td>404</td><td><code>not_found</code></td><td>Unknown payment ID (or other mode's payment).</td></tr>
+    <tr><td>409</td><td><code>reference_conflict</code></td><td>An open payment with this reference has a different amount.</td></tr>
+    <tr><td>409</td><td><code>conflict</code></td><td>Payment can't be cancelled in its current status.</td></tr>
+    <tr><td>503</td><td><code>no_account</code> / <code>busy</code></td><td>Merchant can't accept payments right now — retry later.</td></tr>
+  </table></div>
+
+  <h2 id="node">Node.js example</h2>
+  <pre>const BASE = 'https://stockpay-in.vercel.app/api/v1';
+const KEY = process.env.STOCKPAY_KEY; // sk_test_… or sk_live_…
+
+async function createPayment(orderId, amountInr) {
+  const r = await fetch(BASE + '/orders', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: amountInr, currency: 'INR', reference: orderId,
+                           return_url: 'https://yourapp.com/payment/return' }),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error.message);
+  return data; // redirect the customer to data.payment_url
+}
+
+async function getPayment(id) {
+  const r = await fetch(BASE + '/orders/' + id, { headers: { Authorization: 'Bearer ' + KEY } });
+  return r.json(); // { status: 'paid' | 'pending' | 'expired' | 'cancelled', amount_paid, currency, … }
+}</pre>
+</main>
+<script>
+  // Show the address this page was opened on, so copied examples match.
+  document.querySelectorAll('pre, #host').forEach((el) => {
+    if (location.host && location.host !== 'stockpay-in.vercel.app') el.innerHTML = el.innerHTML.replaceAll('stockpay-in.vercel.app', location.host);
+  });
+</script>
+</body>
+</html>

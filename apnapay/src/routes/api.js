@@ -27,6 +27,10 @@ const fail = (res, err) => {
 
 router.post('/orders', async (req, res) => {
   const body = req.body || {};
+  // Payments are UPI transfers into an Indian bank account, so only INR exists.
+  if (body.currency !== undefined && String(body.currency).toUpperCase() !== 'INR') {
+    return res.status(400).json({ error: { code: 'unsupported_currency', message: 'only INR is supported' } });
+  }
   const basePaise = toPaise(body.amount);
   if (basePaise === null) return res.status(400).json({ error: { code: 'bad_request', message: 'amount is required, e.g. 499 or "499.00"' } });
   if (body.return_url && !isHttpUrl(body.return_url)) {

@@ -15,7 +15,7 @@ import java.nio.charset.StandardCharsets;
 /** Sends queued bank SMS to the StockPay server. Anything that fails stays queued for the next try. */
 final class SmsSender {
     private static final Object LOCK = new Object();
-    static final String VERSION = "1.4";
+    static final String VERSION = "1.5";
 
     private SmsSender() {}
 

@@ -286,3 +286,19 @@ test('API Keys tab creates keys on first open', async (t) => {
   });
   assert.equal(r.status, 201);
 });
+
+test('API docs page and INR-only currency', async (t) => {
+  const db = require('../src/db');
+  const server = http.createServer(createApp());
+  const base = await listen(server);
+  t.after(() => server.close());
+  const docs = await fetch(base + '/docs');
+  assert.equal(docs.status, 200);
+  assert.match(await docs.text(), /StockPay API Reference/);
+  const site = await db.get('SELECT * FROM sites WHERE active = 1 AND test_key IS NOT NULL ORDER BY id DESC LIMIT 1');
+  const call = (body) => fetch(base + '/api/v1/orders', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + site.test_key }, body: JSON.stringify(body) });
+  const gbp = await call({ amount: 200, currency: 'GBP' });
+  assert.equal(gbp.status, 400);
+  assert.equal((await gbp.json()).error.code, 'unsupported_currency');
+  assert.equal((await call({ amount: 200, currency: 'inr' })).status, 201);
+});

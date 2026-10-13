@@ -50,6 +50,7 @@ function createApp() {
   const pub = config.publicDir;
   app.use(express.static(pub, { index: false, maxAge: '1h' }));
   app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(pub, 'admin.html')));
+  app.get(['/docs', '/docs/'], (req, res) => res.sendFile(path.join(pub, 'docs.html')));
   app.get('/', (req, res) => res.redirect('/admin'));
 
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
