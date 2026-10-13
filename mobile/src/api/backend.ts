@@ -884,6 +884,8 @@ export function fetchFortuneSixHistory(limit = 30) {
 export interface CardDepositStatus {
   enabled: boolean;
   testMode: boolean;
+  gateway: 'stripe' | 'paypal' | 'checkout' | null;
+  gatewayName: string | null;
   reason: string | null;
   min?: number;
   max?: number;

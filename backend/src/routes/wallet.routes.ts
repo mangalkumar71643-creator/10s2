@@ -7,7 +7,7 @@ import { prisma } from "../db/prismaClient";
 import { paymentProvider } from "../services/paymentService";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { completeDeposit } from "../services/depositService";
-import { cardDepositStatus, confirmCardDeposits, createCardCheckout } from "../services/stripeService";
+import { cardDepositStatus, confirmCardDeposits, createCardCheckout } from "../services/paymentGateways";
 import { env } from "../config/env";
 
 const router = Router();

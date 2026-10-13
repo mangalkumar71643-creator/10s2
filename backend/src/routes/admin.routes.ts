@@ -8,7 +8,7 @@ import { paymentProvider } from "../services/paymentService";
 import { completeDeposit } from "../services/depositService";
 import { FAST2SMS_ROUTES, fast2SmsFromEnv } from "../services/smsService";
 import { INTEGRATION_FIELDS, integration, integrationView, saveIntegrationSettings } from "../services/integrationSettings";
-import { assertAllowedStripeKey } from "../services/stripeService";
+import { GATEWAYS, assertSandboxKeys } from "../services/paymentGateways";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { getGameReport } from "../services/gameReportService";
 import * as winGoService from "../services/winGoService";
@@ -475,8 +475,10 @@ router.put(
   "/integrations",
   asyncHandler(async (req, res) => {
     const patch = integrationSchema.parse(req.body);
-    if (patch.stripeSecretKey) assertAllowedStripeKey(patch.stripeSecretKey.trim());
-    if (patch.stripeCurrency && !/^[a-zA-Z]{3}$/.test(patch.stripeCurrency.trim())) throw new ApiError(400, "Currency must be a 3-letter code like INR or GBP.");
+    assertSandboxKeys(patch);
+    if (patch.paymentCurrency && !/^[a-zA-Z]{3}$/.test(patch.paymentCurrency.trim())) throw new ApiError(400, "Currency must be a 3-letter code like INR or GBP.");
+    const gw = patch.paymentGateway?.trim();
+    if (gw && !(GATEWAYS as readonly string[]).includes(gw)) throw new ApiError(400, `Payment company must be one of ${GATEWAYS.join(", ")}.`);
     for (const k of ["smsRoute", "smsFallbackRoute"] as const) {
       const v = patch[k]?.trim();
       if (v && !(FAST2SMS_ROUTES as string[]).includes(v)) throw new ApiError(400, `${k} must be one of ${FAST2SMS_ROUTES.join(", ")}.`);

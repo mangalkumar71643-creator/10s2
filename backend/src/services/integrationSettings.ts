@@ -12,9 +12,14 @@ import { ApiError } from "../middleware/errorHandler";
  * over the matching environment variable; clearing it falls back to that.
  */
 export const INTEGRATION_FIELDS = {
+  paymentGateway: { env: "PAYMENT_GATEWAY", secret: false },
+  paymentCurrency: { env: "PAYMENT_CURRENCY", secret: false },
+  paymentTestPhones: { env: "PAYMENT_TEST_PHONES", secret: false },
   stripeSecretKey: { env: "STRIPE_SECRET_KEY", secret: true },
-  stripeCurrency: { env: "STRIPE_CURRENCY", secret: false },
-  stripeTestPhones: { env: "STRIPE_TEST_PHONES", secret: false },
+  paypalClientId: { env: "PAYPAL_CLIENT_ID", secret: false },
+  paypalSecret: { env: "PAYPAL_SECRET", secret: true },
+  checkoutSecretKey: { env: "CHECKOUT_SECRET_KEY", secret: true },
+  checkoutPrefix: { env: "CHECKOUT_PREFIX", secret: false },
   smsApiKey: { env: "SMS_API_KEY", secret: true },
   smsRoute: { env: "SMS_ROUTE", secret: false },
   smsSenderId: { env: "SMS_SENDER_ID", secret: false },
