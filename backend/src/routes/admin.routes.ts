@@ -8,7 +8,7 @@ import { paymentProvider } from "../services/paymentService";
 import { completeDeposit } from "../services/depositService";
 import { FAST2SMS_ROUTES, fast2SmsFromEnv } from "../services/smsService";
 import { INTEGRATION_FIELDS, integration, integrationView, saveIntegrationSettings } from "../services/integrationSettings";
-import { GATEWAYS, assertSandboxKeys } from "../services/paymentGateways";
+import { GATEWAYS, assertSandboxKeys, routeTestKeys } from "../services/paymentGateways";
 import { assertCanTransact, assertWithinDepositLimits } from "../services/responsibleGamblingService";
 import { getGameReport } from "../services/gameReportService";
 import * as winGoService from "../services/winGoService";
@@ -483,7 +483,9 @@ router.put(
       const v = patch[k]?.trim();
       if (v && !(FAST2SMS_ROUTES as string[]).includes(v)) throw new ApiError(400, `${k} must be one of ${FAST2SMS_ROUTES.join(", ")}.`);
     }
-    res.json(await saveIntegrationSettings(patch));
+    // Stripe and StockPay test keys look alike: file the key under whichever accepts it.
+    const { patch: routed, detected } = await routeTestKeys(patch);
+    res.json({ ...(await saveIntegrationSettings(routed)), detected });
   })
 );
 

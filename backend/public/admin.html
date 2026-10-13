@@ -2284,7 +2284,7 @@
     btn.disabled = true;
     out.textContent = 'Saving…';
     api('/admin/integrations', { method: 'PUT', body: JSON.stringify(body) })
-      .then(function (view) { showIntegrations(view); out.innerHTML = '<span style="color:#7dffb0;">Saved — working now.</span>'; loadSmsStatus(); })
+      .then(function (view) { showIntegrations(view); out.innerHTML = '<span style="color:#7dffb0;">Saved — working now.' + (view.detected ? ' Key recognised as <b>' + (view.detected === 'stockpay' ? 'StockPay' : 'Stripe') + '</b> and switched on.' : '') + '</span>'; loadSmsStatus(); })
       .catch(function (err) { if (err.authError) doLogout(); else out.innerHTML = '<span style="color:#ff8a8a;">' + escapeHtml(err.message) + '</span>'; })
       .finally(function () { btn.disabled = false; });
   });

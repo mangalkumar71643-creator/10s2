@@ -1,6 +1,6 @@
 import { prisma } from "../db/prismaClient";
 import { ApiError } from "../middleware/errorHandler";
-import { integration } from "./integrationSettings";
+import { integration, saveIntegrationSettings } from "./integrationSettings";
 import { completeDeposit } from "./depositService";
 
 /**
@@ -246,7 +246,8 @@ function activeGateway(): Gateway | null {
 }
 
 // Stripe test accounts take INR; PayPal and Checkout.com sandboxes need e.g. GBP.
-const currencyFor = (g: Gateway) => (integration("paymentCurrency") || (g === "stripe" ? "inr" : "gbp")).toLowerCase();
+// StockPay is wired to its GBP card checkout (its INR side is UPI, a different flow).
+const currencyFor = (g: Gateway) => (g === "stockpay" ? "gbp" : (integration("paymentCurrency") || (g === "stripe" ? "inr" : "gbp")).toLowerCase());
 
 function testPhones(): string[] {
   return integration("paymentTestPhones")
@@ -269,12 +270,56 @@ export async function cardDepositStatus(userId: string) {
 }
 
 /** Opens the active gateway's payment page for `amount` and records the PENDING deposit. */
+async function keyAccepted(url: string, key: string) {
+  try {
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10000) });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Stripe and StockPay test keys look alike (sk_test_...): ask each which one accepts it. */
+export async function detectTestKeyOwner(key: string): Promise<"stripe" | "stockpay" | null> {
+  if (!key.startsWith("sk_test_")) return null;
+  if (await keyAccepted("https://api.stripe.com/v1/balance", key)) return "stripe";
+  if (await keyAccepted(`${STOCKPAY}/orders?reference=np-key-check`, key)) return "stockpay";
+  return null;
+}
+
+/**
+ * A sk_test_ key pasted in the Stripe or StockPay box is filed under the
+ * company that actually accepts it, and that company becomes the active one.
+ * Rejects a key neither accepts (usually a key copied only in part).
+ */
+export async function routeTestKeys<T extends { stripeSecretKey?: string; stockpaySecretKey?: string; paymentGateway?: string }>(patch: T) {
+  const key = (patch.stripeSecretKey || patch.stockpaySecretKey || "").trim();
+  if (!key.startsWith("sk_test_")) return { patch, detected: null };
+  const owner = await detectTestKeyOwner(key);
+  if (!owner) throw new ApiError(400, "Neither Stripe nor StockPay accepted this key. Copy it again in full (use the copy button) and paste it once more.");
+  const other = owner === "stripe" ? "stockpaySecretKey" : "stripeSecretKey";
+  const routed = { ...patch, [owner === "stripe" ? "stripeSecretKey" : "stockpaySecretKey"]: key, paymentGateway: owner };
+  if ((patch[other] ?? "").trim() === key) routed[other] = "";
+  return { patch: routed, detected: owner };
+}
+
 export async function createCardCheckout(userId: string, amount: number, returnBase: string) {
   const status = await cardDepositStatus(userId);
   if (!status.enabled || !status.gateway) throw new ApiError(403, status.reason ?? "Card payments are not available.");
   if (amount < MIN_CARD_DEPOSIT || amount > MAX_CARD_DEPOSIT) throw new ApiError(400, `Deposit must be between ${MIN_CARD_DEPOSIT} and ${MAX_CARD_DEPOSIT}.`);
-  const gateway = status.gateway;
-  const session = await CLIENTS[gateway].create(amount, currencyFor(gateway), returnBase, userId);
+  let gateway = status.gateway;
+  let session: { id: string; url: string };
+  try {
+    session = await CLIENTS[gateway].create(amount, currencyFor(gateway), returnBase, userId);
+  } catch (err) {
+    // A StockPay key saved in the Stripe box: Stripe refuses it. Move it to
+    // StockPay (once, for good) and carry on there.
+    const key = integration("stripeSecretKey");
+    if (gateway !== "stripe" || (await detectTestKeyOwner(key)) !== "stockpay") throw err;
+    await saveIntegrationSettings({ stockpaySecretKey: key, stripeSecretKey: "", paymentGateway: "stockpay" });
+    gateway = "stockpay";
+    session = await CLIENTS[gateway].create(amount, currencyFor(gateway), returnBase, userId);
+  }
   await prisma.transaction.create({
     data: { userId, type: "DEPOSIT", amount, status: "PENDING", provider: gateway, providerReferenceId: session.id },
   });
