@@ -406,3 +406,12 @@ test('GBP via Razorpay: payment link, redirect, webhook, status check, return', 
   const r = await orders.ingestMessage({ source: 'manual', text: 'Rs.499.00 credited to your account XX1234 by UPI. UPI Ref No 427500004990', sender: 'SBIUPI' });
   assert.notEqual(r.order && r.order.id, o4.id);
 });
+
+test('GBP docs page', async (t) => {
+  const server = http.createServer(createApp());
+  const base = await listen(server);
+  t.after(() => server.close());
+  const r = await fetch(base + '/docs/gbp');
+  assert.equal(r.status, 200);
+  assert.match(await r.text(), /GBP \(UK\) payments/);
+});

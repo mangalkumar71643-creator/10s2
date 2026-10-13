@@ -66,6 +66,7 @@ function createApp() {
   const pub = config.publicDir;
   app.use(express.static(pub, { index: false, maxAge: '1h' }));
   app.get(['/admin', '/admin/'], (req, res) => res.sendFile(path.join(pub, 'admin.html')));
+  app.get(['/docs/gbp', '/docs/gbp/'], (req, res) => res.sendFile(path.join(pub, 'docs-gbp.html')));
   app.get(['/docs', '/docs/'], (req, res) => res.sendFile(path.join(pub, 'docs.html')));
   app.get('/', (req, res) => res.redirect('/admin'));
 
