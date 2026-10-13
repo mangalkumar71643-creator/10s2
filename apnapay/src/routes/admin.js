@@ -154,15 +154,15 @@ router.get('/dashboard', h(async () => {
   background(() => webhooks.processDue()); // admin visits also push pending webhook retries
   const start = istDayStart();
   const today = await db.get(
-    "SELECT COUNT(*) AS n, COALESCE(SUM(paid_amount), 0) AS sum FROM orders WHERE status = 'paid' AND test = 0 AND paid_at >= ?",
+    "SELECT COUNT(*) AS n, COALESCE(SUM(paid_amount), 0) AS sum FROM orders WHERE status = 'paid' AND test = 0 AND currency = 'INR' AND paid_at >= ?",
     start,
   );
   const week = await db.all(
-    `SELECT paid_at FROM orders WHERE status = 'paid' AND test = 0 AND paid_at >= ?`,
+    `SELECT paid_at FROM orders WHERE status = 'paid' AND test = 0 AND currency = 'INR' AND paid_at >= ?`,
     start - 6 * 86400000,
   );
   const days = Array.from({ length: 7 }, (_, i) => ({ start: start - (6 - i) * 86400000, sum: 0 }));
-  for (const row of await db.all("SELECT paid_at, paid_amount FROM orders WHERE status = 'paid' AND test = 0 AND paid_at >= ?", days[0].start)) {
+  for (const row of await db.all("SELECT paid_at, paid_amount FROM orders WHERE status = 'paid' AND test = 0 AND currency = 'INR' AND paid_at >= ?", days[0].start)) {
     const d = days.find((x) => row.paid_at >= x.start && row.paid_at < x.start + 86400000);
     if (d) d.sum += row.paid_amount;
   }
@@ -171,7 +171,7 @@ router.get('/dashboard', h(async () => {
     min_order_amount: (await db.getSettings()).min_order_amount,
     today: { count: today.n, amount: rupees(today.sum) },
     week_count: week.length,
-    pending: await count("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending' AND test = 0"),
+    pending: await count("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending' AND test = 0 AND currency = 'INR'"),
     unmatched: await count("SELECT COUNT(*) AS n FROM transactions WHERE status = 'unmatched'"),
     failed_webhooks: await count("SELECT COUNT(*) AS n FROM webhook_deliveries WHERE status = 'failed'"),
     chart: days.map((d) => ({ date: new Date(d.start + 330 * 60000).toISOString().slice(0, 10), amount: rupees(d.sum) })),
@@ -653,6 +653,62 @@ router.post('/settings/telegram-test', h(async () => {
 router.post('/settings/new-email-token', h(async () => {
   await db.setSetting('email_token', crypto.randomBytes(18).toString('base64url'));
   await alert('alert', 'Email forwarding link changed. Update it in your email worker.', { telegram: false });
+}));
+
+// ---------- Razorpay (international cards) -------------------------------------------------------
+
+const mask = (v) => (v ? '••••' + String(v).slice(-4) : '');
+
+router.get('/razorpay', h(async () => {
+  const s = await db.getSettings();
+  return {
+    key_id: s.razorpay_key_id,
+    test_key_id: s.razorpay_test_key_id,
+    key_secret: mask(s.razorpay_key_secret),
+    test_key_secret: mask(s.razorpay_test_key_secret),
+    webhook_secret: mask(s.razorpay_webhook_secret),
+    currencies: s.razorpay_currencies,
+    live_ready: !!(s.razorpay_key_id && s.razorpay_key_secret),
+    test_ready: !!(s.razorpay_test_key_id && s.razorpay_test_key_secret),
+    webhook_url: `${config.baseUrl}/razorpay/webhook`,
+  };
+}));
+
+router.put('/razorpay', h(async (req) => {
+  const b = req.body || {};
+  const keyId = (k, prefix) => {
+    const v = str(b[k], 80);
+    if (v && !new RegExp('^' + prefix + '[A-Za-z0-9]+$').test(v)) throw bad(`Key ID ${prefix}… se shuru hona chahiye`);
+    return v;
+  };
+  if (b.key_id !== undefined) await db.setSetting('razorpay_key_id', keyId('key_id', 'rzp_live_'));
+  if (b.test_key_id !== undefined) await db.setSetting('razorpay_test_key_id', keyId('test_key_id', 'rzp_test_'));
+  // Secrets: an empty box means "keep the saved one"; "-" clears it.
+  for (const [field, key] of [['key_secret', 'razorpay_key_secret'], ['test_key_secret', 'razorpay_test_key_secret'], ['webhook_secret', 'razorpay_webhook_secret']]) {
+    const v = str(b[field], 200);
+    if (v === '-') await db.setSetting(key, '');
+    else if (v && !v.startsWith('••••')) await db.setSetting(key, v);
+  }
+  if (b.currencies !== undefined) {
+    const list = [...new Set(String(b.currencies).toUpperCase().split(/[\s,]+/).filter((c) => /^[A-Z]{3}$/.test(c) && c !== 'INR'))];
+    await db.setSetting('razorpay_currencies', list.join(', '));
+  }
+  await alert('alert', 'Razorpay settings changed');
+}));
+
+router.post('/razorpay/check', h(async (req) => {
+  const out = {};
+  for (const mode of ['live', 'test']) {
+    const creds = await require('../razorpay').credentials(mode === 'test');
+    if (!creds) { out[mode] = 'not set'; continue; }
+    try {
+      await require('../razorpay').checkKeys(creds);
+      out[mode] = 'ok';
+    } catch (err) {
+      out[mode] = err.message;
+    }
+  }
+  return out;
 }));
 
 router.post('/security/password', h(async (req, res) => {

@@ -287,7 +287,7 @@ test('API Keys tab creates keys on first open', async (t) => {
   assert.equal(r.status, 201);
 });
 
-test('API docs page and INR-only currency', async (t) => {
+test('API docs page and currency checks', async (t) => {
   const db = require('../src/db');
   const server = http.createServer(createApp());
   const base = await listen(server);
@@ -297,8 +297,112 @@ test('API docs page and INR-only currency', async (t) => {
   assert.match(await docs.text(), /StockPay API Reference/);
   const site = await db.get('SELECT * FROM sites WHERE active = 1 AND test_key IS NOT NULL ORDER BY id DESC LIMIT 1');
   const call = (body) => fetch(base + '/api/v1/orders', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + site.test_key }, body: JSON.stringify(body) });
+  // Currencies nobody enabled are refused; GBP with a test key works (Simulate button, no Razorpay needed).
+  const xyz = await call({ amount: 200, currency: 'XYZ' });
+  assert.equal(xyz.status, 400);
+  assert.equal((await xyz.json()).error.code, 'unsupported_currency');
   const gbp = await call({ amount: 200, currency: 'GBP' });
-  assert.equal(gbp.status, 400);
-  assert.equal((await gbp.json()).error.code, 'unsupported_currency');
+  assert.equal(gbp.status, 201);
+  const g = await gbp.json();
+  assert.equal(g.currency, 'GBP');
+  assert.equal(g.test, true);
   assert.equal((await call({ amount: 200, currency: 'inr' })).status, 201);
+});
+
+test('GBP via Razorpay: payment link, redirect, webhook, status check, return', async (t) => {
+  const db = require('../src/db');
+  const links = new Map();
+  let n = 0;
+  const rzp = http.createServer((req, res) => {
+    let b = '';
+    req.on('data', (c) => (b += c));
+    req.on('end', () => {
+      res.setHeader('content-type', 'application/json');
+      if (!/^Basic /.test(req.headers.authorization || '')) return res.writeHead(401).end('{}');
+      if (req.method === 'POST' && req.url === '/payment_links') {
+        const body = JSON.parse(b);
+        const id = 'plink_' + ++n;
+        const link = { id, short_url: `https://rzp.io/l/${id}`, status: 'created', amount: body.amount, amount_paid: 0, currency: body.currency, reference_id: body.reference_id, payments: [] };
+        links.set(id, link);
+        return res.end(JSON.stringify(link));
+      }
+      const m = /^\/payment_links\/(.+)$/.exec(req.url);
+      if (m && links.has(m[1])) return res.end(JSON.stringify(links.get(m[1])));
+      if (req.url.startsWith('/payment_links?')) return res.end('{"payment_links":[]}');
+      res.writeHead(404).end('{"error":{"description":"not found"}}');
+    });
+  });
+  const rzpUrl = await listen(rzp);
+  process.env.RAZORPAY_API_BASE = rzpUrl;
+  const server = http.createServer(createApp());
+  const base = await listen(server);
+  const hooks = [];
+  const shop = http.createServer((req, res) => { let b = ''; req.on('data', (c) => (b += c)); req.on('end', () => { hooks.push(JSON.parse(b)); res.end('ok'); }); });
+  const shopUrl = await listen(shop);
+  t.after(() => { server.close(); rzp.close(); shop.close(); delete process.env.RAZORPAY_API_BASE; });
+
+  let cookie = '';
+  const admin = async (path, method = 'GET', body) => {
+    const r = await fetch(base + '/admin/api' + path, { method, headers: { 'content-type': 'application/json', 'x-requested-with': 'stockpay', cookie }, body: body ? JSON.stringify(body) : undefined });
+    const sc = r.headers.get('set-cookie');
+    if (sc) cookie = sc.split(';')[0];
+    return { status: r.status, data: await r.json() };
+  };
+  await admin('/login', 'POST', { username: 'owner', password: 'supersecret1' });
+  const site = (await admin('/sites', 'POST', { name: 'UK Shop', webhook_url: shopUrl + '/h' })).data;
+  const call = (path, method = 'GET', body) => fetch(base + '/api/v1' + path, { method, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + site.api_key }, body: body && JSON.stringify(body) });
+
+  // Not connected yet -> GBP refused.
+  assert.equal((await call('/orders', 'POST', { amount: '24.99', currency: 'GBP' })).status, 400);
+  assert.equal((await admin('/razorpay', 'PUT', { key_id: 'bad_key' })).status, 400);
+  assert.equal((await admin('/razorpay', 'PUT', { key_id: 'rzp_live_ABC123', key_secret: 'livesecret', webhook_secret: 'whsecret', currencies: 'gbp' })).status, 200);
+  const rs = (await admin('/razorpay')).data;
+  assert.equal(rs.live_ready, true);
+  assert.equal(rs.key_secret, '••••cret'); // secret never sent back
+  assert.equal(rs.currencies, 'GBP');
+
+  // 1) Create + redirect to Razorpay.
+  const o1 = await (await call('/orders', 'POST', { amount: '24.99', currency: 'GBP', reference: 'UK-1', customer: { name: 'John', email: 'j@x.co.uk' } })).json();
+  assert.equal(o1.currency, 'GBP');
+  assert.equal(o1.amount_payable, '24.99');
+  assert.equal(links.get('plink_1').amount, 2499);
+  assert.equal(links.get('plink_1').currency, 'GBP');
+  const redir = await fetch(o1.payment_url.replace(/^https?:\/\/[^/]+/, base), { redirect: 'manual' });
+  assert.equal(redir.status, 302);
+  assert.equal(redir.headers.get('location'), 'https://rzp.io/l/plink_1');
+
+  // 2) Webhook: bad signature refused, good one confirms.
+  const event = JSON.stringify({ event: 'payment_link.paid', payload: { payment_link: { entity: { id: 'plink_1', amount_paid: 2499, status: 'paid' } }, payment: { entity: { id: 'pay_111' } } } });
+  const bad = await fetch(base + '/razorpay/webhook', { method: 'POST', headers: { 'content-type': 'application/json', 'x-razorpay-signature': 'nope' }, body: event });
+  assert.equal(bad.status, 400);
+  const sig = crypto.createHmac('sha256', 'whsecret').update(event).digest('hex');
+  assert.equal((await fetch(base + '/razorpay/webhook', { method: 'POST', headers: { 'content-type': 'application/json', 'x-razorpay-signature': sig }, body: event })).status, 200);
+  const paid1 = await (await call('/orders/' + o1.id)).json();
+  assert.equal(paid1.status, 'paid');
+  assert.equal(paid1.utr, 'pay_111');
+  assert.equal(paid1.amount_paid, '24.99');
+  await webhooks.processDue();
+  for (let i = 0; i < 50 && !hooks.length; i++) await new Promise((r) => setTimeout(r, 20));
+  assert.equal(hooks[0].order.currency, 'GBP');
+
+  // 3) No webhook: status check asks Razorpay.
+  const o2 = await (await call('/orders', 'POST', { amount: 10, currency: 'GBP' })).json();
+  Object.assign(links.get('plink_2'), { status: 'paid', amount_paid: 1000, payments: [{ payment_id: 'pay_222', status: 'captured' }] });
+  assert.equal((await (await call('/orders/' + o2.id)).json()).status, 'paid');
+
+  // 4) Customer comes back with a signed callback.
+  const o3 = await (await call('/orders', 'POST', { amount: 5, currency: 'GBP' })).json();
+  const q = { razorpay_payment_id: 'pay_333', razorpay_payment_link_id: 'plink_3', razorpay_payment_link_reference_id: o3.id, razorpay_payment_link_status: 'paid' };
+  q.razorpay_signature = crypto.createHmac('sha256', 'livesecret').update(`${q.razorpay_payment_link_id}|${q.razorpay_payment_link_reference_id}|${q.razorpay_payment_link_status}|${q.razorpay_payment_id}`).digest('hex');
+  const back = await fetch(`${base}/pay/${o3.id}/razorpay-return?${new URLSearchParams(q)}`, { redirect: 'manual' });
+  assert.equal(back.status, 302);
+  const paid3 = await db.get('SELECT * FROM orders WHERE id = ?', o3.id);
+  assert.equal(paid3.status, 'paid');
+  assert.equal(paid3.utr, 'pay_333');
+
+  // GBP money never shows up in the INR totals, and a bank SMS never matches a GBP order.
+  const o4 = await (await call('/orders', 'POST', { amount: 499, currency: 'GBP' })).json();
+  const orders = require('../src/orders');
+  const r = await orders.ingestMessage({ source: 'manual', text: 'Rs.499.00 credited to your account XX1234 by UPI. UPI Ref No 427500004990', sender: 'SBIUPI' });
+  assert.notEqual(r.order && r.order.id, o4.id);
 });

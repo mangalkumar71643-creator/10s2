@@ -33,7 +33,7 @@
 <body>
 <main class="wrap">
   <h1>StockPay API Reference</h1>
-  <p class="muted">Accept UPI payments in INR through a hosted payment page. REST + JSON, server-to-server.</p>
+  <p class="muted">Accept payments through a hosted payment page — INR by UPI, GBP (and other enabled currencies) by card via Razorpay. REST + JSON, server-to-server.</p>
   <div class="toc">
     <a href="#base">Base URL</a><a href="#auth">Authentication</a><a href="#create">Create payment</a><a href="#get">Get payment</a>
     <a href="#statuses">Statuses</a><a href="#test">Test mode</a><a href="#currency">Currencies</a><a href="#webhooks">Webhooks</a><a href="#errors">Errors</a><a href="#node">Node.js example</a>
@@ -53,8 +53,8 @@ Content-Type: application/json</pre>
   <p><span class="m post">POST</span><code>/orders</code></p>
   <div class="tbl"><table>
     <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-    <tr><td><code>amount</code> <b>required</b></td><td>number | string</td><td>Amount in rupees, e.g. <code>499</code> or <code>"499.00"</code>. Minimum is set by the merchant (currently ₹100). Max ₹99,999.</td></tr>
-    <tr><td><code>currency</code></td><td>string</td><td>Optional. Only <code>"INR"</code> is accepted; anything else → <code>400 unsupported_currency</code>.</td></tr>
+    <tr><td><code>amount</code> <b>required</b></td><td>number | string</td><td>Amount in major units, e.g. <code>499</code> (₹499) or <code>"24.99"</code> (£24.99). INR minimum is set by the merchant (currently ₹100); other currencies minimum 1.00. Max 99,999.</td></tr>
+    <tr><td><code>currency</code></td><td>string</td><td>Optional, default <code>"INR"</code>. <code>"INR"</code> → UPI. <code>"GBP"</code> (or another currency the merchant enabled) → card payment on Razorpay's hosted page. Not enabled → <code>400 unsupported_currency</code>.</td></tr>
     <tr><td><code>reference</code></td><td>string ≤ 80</td><td>Your order ID. Idempotent: sending the same reference again returns the existing pending/paid payment instead of a new one.</td></tr>
     <tr><td><code>customer</code></td><td>object</td><td>Optional <code>{ "name", "phone", "email" }</code>.</td></tr>
     <tr><td><code>note</code></td><td>string ≤ 200</td><td>Optional, shown on the payment page.</td></tr>
@@ -86,13 +86,18 @@ Content-Type: application/json</pre>
   "paid_at": null,
   "test": true
 }</pre>
-  <p>Redirect the customer to <code>payment_url</code>. The page expires at <code>expires_at</code> (15 minutes by default). In live mode <code>amount_payable</code> includes up to ₹0.99 extra so each payment can be identified; the customer pays that exact amount.</p>
+  <p>Redirect the customer to <code>payment_url</code> — for every currency. INR opens our UPI page; GBP redirects on to Razorpay's card checkout and comes back to your <code>return_url</code> after payment.</p>
+  <p>Expiry: 15 minutes for INR (by default), 30 minutes for card payments. For INR live payments <code>amount_payable</code> includes up to ₹0.99 extra so each payment can be identified; for other currencies <code>amount_payable</code> = <code>amount</code>.</p>
+  <h3>GBP example</h3>
+  <pre>{ "amount": "24.99", "currency": "GBP", "reference": "UK-1001",
+  "customer": { "name": "John Smith", "email": "john@example.co.uk" },
+  "return_url": "https://yourapp.com/payment/return" }</pre>
 
   <h2 id="get">Get a payment's status</h2>
   <p><span class="m get">GET</span><code>/orders/{id}</code> — returns the same object as above.</p>
   <p><span class="m get">GET</span><code>/orders?reference=ORD-1001</code> — <code>{ "data": [ … ] }</code>, newest first.</p>
   <p><span class="m post">POST</span><code>/orders/{id}/cancel</code> — cancels a pending or expired payment.</p>
-  <p>Fields to read: <code>status</code>, <code>amount_paid</code>, <code>currency</code>, <code>paid_at</code>, <code>utr</code> (12-digit UPI reference from the bank).</p>
+  <p>Fields to read: <code>status</code>, <code>amount_paid</code>, <code>currency</code>, <code>paid_at</code>, <code>utr</code> (INR: 12-digit UPI reference from the bank; card payments: the Razorpay payment ID <code>pay_…</code>).</p>
 
   <h2 id="statuses">Statuses</h2>
   <div class="tbl"><table>
@@ -109,11 +114,17 @@ Content-Type: application/json</pre>
     <li>Use your <code>sk_test_…</code> key with the same base URL.</li>
     <li>Payments are created with <code>"test": true</code> and never touch a bank account.</li>
     <li>Open the <code>payment_url</code> — instead of a UPI QR it shows a <b>Simulate successful payment</b> button. Pressing it marks the payment <code>paid</code> and sends the <code>order.paid</code> webhook with <code>"test": true</code>.</li>
-    <li>There are <b>no test card numbers</b>: StockPay does not process cards. Payments are UPI only.</li>
+    <li><b>INR (UPI):</b> no test cards needed — use the Simulate button.</li>
+    <li><b>GBP (card):</b> if the merchant has added Razorpay <i>test</i> keys, the <code>payment_url</code> opens Razorpay's test checkout — use Razorpay's published test cards (see Razorpay docs → "Test Card Details"). Without Razorpay test keys, GBP test payments also use the Simulate button.</li>
   </ul>
 
   <h2 id="currency">Supported currencies and methods</h2>
-  <p><b>INR only</b>, paid by <b>UPI</b> (any UPI app or QR scan). GBP, other currencies, cards, net banking and wallets are <b>not supported</b>.</p>
+  <div class="tbl"><table>
+    <tr><th>Currency</th><th>Paid by</th><th>Settles to</th></tr>
+    <tr><td><code>INR</code></td><td>UPI (any UPI app / QR)</td><td>Merchant's Indian bank account, 0% fee</td></tr>
+    <tr><td><code>GBP</code></td><td>Card, via Razorpay hosted checkout</td><td>Merchant's Razorpay account (Razorpay fees apply)</td></tr>
+  </table></div>
+  <p>Other currencies work only if the merchant enables them for Razorpay. Net banking and wallets are not offered through this API.</p>
 
   <h2 id="webhooks">Webhooks</h2>
   <p>Set your webhook URL in the admin panel → <b>API Keys</b>. When a payment is confirmed we send:</p>
@@ -143,7 +154,8 @@ function verifyStockPay(rawBody, headers, secret) {
     <tr><th>HTTP</th><th>code</th><th>Meaning</th></tr>
     <tr><td>400</td><td><code>bad_request</code></td><td>Missing/invalid field.</td></tr>
     <tr><td>400</td><td><code>amount_too_low</code></td><td>Below the merchant's minimum.</td></tr>
-    <tr><td>400</td><td><code>unsupported_currency</code></td><td>Currency other than INR.</td></tr>
+    <tr><td>400</td><td><code>unsupported_currency</code></td><td>Currency not enabled by the merchant.</td></tr>
+    <tr><td>502</td><td><code>provider_error</code></td><td>Razorpay refused to create the card payment (message says why).</td></tr>
     <tr><td>401</td><td><code>unauthorized</code></td><td>Missing or invalid API key.</td></tr>
     <tr><td>404</td><td><code>not_found</code></td><td>Unknown payment ID (or other mode's payment).</td></tr>
     <tr><td>409</td><td><code>reference_conflict</code></td><td>An open payment with this reference has a different amount.</td></tr>

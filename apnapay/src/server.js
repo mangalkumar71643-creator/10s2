@@ -26,7 +26,8 @@ function createApp() {
     });
   });
 
-  app.use(express.json({ limit: '2mb' }));
+  // Keep the raw body: Razorpay webhook signatures are computed over it.
+  app.use(express.json({ limit: '2mb', verify: (req, res, buf) => (req.rawBody = buf.toString('utf8')) }));
   app.use(express.urlencoded({ extended: false, limit: '256kb' }));
   app.use(express.text({ type: ['text/*', 'message/rfc822'], limit: '1mb' }));
 
@@ -44,6 +45,21 @@ function createApp() {
   app.use('/api/v1', require('./routes/api'));
   app.use('/ingest', require('./routes/ingest'));
   app.use('/pay', require('./routes/pay'));
+  // Razorpay → "payment_link.paid" webhook (set this URL in the Razorpay dashboard).
+  app.post('/razorpay/webhook', async (req, res) => {
+    const secret = (await db.getSettings()).razorpay_webhook_secret;
+    if (!require('./razorpay').verifyWebhook(req.rawBody || '', req.headers['x-razorpay-signature'], secret)) {
+      return res.status(400).json({ error: 'bad signature' });
+    }
+    const body = req.body || {};
+    if (body.event === 'payment_link.paid') {
+      const link = body.payload && body.payload.payment_link && body.payload.payment_link.entity;
+      const pay = body.payload && body.payload.payment && body.payload.payment.entity;
+      const order = link && await db.get("SELECT id FROM orders WHERE provider = 'razorpay' AND provider_ref = ?", link.id);
+      if (order) await orders.markProviderPaid(order.id, { paymentId: pay ? pay.id : null, amountPaid: link.amount_paid || null });
+    }
+    res.json({ ok: true });
+  });
   app.use(['/topup', '/add-money'], require('./routes/topup'));
   app.use('/admin/api', require('./routes/admin'));
 

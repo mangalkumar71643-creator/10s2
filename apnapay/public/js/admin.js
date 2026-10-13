@@ -7,6 +7,8 @@
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const inr = (v) => '₹' + Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Amount in an order's own currency (INR by UPI, others e.g. GBP via Razorpay).
+  const money = (v, c) => (!c || c === 'INR' ? inr(v) : ({ GBP: '£', USD: '$', EUR: '€' }[c] || c + ' ') + Number(v || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   const inrShort = (v) => '₹' + Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
   const when = (t) => {
     if (!t) return '—';
@@ -431,7 +433,7 @@
         <div class="tiny muted ellipsis">${esc(o.site)}${o.reference ? ' · ' + esc(o.reference) : ''} · ${when(o.created_at)}</div>
       </div>
       <div style="text-align:right">
-        <div class="amount">${inr(o.amount_paid || o.amount_payable)}</div>
+        <div class="amount">${money(o.amount_paid || o.amount_payable, o.currency)}</div>
         <div style="margin-top:2px">${statusBadge(o.status)}</div>
       </div></div>`;
   }
@@ -461,7 +463,7 @@
               <td><div class="bold">${esc(o.customer.name || '—')}${o.test ? ' <span class="badge warn plain">TEST</span>' : ''}</div><div class="tiny muted mono">${esc(o.reference || o.id)}</div></td>
               <td class="small">${esc(o.site)}</td>
               <td class="small">${esc(o.account || '—')}</td>
-              <td class="amount">${inr(o.amount_paid || o.amount_payable)}</td>
+              <td class="amount">${money(o.amount_paid || o.amount_payable, o.currency)}</td>
               <td>${statusBadge(o.status)}${o.customer_utr && o.status !== 'paid' ? ' <span class="badge info plain">UTR given</span>' : ''}</td>
               <td class="small muted nowrap">${when(o.created_at)}</td>
             </tr>`).join('')}</tbody></table>
@@ -500,12 +502,13 @@
       body: `
         <div class="stack lg">
           <div class="row between wrap">
-            <div><div class="muted small">Amount ${o.amount !== o.amount_payable ? `(price ${inr(o.amount)})` : ''}</div><div style="font-size:30px;font-weight:800">${inr(o.amount_paid || o.amount_payable)}</div></div>
+            <div><div class="muted small">Amount ${o.amount !== o.amount_payable ? `(price ${money(o.amount, o.currency)})` : ''}</div><div style="font-size:30px;font-weight:800">${money(o.amount_paid || o.amount_payable, o.currency)}</div></div>
             ${o.status === 'pending' ? `<a class="btn btn-ghost btn-sm" href="${esc(o.payment_url)}" target="_blank" rel="noopener">${icon.link} Open payment page</a>` : ''}
           </div>
           ${o.status === 'pending' ? copyField(o.payment_url, 'Payment link') : ''}
           <dl class="detail-grid">
             <dt>Order ID</dt><dd class="mono">${esc(o.id)}</dd>
+            ${o.currency && o.currency !== 'INR' ? `<dt>Paid via</dt><dd>Razorpay (card · ${esc(o.currency)})</dd>` : ''}
             ${o.reference ? `<dt>Reference</dt><dd class="mono">${esc(o.reference)}</dd>` : ''}
             <dt>From</dt><dd>${esc(o.site)}</dd>
             <dt>Customer</dt><dd>${esc([o.customer.name, o.customer.phone, o.customer.email].filter(Boolean).join(' · ') || '—')}</dd>
@@ -640,8 +643,10 @@
         <div class="card empty" style="padding:48px 20px">${icon.bank}<h2 style="color:var(--text)">No bank accounts yet</h2>
           <p style="margin:6px 0 16px">Add Kotak, Central Bank, Fino or any bank. Just upload the UPI QR.</p>
           <button class="btn btn-primary" id="addAcc2">${icon.plus} Add bank account</button></div>`}
+      <div id="rzpCard" class="mt"></div>
       <div class="notice mt">${icon.info}<div class="small"><b>How it works:</b> every new order goes to one LIVE bank (by Share). When a bank reaches its daily limit it pauses by itself until tomorrow. Turning a bank OFF does not affect people who are already paying.</div></div>`;
 
+    renderRazorpay($('#rzpCard', page)).catch((err) => ($('#rzpCard', page).innerHTML = `<div class="notice bad">${esc(err.message)}</div>`));
     $('#addAcc').addEventListener('click', () => accountForm(null, devices));
     $('#addAcc2')?.addEventListener('click', () => accountForm(null, devices));
     $$('[data-edit]', page).forEach((b) => b.addEventListener('click', () => accountForm(accounts.find((a) => a.id === Number(b.dataset.edit)), devices)));
@@ -658,6 +663,45 @@
     }));
     bindLiveSwitches(page);
   };
+
+  // Razorpay = second "bank" for international customers (GBP etc. by card).
+  async function renderRazorpay(box) {
+    const r = await api('/razorpay');
+    const state = (ok, label) => `<span class="badge ${ok ? 'live' : 'off'}">${label}: ${ok ? 'Connected' : 'Not set'}</span>`;
+    box.innerHTML = `
+      <form class="card stack" id="rzpForm" autocomplete="off">
+        <div class="row"><div class="bank-logo" style="background:#0c2451;color:#fff;font-size:11px">RZP</div>
+          <div class="grow"><div class="bold" style="font-size:16px">Razorpay — UK / international</div>
+            <div class="small muted">GBP jaise currency ke payment card se. INR pehle jaisa UPI se (0% fee).</div></div></div>
+        <div class="row wrap" style="gap:6px">${state(r.live_ready, 'Live')} ${state(r.test_ready, 'Test')}</div>
+        <div class="form-grid">
+          <div class="field"><label>Live Key ID</label><input class="input mono" name="key_id" value="${esc(r.key_id)}" placeholder="rzp_live_…"></div>
+          <div class="field"><label>Live Key Secret</label><input class="input mono" name="key_secret" placeholder="${esc(r.key_secret || 'Paste secret')}"></div>
+          <div class="field"><label>Test Key ID</label><input class="input mono" name="test_key_id" value="${esc(r.test_key_id)}" placeholder="rzp_test_…"></div>
+          <div class="field"><label>Test Key Secret</label><input class="input mono" name="test_key_secret" placeholder="${esc(r.test_key_secret || 'Paste secret')}"></div>
+          <div class="field full"><label>Currencies (comma)</label><input class="input mono" name="currencies" value="${esc(r.currencies)}" placeholder="GBP">
+            <span class="hint">Developer API mein <code>"currency": "GBP"</code> bhejega to Razorpay ka card page khulega.</span></div>
+        </div>
+        <div class="field"><label>Webhook URL (Razorpay dashboard mein daalo)</label>${copyField(r.webhook_url, 'Razorpay webhook URL')}
+          <span class="hint">Razorpay → Settings → Webhooks → Add: ye URL, event <b>payment_link.paid</b>, aur ek secret. Wahi secret neeche daalo.</span></div>
+        <div class="field"><label>Webhook Secret</label><input class="input mono" name="webhook_secret" placeholder="${esc(r.webhook_secret || 'Same secret as in Razorpay')}"></div>
+        <p class="tiny muted" style="margin:0">Secret wale box khali chhodoge to purana saved secret hi rahega. Key kahan milegi: Razorpay Dashboard → Account &amp; Settings → API Keys.</p>
+        <div class="row wrap"><button class="btn btn-primary">${icon.check} Save</button><button type="button" class="btn btn-ghost" id="rzpCheck">${icon.refresh} Check keys</button></div>
+      </form>`;
+    const f = $('#rzpForm', box);
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy($('button', f), async () => {
+        await api('/razorpay', { method: 'PUT', body: formData(f) });
+        toast('Razorpay saved', 'ok');
+        renderRazorpay(box);
+      });
+    });
+    $('#rzpCheck', box).addEventListener('click', (e) => busy(e.currentTarget, async () => {
+      const c = await api('/razorpay/check', { method: 'POST' });
+      toast(`Live: ${c.live} · Test: ${c.test}`, c.live === 'ok' || c.test === 'ok' ? 'ok' : 'bad');
+    }));
+  }
 
   // Read a QR image in the browser: shrink it, decode with jsQR.
   function readQrFile(file) {
@@ -1056,7 +1100,7 @@
         ? `<p class="small muted" style="margin-bottom:10px">Closest amounts first. Choose the order this money belongs to.</p>
            <div class="card flush">${options.slice(0, 20).map((o) => `<div class="list-item click" data-pick="${esc(o.id)}">
              <div class="grow"><div class="bold">${esc(o.customer.name || o.reference || o.id)}</div><div class="tiny muted">${esc(o.site)} · ${when(o.created_at)}</div></div>
-             <div style="text-align:right"><div class="amount">${inr(o.amount_payable)}</div>${statusBadge(o.status)}</div></div>`).join('')}</div>`
+             <div style="text-align:right"><div class="amount">${money(o.amount_payable, o.currency)}</div>${statusBadge(o.status)}</div></div>`).join('')}</div>`
         : '<div class="empty">No open or expired orders to link.</div>',
     });
     $$('[data-pick]', m.el).forEach((el) => el.addEventListener('click', async () => {
