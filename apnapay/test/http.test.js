@@ -259,3 +259,30 @@ test('live and test API keys: test orders never touch real money', async (t) => 
   assert.equal((await call(site.test_key, '/orders', 'POST', { amount: 100 })).status, 401);
   assert.equal((await call(fresh.test_key, '/orders', 'POST', { amount: 100 })).status, 201);
 });
+
+test('API Keys tab creates keys on first open', async (t) => {
+  const db = require('../src/db');
+  const server = http.createServer(createApp());
+  const base = await listen(server);
+  t.after(() => server.close());
+  let cookie = '';
+  const admin = async (path, method = 'GET', body) => {
+    const r = await fetch(base + '/admin/api' + path, { method, headers: { 'content-type': 'application/json', 'x-requested-with': 'stockpay', cookie }, body: body ? JSON.stringify(body) : undefined });
+    const sc = r.headers.get('set-cookie');
+    if (sc) cookie = sc.split(';')[0];
+    return { status: r.status, data: await r.json() };
+  };
+  await admin('/login', 'POST', { username: 'owner', password: 'supersecret1' });
+  await db.run('UPDATE sites SET active = 0');
+  const first = (await admin('/keys')).data;
+  assert.match(first.api_base, /\/api\/v1$/);
+  assert.equal(first.sites.length, 1);
+  assert.match(first.sites[0].live_key, /^sk_live_/);
+  assert.match(first.sites[0].test_key, /^sk_test_/);
+  // Opening again does not make more websites.
+  assert.equal((await admin('/keys')).data.sites.length, 1);
+  const r = await fetch(first.api_base.replace(/^https?:\/\/[^/]+/, base) + '/orders', {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + first.sites[0].test_key }, body: '{"amount":200}',
+  });
+  assert.equal(r.status, 201);
+});

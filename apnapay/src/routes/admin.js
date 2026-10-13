@@ -368,6 +368,29 @@ router.get('/sites', h(async () => {
   return mapAll(await db.all('SELECT * FROM sites ORDER BY id'), siteView);
 }));
 
+// API Keys tab: everything needed to connect a website, ready to copy. Makes a first website if there is none.
+router.get('/keys', h(async () => {
+  if (!(await db.get('SELECT id FROM sites WHERE active = 1 LIMIT 1'))) {
+    const key = newApiKey();
+    const testKey = newTestKey();
+    const name = (await db.getSettings()).business_name || 'My Shop';
+    await db.run(
+      `INSERT INTO sites (name, api_key_hash, api_key_hint, live_key, test_key, test_key_hash, webhook_url, webhook_secret, return_url, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, '', ?, '', ?)`,
+      name, sha256(key), keyHint(key), key, testKey, sha256(testKey), newSecret(), Date.now(),
+    );
+    await db.logActivity('info', `API keys created for ${name}`);
+  }
+  for (const s of await db.all('SELECT id FROM sites WHERE test_key IS NULL')) {
+    const key = newTestKey();
+    await db.run('UPDATE sites SET test_key = ?, test_key_hash = ? WHERE id = ?', key, sha256(key), s.id);
+  }
+  return {
+    api_base: `${config.baseUrl}/api/v1`,
+    sites: await mapAll(await db.all('SELECT * FROM sites WHERE active = 1 ORDER BY id'), siteView),
+  };
+}));
+
 router.post('/sites', h(async (req) => {
   const name = str(req.body.name, 60);
   if (!name) throw bad('Website name is required');

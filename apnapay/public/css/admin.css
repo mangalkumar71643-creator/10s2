@@ -31,13 +31,13 @@
   .main { padding: 18px 16px 110px; }
   .topbar h1 { font-size: 21px; }
   .bottom-nav {
-    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
+    display: grid; grid-template-columns: repeat(6, 1fr); position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
     background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(12px);
     border-top: 1px solid var(--border); padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   }
   .bottom-nav a {
     display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border-radius: 12px;
-    color: var(--muted); font-size: 11px; font-weight: 600; text-decoration: none !important; position: relative;
+    color: var(--muted); font-size: 10.5px; font-weight: 600; text-decoration: none !important; position: relative;
   }
   .bottom-nav a svg { width: 22px; height: 22px; }
   .bottom-nav a.active { color: var(--brand); }

@@ -48,6 +48,7 @@
     whatsapp: I('<path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z"/><path d="M9 9.5c.5 2 2.5 4 4.5 4.5l1-1.2 2 .8-.4 1.6c-3.8.2-7.8-3.8-7.6-7.6l1.6-.4.8 2z"/>'),
     search: I('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>'),
     inbox: I('<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 2h6l1-2h5"/>'),
+    key: I('<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/>'),
     upload: I('<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/>'),
   };
 
@@ -231,13 +232,14 @@
   const NAV = [
     { id: 'dashboard', label: 'Dashboard', icon: 'home' },
     { id: 'orders', label: 'Orders', icon: 'receipt' },
+    { id: 'keys', label: 'API Keys', short: 'Keys', icon: 'key' },
     { id: 'accounts', label: 'Bank Accounts', short: 'Banks', icon: 'bank' },
     { id: 'messages', label: 'Bank Messages', short: 'Messages', icon: 'msg' },
     { id: 'devices', label: 'Phones', icon: 'phone' },
     { id: 'sites', label: 'Websites & API', icon: 'globe' },
     { id: 'settings', label: 'Settings', icon: 'gear' },
   ];
-  const MOBILE_NAV = ['dashboard', 'orders', 'accounts', 'messages'];
+  const MOBILE_NAV = ['dashboard', 'orders', 'keys', 'accounts', 'messages'];
   const IN_APP = /ApnaPayApp/.test(navigator.userAgent);
   let badges = { messages: 0 };
 
@@ -1069,6 +1071,67 @@
       }
     }));
   }
+
+  // ---------------------------------------------------------------- API keys
+  pages.keys = async (page) => {
+    const d = await api('/keys');
+    const keyBlock = (label, badge, value, copyLabel, note) => `
+      <div class="field"><label><span class="badge ${badge} plain">${label}</span></label>
+        ${value ? copyField(value, copyLabel) : ''}${note ? `<span class="hint">${note}</span>` : ''}</div>`;
+    page.innerHTML = `
+      ${topbar('🔑 API Keys', 'Apni shop / website ko StockPay se jodne ke liye — copy karo aur lagao')}
+      <div class="notice warn" style="margin-bottom:16px">${icon.shield}<div class="small">Keys sirf apne <b>server</b> code mein rakho — browser JavaScript ya app ke andar nahi. Kisi ko mat bhejo. Lagta hai key leak hui? "New" dabao, purani turant band.</div></div>
+      <div class="card stack" style="margin-bottom:16px">
+        <div class="field"><label>API URL</label>${copyField(d.api_base, 'API URL')}</div>
+      </div>
+      <div class="stack lg">${d.sites.map((s) => `
+        <div class="card stack">
+          <div class="row"><div class="bank-logo" style="background:var(--brand-soft);color:var(--brand)">${icon.globe}</div>
+            <div class="grow"><div class="bold">${esc(s.name)}</div><div class="tiny muted">${s.orders} orders</div></div></div>
+          ${keyBlock('LIVE KEY', 'live', s.live_key, 'Live API key', s.live_key ? 'Asli payment ke liye.' : `Purani key dobara nahi dikh sakti. <a href="#" data-knew="${s.id}">Nayi live key banao</a> — fir hamesha yahan dikhegi.`)}
+          ${keyBlock('TEST KEY', 'warn', s.test_key, 'Test API key', 'Bina paise ke testing — payment page par "Simulate payment" button aata hai.')}
+          ${keyBlock('WEBHOOK SECRET', 'info', s.webhook_secret, 'Webhook secret', 'Isse check karo ki "payment ho gaya" message sach mein StockPay se aaya hai.')}
+          <form class="row" data-wh="${s.id}" style="align-items:flex-end">
+            <div class="field grow"><label>Webhook URL (aapki website)</label><input class="input mono" name="webhook_url" value="${esc(s.webhook_url)}" placeholder="https://myshop.in/webhook.php"></div>
+            <button class="btn btn-primary">Save</button></form>
+          <div class="row wrap">
+            <button class="btn btn-ghost btn-sm" data-knew="${s.id}">${icon.refresh} New live key</button>
+            <button class="btn btn-ghost btn-sm" data-ktest="${s.id}">${icon.refresh} New test key</button>
+            ${s.webhook_url ? `<button class="btn btn-ghost btn-sm" data-ktry="${s.id}">${icon.send} Test webhook</button>` : ''}
+          </div>
+        </div>`).join('')}</div>
+      <div class="card stack mt">
+        <h2>Test karo (copy karke chalao)</h2>
+        ${d.sites[0] && d.sites[0].test_key ? copyField(`curl -X POST ${d.api_base}/orders -H "Authorization: Bearer ${d.sites[0].test_key}" -H "Content-Type: application/json" -d '{"amount":200,"reference":"TEST-1"}'`, 'Command') : ''}
+        <p class="small muted" style="margin:0">Jawab mein <code>payment_url</code> milega — use kholo aur "Simulate payment" dabao. Poori guide: <a href="#/sites">Websites &amp; API</a> page.</p>
+      </div>`;
+
+    $$('[data-knew]', page).forEach((b) => b.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (!(await confirmBox('Nayi LIVE key banaye?', 'Purani live key turant band ho jayegi. Website par nayi key lagani padegi.'))) return;
+      await api(`/sites/${b.dataset.knew}/new-key`, { method: 'POST' });
+      toast('Nayi live key ban gayi — Copy kar lo', 'ok');
+      route();
+    }));
+    $$('[data-ktest]', page).forEach((b) => b.addEventListener('click', async () => {
+      if (!(await confirmBox('Nayi TEST key banaye?', 'Purani test key band ho jayegi.'))) return;
+      await api(`/sites/${b.dataset.ktest}/new-test-key`, { method: 'POST' });
+      toast('Nayi test key ban gayi', 'ok');
+      route();
+    }));
+    $$('[data-ktry]', page).forEach((b) => b.addEventListener('click', () => busy(b, async () => {
+      const r = await api(`/sites/${b.dataset.ktry}/test-webhook`, { method: 'POST' });
+      toast(r.ok ? `Webhook OK (HTTP ${r.status}) ✅` : `Webhook failed: ${r.error || 'HTTP ' + r.status}`, r.ok ? 'ok' : 'bad');
+    })));
+    $$('[data-wh]', page).forEach((f) => f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy($('button', f), async () => {
+        await api('/sites/' + f.dataset.wh, { method: 'PUT', body: formData(f) });
+        toast('Webhook URL saved', 'ok');
+        route();
+      });
+    }));
+  };
 
   // ---------------------------------------------------------------- websites
   pages.sites = async (page) => {
