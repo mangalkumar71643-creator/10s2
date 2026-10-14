@@ -101,6 +101,7 @@ export interface BackendTransaction {
     | 'WITHDRAWAL_REVERSAL';
   amount: string;
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  provider: string | null;
   createdAt: string;
 }
 
@@ -879,6 +880,33 @@ export function playFortuneSix(stake: number, picks: number[]) {
 
 export function fetchFortuneSixHistory(limit = 30) {
   return apiFetch<FortuneSixBetRow[]>(`/fortune-six/my-history?limit=${limit}`);
+}
+
+export interface UpiDepositStatus {
+  enabled: boolean;
+  testMode: boolean;
+  gateway: 'stockpay' | null;
+  gatewayName: string | null;
+  reason: string | null;
+  min?: number;
+  max?: number;
+  currency?: string;
+}
+export interface UpiDepositResult {
+  status: 'COMPLETED' | 'FAILED' | 'PENDING';
+  amount: number;
+  bonus: number;
+  alreadyCredited: boolean;
+}
+export function fetchUpiDepositStatus() {
+  return apiFetch<UpiDepositStatus>('/wallet/upi/status');
+}
+export function startUpiCheckout(amount: number) {
+  return apiFetch<{ sessionId: string; url: string }>('/wallet/upi/checkout', { method: 'POST', body: JSON.stringify({ amount }) });
+}
+/** Settles this player's open UPI payments (or just `sessionId`) with StockPay. */
+export function confirmUpiDeposits(sessionId?: string) {
+  return apiFetch<{ results: UpiDepositResult[] }>('/wallet/upi/confirm', { method: 'POST', body: JSON.stringify(sessionId ? { sessionId } : {}) });
 }
 
 export interface MinesConfig {

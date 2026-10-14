@@ -256,7 +256,10 @@ model Wallet {
   userId   String  @unique
   user     User    @relation(fields: [userId], references: [id])
   balance  Decimal @default(0) @db.Decimal(12, 2)
-  currency String  @default("GBP")
+  // Wallets are rupee-denominated: StockPay deposits are INR by UPI.
+  // Existing rows pre-dating the switch are converted by
+  // prisma/sql/20261014_wallet_currency_inr.sql.
+  currency String  @default("INR")
 
   // Bonus funds already added to `balance` (so they're immediately
   // playable) but not yet withdrawable until `wageringProgress` reaches
