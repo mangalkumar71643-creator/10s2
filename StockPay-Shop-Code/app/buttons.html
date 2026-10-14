@@ -1,0 +1,31 @@
+<!--
+  StockPay "Add Money" buttons — for a website, or an app that shows web pages (WebView).
+  Paste this where the ₹200 / ₹400 ... buttons should appear.
+  It calls YOUR server (/stockpay/add-money). The StockPay key is never in the app.
+-->
+<div class="add-money">
+  <button onclick="addMoney(200)">₹200</button>
+  <button onclick="addMoney(400)">₹400</button>
+  <button onclick="addMoney(600)">₹600</button>
+  <button onclick="addMoney(800)">₹800</button>
+  <button onclick="addMoney(1000)">₹1000</button>
+</div>
+
+<script>
+  async function addMoney(amount) {
+    try {
+      const res = await fetch('/stockpay/add-money', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'include', // sends the login cookie
+        body: JSON.stringify({ amount: amount }),
+      });
+      const data = await res.json();
+      if (!res.ok) return alert(data.error || 'Please try again');
+      // Opens the StockPay page with the QR code and PhonePe / GPay / Paytm buttons.
+      window.location.href = data.payment_url;
+    } catch (e) {
+      alert('No internet, please try again');
+    }
+  }
+</script>
