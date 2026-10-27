@@ -1,0 +1,16 @@
+{
+  "name": "nova-ai-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Chat backend for Nova AI. Streams replies from any OpenAI-compatible model (OpenAI, Ollama, vLLM, LM Studio, your own trained model) or a built-in demo model.",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --watch --env-file-if-exists=.env src/index.js",
+    "test": "node --test test/*.test.js"
+  }
+}
